@@ -80,3 +80,42 @@ describe('navigation par période', () => {
     expect(libelleJourCourt('2026-11-02')).toEqual({ nom: 'lun.', numero: 2 })
   })
 })
+
+describe("semaines de changement d'heure (arithmétique en UTC, jamais le fuseau de la machine)", () => {
+  it("fin de l'heure d'été : dimanche 25 octobre 2026 (semaine ISO 43)", () => {
+    const semaine = joursDeLaSemaine('2026-10-25')
+    expect(semaine).toEqual([
+      '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25',
+    ])
+    expect(joursDeLaSemaine('2026-10-19')).toEqual(semaine)
+    expect(lundiDe('2026-10-25')).toBe('2026-10-19')
+    expect(numeroSemaine('2026-10-25')).toBe(43)
+    expect(numeroSemaine('2026-10-26')).toBe(44) // lundi suivant
+    expect(joursDeLaSemaine('2026-10-26')[0]).toBe('2026-10-26')
+  })
+
+  it("début de l'heure d'été : dimanche 28 mars 2027 (semaine ISO 12)", () => {
+    const semaine = joursDeLaSemaine('2027-03-28')
+    expect(semaine).toEqual([
+      '2027-03-22', '2027-03-23', '2027-03-24', '2027-03-25', '2027-03-26', '2027-03-27', '2027-03-28',
+    ])
+    expect(joursDeLaSemaine('2027-03-22')).toEqual(semaine)
+    expect(lundiDe('2027-03-28')).toBe('2027-03-22')
+    expect(numeroSemaine('2027-03-28')).toBe(12)
+    expect(numeroSemaine('2027-03-29')).toBe(13)
+    expect(joursDeLaSemaine('2027-03-29')[0]).toBe('2027-03-29')
+  })
+
+  it("les mois qui contiennent un changement d'heure ont des jours consécutifs et uniques", () => {
+    for (const mois of ['2026-10', '2027-03']) {
+      const jours = joursDuMois(mois)
+      expect(new Set(jours).size).toBe(jours.length)
+      expect(jours.length % 7).toBe(0)
+      for (let i = 1; i < jours.length; i++) {
+        expect(Date.parse(`${jours[i]}T00:00:00Z`) - Date.parse(`${jours[i - 1]}T00:00:00Z`)).toBe(86_400_000)
+      }
+    }
+    expect(joursDuMois('2026-10')).toContain('2026-10-25')
+    expect(joursDuMois('2027-03')).toContain('2027-03-28')
+  })
+})

@@ -50,7 +50,6 @@ export function VueMois({ mois, onOuvrirJour }: Props) {
               data-charge={charge}
               data-hors-mois={j.slice(0, 7) !== mois}
               data-aujourdhui={j === aujourdhui}
-              data-dense={ratio > 0.6}
               style={{ '--charge': ratio } as CSSProperties}
               aria-label={description}
               aria-current={j === aujourdhui ? 'date' : undefined}

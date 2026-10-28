@@ -366,14 +366,6 @@
   opacity: var(--charge, 0);
 }
 
-.mois-jour[data-dense='true'] {
-  color: var(--on-accent);
-}
-
-.mois-jour[data-hors-mois='true'] .mois-numero {
-  opacity: 0.45;
-}
-
 .mois-jour[data-aujourdhui='true'] {
   box-shadow: inset 0 0 0 2px var(--now);
 }
@@ -382,21 +374,38 @@
   outline-offset: -3px;
 }
 
+/* Le numéro et la charge sont posés sur une pastille pleine (--panel / --ink) : leur lisibilité ne dépend
+   jamais de la teinte d'encre du carreau (opacité min(1, charge / 480)). Contrastes : voir le rapport. */
+.mois-numero,
+.mois-charge {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+}
+
 .mois-numero {
   font-family: 'Bricolage Grotesque', system-ui, sans-serif;
   font-weight: 700;
   font-size: var(--fs-4);
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
-.mois-jour[data-aujourdhui='true']:not([data-dense='true']) .mois-numero {
-  color: var(--now);
+.mois-jour[data-hors-mois='true'] .mois-numero {
+  color: var(--muted);
+}
+
+/* Aujourd'hui : numéro en pastille inversée (encre pleine), en plus du liseré rouge du carreau. */
+.mois-jour[data-aujourdhui='true'] .mois-numero {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .mois-charge {
   font-family: 'Bricolage Grotesque', system-ui, sans-serif;
   font-weight: 500;
   font-size: var(--fs-2);
+  line-height: 1.3;
 }
 
 @media (hover: hover) {

@@ -102,29 +102,48 @@ export const DONNEES = {
   ],
 }
 
-/** Écrit les tables dans IndexedDB (la base existe déjà : l'app a démarré), puis recharge la page. */
+/**
+ * Écrit les tables dans IndexedDB, puis recharge la page. Attend d'abord que l'app ait créé son schéma
+ * (Dexie le fait à l'ouverture de la base) : on n'ouvre jamais la base avant, ce qui en créerait une vide.
+ */
 export async function semer(page: Page, extra: { creneaux?: Ligne[]; reglages?: Ligne } = {}): Promise<void> {
+  await page.getByRole('region', { name: 'Calendrier' }).waitFor()
   const donnees = { ...DONNEES, creneaux: [...DONNEES.creneaux, ...(extra.creneaux ?? [])] }
   await page.evaluate(
-    ([d, reglages]) =>
-      new Promise<void>((resolve, reject) => {
-        const ouverture = indexedDB.open('revisions')
-        ouverture.onerror = () => reject(ouverture.error)
-        ouverture.onsuccess = () => {
-          const base = ouverture.result
-          const tables = ['colleges', 'items', 'creneaux', 'indispos', 'meta'] as const
-          const tx = base.transaction([...tables], 'readwrite')
-          for (const t of ['colleges', 'items', 'creneaux', 'indispos'] as const) {
-            for (const ligne of (d as Record<string, unknown[]>)[t]) tx.objectStore(t).put(ligne)
-          }
-          if (reglages) tx.objectStore('meta').put({ cle: 'reglages', valeur: reglages })
-          tx.oncomplete = () => {
-            base.close()
-            resolve()
-          }
-          tx.onerror = () => reject(tx.error)
+    async ([d, reglages]) => {
+      const tables = ['colleges', 'items', 'creneaux', 'indispos', 'meta'] as const
+      const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms))
+      const ouvrir = () =>
+        new Promise<IDBDatabase>((resolve, reject) => {
+          const o = indexedDB.open('revisions')
+          o.onerror = () => reject(o.error)
+          o.onsuccess = () => resolve(o.result)
+        })
+      let base: IDBDatabase | null = null
+      for (let essai = 0; essai < 100 && base === null; essai++) {
+        const existe = (await indexedDB.databases()).some((b) => b.name === 'revisions')
+        if (existe) {
+          const ouverte = await ouvrir()
+          if (tables.every((t) => ouverte.objectStoreNames.contains(t))) base = ouverte
+          else ouverte.close()
         }
-      }),
+        if (base === null) await attendre(100)
+      }
+      if (base === null) throw new Error("le schéma de la base « revisions » n'a pas été créé")
+      const ouverte = base
+      await new Promise<void>((resolve, reject) => {
+        const tx = ouverte.transaction([...tables], 'readwrite')
+        for (const t of ['colleges', 'items', 'creneaux', 'indispos'] as const) {
+          for (const ligne of (d as Record<string, unknown[]>)[t]) tx.objectStore(t).put(ligne)
+        }
+        if (reglages) tx.objectStore('meta').put({ cle: 'reglages', valeur: reglages })
+        tx.oncomplete = () => {
+          ouverte.close()
+          resolve()
+        }
+        tx.onerror = () => reject(tx.error)
+      })
+    },
     [donnees, extra.reglages ?? null] as const,
   )
   await page.reload()
