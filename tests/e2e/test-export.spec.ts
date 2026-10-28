@@ -31,7 +31,7 @@ test('le téléchargement contient 2 événements en SEQUENCE:1', async ({ page 
 
 test('le réexport passe en SEQUENCE:2 avec test-1 à 11h', async ({ page }) => {
   await page.goto('./#test-export')
-  // Le partage de fichiers est indisponible dans WebKit de Playwright : repli sur le téléchargement.
+  // Sans méthode forcée, le bouton 3 livre par téléchargement.
   const ics = await contenuTelecharge(page, '3. Réexporter modifié')
   expect(ics).toContain('SEQUENCE:2')
   expect(ics).toMatch(

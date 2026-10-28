@@ -65,6 +65,9 @@ export function TestExport() {
       <button type="button" style={styleBouton} onClick={() => exporter(2, 11)}>
         3. Réexporter modifié
       </button>
+      <p style={{ margin: 0, color: 'var(--muted)' }}>
+        Après l’import, regarde demain : l’événement de 10h est-il déplacé à 11h ou dupliqué ?
+      </p>
       <a
         href={`${location.origin}${location.pathname}#test-export`}
         target="_blank"

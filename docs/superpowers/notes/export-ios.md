@@ -13,13 +13,14 @@ Sur l'iPad d'Emma, avec un calendrier « Test » créé dans l'app Calendrier :
 
 ## Résultats
 
-- Bouton 1 (partage) :
-- Bouton 2 (téléchargement) :
+Test sur iPad le 28/10/2026.
+
+- Bouton 1 (partage) : la feuille de partage n'offre pas Calendrier, inutilisable.
+- Bouton 2 (téléchargement) : ouvre l'écran d'import natif du Calendrier, événements ajoutés correctement.
 - Bouton 4 (Ouvrir dans Safari) :
-- Bouton 3 (réexport modifié) : déplacé / dupliqué
+- Bouton 3 (réexport modifié) : à retester en téléchargement (mise à jour ou doublon ?).
 
 ## Décision
 
-- `MODE_EXPORT` : `'maj'` si déplacé, `'nouveaux'` si dupliqué.
-- Ordre de `livrerIcs` : mettre en premier la méthode qui fonctionne.
-- Si aucune méthode ne fonctionne depuis l'écran d'accueil mais que l'une fonctionne dans Safari, l'export passera par le lien « Ouvrir dans Safari ».
+- Livraison par téléchargement (`livrerIcs` : téléchargement par défaut, partage seulement si forcé).
+- `MODE_EXPORT` : en attente du retest du bouton 3 (`'maj'` si déplacé, `'nouveaux'` si dupliqué).

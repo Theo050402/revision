@@ -13,9 +13,12 @@ function telecharger(contenu: string, nomFichier: string): void {
 }
 
 /**
- * Livre un fichier .ics selon l'ordre de la §12.4 : partage de fichier, puis
- * téléchargement. `methode` force une méthode (écran de test) ; si le partage
- * de fichier est indisponible, on se rabat sur le téléchargement.
+ * Livre un fichier .ics. Par défaut : téléchargement seul. Test sur iPad
+ * (28/10/2026) : la feuille de partage d'iOS n'offre pas l'app Calendrier pour
+ * un .ics, alors qu'un téléchargement ouvre l'écran d'import natif du
+ * Calendrier. `methode: 'partage'` force la tentative de partage de fichier
+ * (écran de test), avec repli sur le téléchargement si le partage est
+ * indisponible ou échoue.
  * Renvoie la méthode réellement utilisée, ou `'annule'` si l'utilisateur a
  * fermé la feuille de partage.
  */
@@ -24,7 +27,7 @@ export async function livrerIcs(
   nomFichier: string,
   methode?: MethodeLivraison,
 ): Promise<MethodeLivraison | 'annule'> {
-  if (methode !== 'telechargement') {
+  if (methode === 'partage') {
     const fichier = new File([contenu], nomFichier, { type: 'text/calendar' })
     if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [fichier] })) {
       try {
