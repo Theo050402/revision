@@ -28,20 +28,40 @@ export async function lirePdf(
   onProgres: (fait: number, total: number) => void,
 ): Promise<ResultatLecture> {
   const worker = new Worker(new URL('./pdf.worker.ts', import.meta.url), { type: 'module' })
+  // Les gestionnaires d'échec sont posés tout de suite, avant le moindre `await` : un worker qui plante
+  // (script introuvable, message non clonable…) fait échouer la lecture au lieu de la laisser pendante.
+  let echouer: (e: ErreurPdf) => void = () => {}
+  const echec = new Promise<never>((_, rejeter) => {
+    echouer = rejeter
+  })
+  echec.catch(() => {}) // jamais « non gérée » si l'échec survient hors d'une attente
+  worker.onerror = (e) => echouer(new ErreurPdf('illisible', { cause: e }))
+  worker.onmessageerror = () => echouer(new ErreurPdf('illisible'))
+
+  // Un rappel de progression qui lève ne doit ni interrompre ni bloquer la lecture.
+  const progres = (fait: number, total: number) => {
+    try {
+      onProgres(fait, total)
+    } catch (e) {
+      console.warn('lirePdf : le rappel de progression a levé une erreur', e)
+    }
+  }
+
   try {
     const demander = (message: MessageVersWorker, transfert: Transferable[] = []) =>
-      new Promise<Extract<MessageDepuisWorker, { type: 'pages' }>>((resolve, reject) => {
-        worker.onmessage = (e: MessageEvent<MessageDepuisWorker>) => {
-          const m = e.data
-          if (m.type === 'progres') onProgres(m.fait, m.total)
-          else if (m.type === 'pages') resolve(m)
-          // pdf.js démarre son moteur dans le worker (pas de worker imbriqué) et y poste un message « ready » : on l'ignore.
-          else if (m.type === 'erreur') reject(new ErreurPdf('illisible', { cause: new Error(`${m.nom} : ${m.message}`) }))
-        }
-        worker.onerror = (e) => reject(new ErreurPdf('illisible', { cause: e }))
-        worker.onmessageerror = () => reject(new ErreurPdf('illisible'))
-        worker.postMessage(message, transfert)
-      })
+      Promise.race([
+        new Promise<Extract<MessageDepuisWorker, { type: 'pages' }>>((resolve, reject) => {
+          worker.onmessage = (e: MessageEvent<MessageDepuisWorker>) => {
+            const m = e.data
+            if (m.type === 'progres') progres(m.fait, m.total)
+            else if (m.type === 'pages') resolve(m)
+            // pdf.js démarre son moteur dans le worker (pas de worker imbriqué) et y poste un message « ready » : on l'ignore.
+            else if (m.type === 'erreur') reject(new ErreurPdf('illisible', { cause: new Error(`${m.nom} : ${m.message}`) }))
+          }
+          worker.postMessage(message, transfert)
+        }),
+        echec,
+      ])
 
     let buffer: ArrayBuffer
     try {
@@ -51,7 +71,7 @@ export async function lirePdf(
     }
     const debut = await demander({ buffer, pages: 'debut' }, [buffer])
     const resultat = await extraireEntrees(debut.pages, async () => (await demander({ pages: 'toutes' })).pages)
-    onProgres(debut.nbPages, debut.nbPages)
+    progres(debut.nbPages, debut.nbPages)
     return { ...resultat, nbPages: debut.nbPages }
   } finally {
     worker.terminate()

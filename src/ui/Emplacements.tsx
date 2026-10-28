@@ -1,11 +1,18 @@
 // Emplacements des écrans des tâches suivantes. Chacun est remplacé tel quel par le vrai contenu ;
-// aucun ne contient de logique.
+// aucun ne contient de logique (sauf le bouton « + Collège », qui reste).
+import { ouvrirImport } from './importDemande'
 
 /** Contenu de la bibliothèque d'items (tâche 16) : dans le panneau (iPad) ou la feuille (iPhone). */
 export function EmplacementBibliotheque() {
   return (
-    <div className="emplacement" data-emplacement="bibliotheque">
-      <p>La bibliothèque d'items arrive ici.</p>
+    <div className="bibliotheque">
+      {/* Le bouton reste en tête de la bibliothèque (panneau iPad, feuille iPhone) quand la vraie liste arrive. */}
+      <button type="button" className="btn-ajout" onClick={() => ouvrirImport()}>
+        + Collège
+      </button>
+      <div className="emplacement" data-emplacement="bibliotheque">
+        <p>La bibliothèque d'items arrive ici.</p>
+      </div>
     </div>
   )
 }
@@ -17,18 +24,6 @@ export function EmplacementCalendrier({ vue }: { vue: string }) {
       <div className="carte carte-vide">
         <h1 id="titre-calendrier">Calendrier</h1>
         <p>La vue {vue} arrive ici.</p>
-      </div>
-    </section>
-  )
-}
-
-/** Parcours d'import d'un PDF (tâche 15). Aucune entrée n'y mène tant qu'il n'existe pas. */
-export function EmplacementImport() {
-  return (
-    <section className="ecran ecran-centre" aria-labelledby="titre-import" data-emplacement="import">
-      <div className="carte carte-vide">
-        <h1 id="titre-import">Importer un PDF</h1>
-        <p>Le parcours d'import arrive ici.</p>
       </div>
     </section>
   )

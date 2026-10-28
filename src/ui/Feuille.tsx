@@ -5,7 +5,18 @@ import { useEffect, useRef, type ReactNode } from 'react'
  * ferment ; le focus entre dans la feuille. Le parent rend le reste de l'interface inerte pendant
  * ce temps et rend le focus au bouton qui l'a ouverte.
  */
-export function Feuille({ titre, onFermer, children }: { titre: string; onFermer: () => void; children: ReactNode }) {
+export function Feuille({
+  titre,
+  onFermer,
+  className,
+  children,
+}: {
+  titre: string
+  onFermer: () => void
+  /** Classe en plus (ex. feuille étroite et centrée sur iPad). */
+  className?: string
+  children: ReactNode
+}) {
   const fermer = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -20,7 +31,7 @@ export function Feuille({ titre, onFermer, children }: { titre: string; onFermer
   return (
     <div className="feuille-fond" onClick={onFermer}>
       <div
-        className="feuille"
+        className={className ? `feuille ${className}` : 'feuille'}
         role="dialog"
         aria-modal="true"
         aria-labelledby="titre-feuille"

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { jourDe, utcVersLocal } from '../domain/temps'
 import { BarreHaut } from './BarreHaut'
 import type { Ecran, Vue } from './ecran'
-import { EmplacementBibliotheque, EmplacementCalendrier, EmplacementImport, EmplacementRestauration } from './Emplacements'
+import { EmplacementBibliotheque, EmplacementCalendrier, EmplacementRestauration } from './Emplacements'
 import { Feuille } from './Feuille'
+import { fermerImport, useDemandeImport } from './importDemande'
+import { Import } from './screens/Import'
 import { Reglages } from './screens/Reglages'
 import { TestExport } from './screens/TestExport'
 import { useStore } from './store'
@@ -76,7 +78,10 @@ function Coque() {
   const peutAnnuler = useStore((s) => s.passe.length > 0)
   const peutRetablir = useStore((s) => s.futur.length > 0)
 
-  const [ecran, setEcran] = useState<Ecran>('calendrier')
+  const [ecranChoisi, setEcran] = useState<Ecran>('calendrier')
+  // Le parcours d'import peut être ouvert de partout (bibliothèque, Réglages) : il passe avant l'écran choisi.
+  const importOuvert = useDemandeImport((s) => s.ouvert)
+  const ecran: Ecran = importOuvert ? 'import' : ecranChoisi
   const [vue, setVue] = useState<Vue>(() => (disposition === 'ipad' ? 'semaine' : 'jour'))
   const [panneauOuvert, setPanneauOuvert] = useState(true)
   const [feuilleOuverte, setFeuilleOuverte] = useState(false)
@@ -95,9 +100,14 @@ function Coque() {
     if (!el) return
     el.toggleAttribute('inert', feuilleVisible)
     if (feuilleVisible) feuilleDejaVue.current = true
-    else if (feuilleDejaVue.current) boutonItems.current?.focus({ preventScroll: true })
+    else if (feuilleDejaVue.current && !useDemandeImport.getState().ouvert) boutonItems.current?.focus({ preventScroll: true })
     return () => el.removeAttribute('inert')
   }, [feuilleVisible])
+
+  // L'import commence depuis la feuille de la bibliothèque (iPhone) : elle se ferme pour laisser place à l'écran.
+  useEffect(() => {
+    if (importOuvert) setFeuilleOuverte(false)
+  }, [importOuvert])
 
   const fermerFeuille = useCallback(() => setFeuilleOuverte(false), [])
   const { annuler, retablir } = useStore.getState()
@@ -127,9 +137,13 @@ function Coque() {
             onVue={(v) => {
               setVue(v)
               setEcran('calendrier')
+              fermerImport()
             }}
             ecran={ecran}
-            onReglages={() => setEcran((e) => (e === 'reglages' ? 'calendrier' : 'reglages'))}
+            onReglages={() => {
+              fermerImport()
+              setEcran(ecran === 'reglages' ? 'calendrier' : 'reglages')
+            }}
             peutAnnuler={peutAnnuler}
             peutRetablir={peutRetablir}
             onAnnuler={annuler}
@@ -149,7 +163,14 @@ function Coque() {
           <main className="zone">
             {ecran === 'calendrier' && <EmplacementCalendrier vue={vue} />}
             {ecran === 'reglages' && <Reglages onRetour={() => setEcran('calendrier')} />}
-            {ecran === 'import' && <EmplacementImport />}
+            {ecran === 'import' && (
+              <Import
+                onTermine={(enregistre) => {
+                  fermerImport()
+                  if (enregistre) setEcran('calendrier')
+                }}
+              />
+            )}
           </main>
 
           {disposition === 'iphone' && (
