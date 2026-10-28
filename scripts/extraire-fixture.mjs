@@ -2,6 +2,8 @@
 // Extrait les fragments de texte (coordonnées en points, origine en haut) de chaque page.
 import { readFileSync, writeFileSync } from 'node:fs'
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
+// Même conversion que le worker de l'app (coordonnées identiques). Node charge ce .ts en retirant les types.
+import { fragmentsDe } from '../src/import/textePdf.ts'
 
 const [entree, sortie] = process.argv.slice(2)
 if (!entree || !sortie) {
@@ -17,16 +19,9 @@ for (let p = 1; p <= doc.numPages; p++) {
   const page = await doc.getPage(p)
   const hauteur = page.getViewport({ scale: 1 }).height
   const contenu = await page.getTextContent()
-  const fragments = contenu.items
-    .filter((it) => 'str' in it && it.str.trim() !== '')
+  const fragments = fragmentsDe(contenu.items, hauteur)
     // Pied de page publicitaire (filigrane du PDF source) : retiré pour ne pas publier d'URL tierces dans le dépôt public.
-    .filter((it) => !/amis-med|t\.me\/|Pour avoir plus d/i.test(it.str))
-    .map((it) => ({
-      str: it.str,
-      x: arrondi(it.transform[4]),
-      y: arrondi(hauteur - it.transform[5]),
-      h: arrondi(it.height),
-    }))
+    .filter((fr) => !/amis-med|t\.me\/|Pour avoir plus d/i.test(fr.str))
   pages.push({ page: p, hauteur: arrondi(hauteur), fragments })
 }
 writeFileSync(sortie, JSON.stringify(pages))
