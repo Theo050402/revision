@@ -1,0 +1,14 @@
+# Compagnon visuel du brainstorming
+.superpowers/
+
+# Collèges : jamais dans le dépôt (droits d'auteur, taille)
+*.pdf
+
+# Node / Vite
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+.DS_Store
