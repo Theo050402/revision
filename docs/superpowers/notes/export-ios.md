@@ -6,7 +6,7 @@ Valeur retenue : `MODE_EXPORT` dans `src/ics/mode.ts` (à fixer après le test).
 
 Sur l'iPad d'Emma, avec un calendrier « Test » créé dans l'app Calendrier :
 
-1. Ouvrir `https://<compte>.github.io/revisions/#test-export` dans Safari.
+1. Ouvrir `https://theo050402.github.io/revision/#test-export` dans Safari.
 2. Faire « Partager › Sur l'écran d'accueil », puis ouvrir l'app depuis l'icône.
 3. Essayer les boutons 1 et 2, et noter lequel ouvre l'écran d'import du Calendrier.
 4. Après l'import, essayer le bouton 3 et noter si `test-1` est **déplacé** à 11 h ou **dupliqué**.

@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: 'tests/e2e',
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:4173/revisions/',
+    baseURL: 'http://localhost:4173/revision/',
   },
   projects: [
     {
@@ -18,7 +18,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run build && npx vite preview --port 4173',
-    url: 'http://localhost:4173/revisions/',
+    url: 'http://localhost:4173/revision/',
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },
