@@ -30,11 +30,14 @@
   --accent: #a490c2;
   --on-accent: #241934;
   --now: #f29e8e;
-  --margin: #f29e8e;
+  --margin: #b86f6a;
   --lock-bg: #3a2d53;
+  --grille: #3a2d53;
   color-scheme: dark;
 }
 
+/* GARDER EN PHASE : ce bloc recopie à l'identique le thème sombre ci-dessus (une valeur modifiée
+   dans l'un doit l'être dans l'autre) ; il ne s'applique qu'en `auto` sur un appareil sombre. */
 @media (prefers-color-scheme: dark) {
   :root[data-theme='auto'] {
     --bg: #2b1e3e;
@@ -48,10 +51,22 @@
     --accent: #a490c2;
     --on-accent: #241934;
     --now: #f29e8e;
-    --margin: #f29e8e;
+    --margin: #b86f6a;
     --lock-bg: #3a2d53;
+    --grille: #3a2d53;
     color-scheme: dark;
   }
+}
+
+/* Échelle typographique (spec §13.3), rayons et ombre. */
+:root {
+  --fs-1: 11px;
+  --fs-2: 12.5px;
+  --fs-3: 14px;
+  --fs-4: 17px;
+  --fs-5: 22px;
+  --rayon: 10px;
+  --ombre: 0 10px 28px rgba(30, 42, 90, 0.18);
 }
 
 /* Surligneurs des collèges : identiques dans les deux thèmes. */

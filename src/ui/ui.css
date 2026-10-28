@@ -1,0 +1,623 @@
+/* Coque de l'app : disposition iPad / iPhone, barre du haut, composants communs, notifications.
+   Couleurs : uniquement les jetons de theme/tokens.css. Cibles tactiles ≥ 44 px. */
+
+button {
+  font: inherit;
+  color: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.icone {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+/* ---------- Disposition ---------- */
+
+.racine {
+  position: relative;
+}
+
+.coque {
+  --largeur-panneau: 340px;
+  height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.coque[data-dispo='ipad'] {
+  grid-template-columns: var(--largeur-panneau) minmax(0, 1fr);
+  transition: grid-template-columns 180ms ease;
+}
+
+.coque[data-dispo='ipad'][data-replie='true'] {
+  --largeur-panneau: 0px;
+}
+
+.principal {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+/* Panneau de la bibliothèque (iPad). La marge rouge du cahier est le trait d'identité. */
+.panneau {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  box-shadow: inset -3px 0 0 var(--margin);
+}
+
+/* Replié : masqué (hors tabulation et lecteur d'écran) une fois la colonne refermée. */
+.coque[data-replie='true'] .panneau {
+  visibility: hidden;
+  transition: visibility 0s linear 180ms;
+}
+
+.panneau-contenu {
+  width: 340px;
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  padding: 18px 20px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panneau-titre {
+  margin: 0;
+  font-size: var(--fs-4);
+  font-weight: 700;
+}
+
+/* Zone principale : le papier quadrillé. */
+.zone {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--grille, var(--line)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grille, var(--line)) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+}
+
+/* ---------- Barre du haut ---------- */
+
+.barre {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.barre-titre {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  margin-right: auto;
+  padding-left: 4px;
+}
+
+.mois {
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-5);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Trait de surligneur sous le mois. */
+.surligneur {
+  padding: 0 4px;
+  margin: 0 -4px;
+  background: linear-gradient(transparent 58%, rgb(255 228 92 / 0.8) 58% 94%, transparent 94%);
+  border-radius: 2px;
+}
+
+:root[data-theme='sombre'] .surligneur {
+  background: linear-gradient(transparent 58%, rgb(255 228 92 / 0.4) 58% 94%, transparent 94%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='auto'] .surligneur {
+    background: linear-gradient(transparent 58%, rgb(255 228 92 / 0.4) 58% 94%, transparent 94%);
+  }
+}
+
+.semaine {
+  color: var(--muted);
+  font-size: var(--fs-3);
+  white-space: nowrap;
+}
+
+.barre-historique {
+  display: flex;
+  gap: 4px;
+}
+
+.barre-export {
+  display: flex;
+}
+
+/* iPhone : le titre s'empile pour laisser la place aux actions. */
+.barre[data-dispo='iphone'] .barre-titre {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.barre[data-dispo='iphone'] .semaine {
+  font-size: var(--fs-2);
+  line-height: 1.1;
+}
+
+/* iPhone : titre et actions sur la première ligne, vues en dessous sur toute la largeur. */
+.barre[data-dispo='iphone'] {
+  gap: 4px;
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+}
+
+.barre[data-dispo='iphone'] .barre-vues {
+  order: 5;
+  flex: 1 0 100%;
+  margin-top: 4px;
+}
+
+.barre[data-dispo='iphone'] .barre-vues .segment {
+  flex: 1;
+}
+
+.barre[data-dispo='ipad'] .barre-export {
+  margin-left: 4px;
+}
+
+.barre[data-dispo='ipad'] .barre-vues {
+  margin: 0 4px;
+}
+
+/* ---------- Boutons ---------- */
+
+.btn-icone {
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--rayon);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.btn-icone[aria-pressed='true'] {
+  background: var(--field);
+}
+
+.btn-icone:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.btn-icone:disabled {
+  color: var(--muted);
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .btn-icone:hover:not(:disabled) {
+    background: var(--field);
+  }
+}
+
+.btn-principal {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--rayon);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: var(--fs-3);
+  cursor: pointer;
+}
+
+.btn-principal:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-texte {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--rayon);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: var(--fs-3);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+/* Sélecteur segmenté (vues, apparence). */
+.segments {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--field);
+  border-radius: 12px;
+}
+
+.segment {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-3);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.segment[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+/* ---------- Écrans ---------- */
+
+.ecran {
+  box-sizing: border-box;
+  max-width: 720px;
+  padding: 20px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ecran-centre {
+  max-width: none;
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.ecran-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ecran h1,
+.plein-ecran h1 {
+  margin: 0;
+  font-size: var(--fs-5);
+  font-weight: 800;
+}
+
+.carte {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.carte h2 {
+  margin: 0 0 2px;
+  font-size: var(--fs-4);
+  font-weight: 700;
+}
+
+.carte .segments {
+  margin-top: 12px;
+}
+
+.carte-vide {
+  max-width: 360px;
+  text-align: center;
+  border-style: dashed;
+  padding: 24px;
+}
+
+.carte-vide h1 {
+  margin-bottom: 4px;
+}
+
+.carte-vide p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.aide {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-3);
+}
+
+/* Réserve la place du vrai contenu d'une tâche à venir. */
+.emplacement {
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+}
+
+.emplacement p {
+  margin: 0;
+}
+
+/* ---------- Chargement et lecture impossible ---------- */
+
+.plein-ecran {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.plein-ecran-erreur > * {
+  max-width: 480px;
+}
+
+.chargement-trait {
+  width: 120px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--c0);
+  transform-origin: left center;
+  animation: tracer 900ms ease-in-out infinite alternate;
+}
+
+@keyframes tracer {
+  from {
+    transform: scaleX(0.15);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ---------- Bandeau d'erreur (persistant) ---------- */
+
+.bandeau-erreur {
+  margin: 0;
+  padding: 10px 16px;
+  background: var(--field);
+  background: color-mix(in srgb, var(--now) 14%, var(--panel));
+  border-bottom: 1px solid var(--line);
+  border-left: 4px solid var(--now);
+  font-size: var(--fs-3);
+  line-height: 1.4;
+}
+
+.bandeau-seul {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--now);
+  border-radius: 8px;
+  text-align: left;
+}
+
+/* ---------- iPhone : accès à la bibliothèque et feuille du bas ---------- */
+
+.dock {
+  padding: 8px 16px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  box-shadow: inset 0 3px 0 var(--margin);
+}
+
+.btn-items {
+  width: 100%;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--field);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: var(--fs-4);
+  cursor: pointer;
+}
+
+.feuille-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(20 14 40 / 0.4);
+  animation: fondu 180ms ease-out;
+}
+
+.feuille {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: 18px 18px 0 0;
+  border-top: 3px solid var(--margin);
+  box-shadow: var(--ombre);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: monter 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.feuille-poignee {
+  align-self: center;
+  width: 40px;
+  height: 4px;
+  margin: 8px 0 2px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.feuille-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 20px;
+}
+
+.feuille-entete h2 {
+  margin: 0;
+  font-size: var(--fs-4);
+  font-weight: 700;
+}
+
+.feuille-corps {
+  overflow-y: auto;
+  padding: 4px 20px 20px;
+}
+
+@keyframes monter {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fondu {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- Notifications ---------- */
+
+.toasts {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+/* Sur iPhone, au-dessus du dock. */
+.racine[data-dispo='iphone'] .toasts {
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 72px);
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: min(480px, 100%);
+  padding: 4px 4px 4px 16px;
+  min-height: 48px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--ombre);
+  font-size: var(--fs-3);
+  animation: monter-toast 180ms ease-out;
+}
+
+.toast-fermer {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.toast-fermer svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+@keyframes monter-toast {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---------- Refus ---------- */
+
+/* Retour visuel d'un dépôt refusé (spec §13.3) : tremblement de 200 ms et teinte rouge. L'appelant
+   ajoute la classe, puis la retire à la fin de l'animation (`animationend`). */
+.tremble {
+  animation: tremble 200ms ease-in-out;
+}
+
+@keyframes tremble {
+  0%,
+  100% {
+    transform: translateX(0);
+    box-shadow: inset 0 0 0 100vmax rgb(217 71 63 / 0.18);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+/* Mouvement réduit : pas de tremblement, mais la teinte reste pour signaler le refus. */
+@media (prefers-reduced-motion: reduce) {
+  .tremble {
+    animation: none;
+    box-shadow: inset 0 0 0 100vmax rgb(217 71 63 / 0.18);
+  }
+}
