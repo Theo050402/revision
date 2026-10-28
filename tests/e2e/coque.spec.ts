@@ -92,6 +92,10 @@ test('le thème suit le réglage Apparence', async ({ page }) => {
   await apparence.getByRole('button', { name: 'Auto' }).click()
   await expect(racine(page)).toHaveAttribute('data-theme', 'auto')
 
+  // Les réglages ne sont pas annulables (spec §9.6) : ↶ et ↷ restent désactivés.
+  await expect(page.getByRole('button', { name: 'Annuler' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Rétablir' })).toBeDisabled()
+
   // Retour au calendrier.
   await page.getByRole('button', { name: 'Retour au calendrier' }).click()
   await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible()

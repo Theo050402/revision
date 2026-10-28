@@ -20,6 +20,11 @@ type StoreState = {
   erreur: string | null
   /** `null` ou la même référence = refus : aucun effet, renvoie `false`. Refusé aussi tant que `pret` est faux. */
   appliquer: (f: (e: Etat) => Etat | null) => boolean
+  /**
+   * Comme `appliquer` (même garde `pret`, même file d'écriture) mais hors historique : n'empile
+   * rien dans `passe` et ne vide pas `futur`. Pour les champs non annulables (réglages, spec §9.6).
+   */
+  appliquerSansHistorique: (f: (e: Etat) => Etat | null) => boolean
   annuler: () => void
   retablir: () => void
   /** Remplace tout l'état (restauration d'une sauvegarde) : vide l'historique et persiste. */
@@ -73,6 +78,14 @@ export function attendreEcritures(): Promise<void> {
   return file
 }
 
+/**
+ * Un état d'historique rejoué garde les champs non annulables de l'état courant : annuler une
+ * opération sur les créneaux ne doit pas ramener d'anciens réglages (spec §9.6).
+ */
+function rejouer(snapshot: Etat, courant: Etat): Etat {
+  return { ...snapshot, reglages: courant.reglages, premierExportFait: courant.premierExportFait }
+}
+
 export const useStore = create<StoreState>()((set, get) => ({
   etat: etatVide(),
   passe: [],
@@ -90,13 +103,24 @@ export const useStore = create<StoreState>()((set, get) => ({
     return true
   },
 
+  appliquerSansHistorique(f) {
+    const { etat, pret } = get()
+    if (!pret) return false
+    const suivant = f(etat)
+    if (suivant === null || suivant === etat) return false
+    set({ etat: suivant })
+    persister(suivant)
+    return true
+  },
+
   annuler() {
     const { etat, passe, futur, pret } = get()
     if (!pret) return
     const precedent = passe[passe.length - 1]
     if (precedent === undefined) return
-    set({ etat: precedent, passe: passe.slice(0, -1), futur: [...futur, etat] })
-    persister(precedent)
+    const cible = rejouer(precedent, etat)
+    set({ etat: cible, passe: passe.slice(0, -1), futur: [...futur, etat] })
+    persister(cible)
   },
 
   retablir() {
@@ -104,8 +128,9 @@ export const useStore = create<StoreState>()((set, get) => ({
     if (!pret) return
     const suivant = futur[futur.length - 1]
     if (suivant === undefined) return
-    set({ etat: suivant, passe: [...passe, etat].slice(-NIVEAUX_ANNULATION), futur: futur.slice(0, -1) })
-    persister(suivant)
+    const cible = rejouer(suivant, etat)
+    set({ etat: cible, passe: [...passe, etat].slice(-NIVEAUX_ANNULATION), futur: futur.slice(0, -1) })
+    persister(cible)
   },
 
   restaurer(etat) {

@@ -109,6 +109,59 @@ describe('store : annuler / rétablir', () => {
   })
 })
 
+describe('store : appliquerSansHistorique (réglages hors historique)', () => {
+  const sombre = (e: Etat): Etat => ({ ...e, reglages: { ...e.reglages, theme: 'sombre' } })
+
+  it('applique et persiste sans toucher à passe ni à futur', async () => {
+    s().appliquer(ajoute(creneau('a')))
+    s().appliquer(ajoute(creneau('b')))
+    s().annuler()
+    const passe = s().passe
+    const futur = s().futur
+    expect(futur).toHaveLength(1)
+
+    expect(s().appliquerSansHistorique(sombre)).toBe(true)
+    expect(s().etat.reglages.theme).toBe('sombre')
+    expect(s().passe).toBe(passe)
+    expect(s().futur).toBe(futur) // ↷ reste disponible
+    await attendreEcritures()
+    expect((await chargerTout()).reglages.theme).toBe('sombre')
+  })
+
+  it('refuse sur null, même référence, ou tant que pret est faux', () => {
+    expect(s().appliquerSansHistorique(() => null)).toBe(false)
+    expect(s().appliquerSansHistorique((e) => e)).toBe(false)
+    useStore.setState({ pret: false })
+    expect(s().appliquerSansHistorique(sombre)).toBe(false)
+    expect(s().etat.reglages.theme).toBe('auto')
+  })
+
+  it('un changement de thème n’active pas annuler', () => {
+    s().appliquerSansHistorique(sombre)
+    expect(s().passe).toHaveLength(0)
+  })
+
+  it('annuler et rétablir un créneau gardent le thème courant', async () => {
+    s().appliquer(ajoute(creneau('a'))) // snapshot : thème auto
+    s().appliquerSansHistorique(sombre)
+    s().appliquerSansHistorique((e) => ({ ...e, premierExportFait: true }))
+
+    s().annuler()
+    expect(s().etat.creneaux).toEqual({})
+    expect(s().etat.reglages.theme).toBe('sombre')
+    expect(s().etat.premierExportFait).toBe(true)
+    await attendreEcritures()
+    expect((await chargerTout()).reglages.theme).toBe('sombre')
+
+    s().retablir()
+    expect(Object.keys(s().etat.creneaux)).toEqual(['a'])
+    expect(s().etat.reglages.theme).toBe('sombre')
+    expect(s().etat.premierExportFait).toBe(true)
+    await attendreEcritures()
+    expect((await chargerTout()).reglages.theme).toBe('sombre')
+  })
+})
+
 describe('store : persistance', () => {
   it('sérialise les écritures : l’état final de la base est celui du dernier appel', async () => {
     for (let k = 0; k < 10; k++) s().appliquer(ajoute(creneau(`c${k}`)))

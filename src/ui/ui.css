@@ -589,7 +589,7 @@ button {
 /* ---------- Refus ---------- */
 
 /* Retour visuel d'un dépôt refusé (spec §13.3) : tremblement de 200 ms et teinte rouge. L'appelant
-   ajoute la classe, puis la retire à la fin de l'animation (`animationend`). */
+   passe par `trembler(el)` (src/ui/trembler.ts), qui retire la classe après 200 ms. */
 .tremble {
   animation: tremble 200ms ease-in-out;
 }

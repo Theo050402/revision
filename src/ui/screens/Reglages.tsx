@@ -12,7 +12,8 @@ const THEMES: ReadonlyArray<{ valeur: ReglagesEtat['theme']; libelle: string }> 
 
 export function Reglages({ onRetour }: { onRetour: () => void }) {
   const theme = useStore((s) => s.etat.reglages.theme)
-  const appliquer = useStore((s) => s.appliquer)
+  // Les réglages ne sont pas annulables (spec §9.6) : hors historique.
+  const appliquer = useStore((s) => s.appliquerSansHistorique)
 
   return (
     <section className="ecran" aria-labelledby="titre-reglages">
