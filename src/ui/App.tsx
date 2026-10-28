@@ -81,6 +81,7 @@ function Coque() {
   const [ecranChoisi, setEcran] = useState<Ecran>('calendrier')
   // Le parcours d'import peut être ouvert de partout (bibliothèque, Réglages) : il passe avant l'écran choisi.
   const importOuvert = useDemandeImport((s) => s.ouvert)
+  const cibleImport = useDemandeImport((s) => s.collegeId)
   const ecran: Ecran = importOuvert ? 'import' : ecranChoisi
   const [vue, setVue] = useState<Vue>(() => (disposition === 'ipad' ? 'semaine' : 'jour'))
   const [panneauOuvert, setPanneauOuvert] = useState(true)
@@ -165,6 +166,8 @@ function Coque() {
             {ecran === 'reglages' && <Reglages onRetour={() => setEcran('calendrier')} />}
             {ecran === 'import' && (
               <Import
+                // Cible différente (nouveau collège ou réimport d'un autre) : l'écran repart de zéro.
+                key={cibleImport ?? 'nouveau'}
                 onTermine={(enregistre) => {
                   fermerImport()
                   if (enregistre) setEcran('calendrier')

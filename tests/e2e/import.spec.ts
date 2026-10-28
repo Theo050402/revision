@@ -215,3 +215,43 @@ test('annuler depuis le choix du fichier revient au calendrier', async ({ page }
   await page.locator('.import-actions').getByRole('button', { name: 'Annuler' }).click()
   await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible()
 })
+
+test('annuler pendant l\'analyse revient tout de suite au calendrier, sans rien ouvrir ensuite', async ({ page }, info) => {
+  await ouvrirImport(page, info)
+  await choisir(page, await pdfSommaire())
+  await expect(page.getByRole('progressbar', { name: 'Analyse du PDF' })).toBeVisible()
+  await page.locator('.import-actions').getByRole('button', { name: 'Annuler' }).click()
+  await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible({ timeout: 1000 })
+  // L'analyse abandonnée ne fait pas réapparaître d'écran de vérification.
+  await page.waitForTimeout(1200)
+  await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Vérifier les items' })).toHaveCount(0)
+  expect(await lireTable(page, 'colleges')).toHaveLength(0)
+})
+
+test('un second « + Collège » est impossible tant que l\'import est ouvert', async ({ page }, info) => {
+  await ouvrirImport(page, info)
+  const plusCollege = () => page.getByRole('button', { name: '+ Collège' })
+
+  // Au choix du fichier : sur iPad le bouton du panneau reste visible mais inactif.
+  if (info.project.name === 'ipad') await expect(plusCollege()).toBeDisabled()
+
+  // Pendant la vérification aussi ; sur iPhone, on le cherche dans la feuille « Items ».
+  await choisir(page, await pdfSommaire())
+  await expect(page.getByRole('heading', { name: 'Vérifier les items' })).toBeVisible()
+  if (info.project.name === 'iphone') await page.getByRole('button', { name: 'Items', exact: true }).click()
+  await expect(plusCollege()).toBeDisabled()
+  if (info.project.name === 'iphone') await page.getByRole('button', { name: 'Fermer' }).click()
+
+  // Rien n'a changé : même liste, aucun collège créé.
+  await expect(page.locator('.ligne')).toHaveCount(4)
+  expect(await lireTable(page, 'colleges')).toHaveLength(0)
+
+  // Après Annuler, « + Collège » redevient actif et repart d'un écran de choix vierge.
+  await page.locator('.verif-pied').getByRole('button', { name: 'Annuler' }).click()
+  if (info.project.name === 'iphone') await page.getByRole('button', { name: 'Items', exact: true }).click()
+  await expect(plusCollege()).toBeEnabled()
+  await plusCollege().click()
+  await expect(page.getByRole('heading', { name: 'Importer un collège' })).toBeVisible()
+  await expect(page.locator('.ligne')).toHaveCount(0)
+})

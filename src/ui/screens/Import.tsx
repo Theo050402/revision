@@ -40,11 +40,14 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
   const titre = useRef<HTMLHeadingElement>(null)
   /** Numéro de l'analyse en cours : une analyse abandonnée ne doit plus rien afficher. */
   const jeton = useRef(0)
+  /** Annule la lecture en cours (et arrête son worker). */
+  const abandon = useRef<AbortController | null>(null)
 
   useEffect(() => {
     titre.current?.focus({ preventScroll: true })
     return () => {
       jeton.current++
+      abandon.current?.abort()
     }
   }, [])
 
@@ -53,12 +56,15 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
     ev.target.value = '' // permet de rechoisir le même fichier après une erreur
     if (!fichier) return
     const moi = ++jeton.current
+    abandon.current?.abort()
+    const controleur = new AbortController()
+    abandon.current = controleur
     setPhase({ type: 'analyse', fichier: fichier.name, fait: 0, total: 0 })
     try {
       const [resultat] = await Promise.all([
         lirePdf(fichier, (fait, total) => {
           if (jeton.current === moi) setPhase({ type: 'analyse', fichier: fichier.name, fait, total })
-        }),
+        }, controleur.signal),
         pause(DUREE_MIN_ANALYSE_MS),
       ])
       if (jeton.current !== moi) return
@@ -68,7 +74,7 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
         items: construireItems(resultat.entrees),
       })
     } catch (e) {
-      if (jeton.current !== moi) return
+      if (jeton.current !== moi || (e instanceof DOMException && e.name === 'AbortError')) return
       const message =
         e instanceof ErreurPdf ? MESSAGE_PDF_ILLISIBLE : `L'analyse a échoué : ${e instanceof Error ? e.message : String(e)}`
       setPhase({ type: 'erreur', message })
@@ -77,6 +83,7 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
 
   function annuler() {
     jeton.current++
+    abandon.current?.abort()
     onTermine(false)
   }
 

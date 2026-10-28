@@ -21,22 +21,31 @@ export type ResultatLecture = {
 /**
  * Lit un PDF dans un Web Worker : les 20 premières pages d'abord, toutes les pages seulement si le sommaire ne suffit pas.
  * Ce module n'importe pas pdf.js (c'est le worker qui le fait), il reste donc léger dans le bundle initial.
- * Le worker est terminé dans tous les cas (succès ou erreur).
+ * Le worker est terminé dans tous les cas (succès, erreur ou annulation). Si `signal` est abandonné, la lecture
+ * est rejetée avec une `DOMException` d'annulation (`name === 'AbortError'`) et le worker est terminé aussitôt.
  */
 export async function lirePdf(
   fichier: File,
   onProgres: (fait: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<ResultatLecture> {
+  if (signal?.aborted) throw new DOMException('Analyse annulée', 'AbortError')
   const worker = new Worker(new URL('./pdf.worker.ts', import.meta.url), { type: 'module' })
   // Les gestionnaires d'échec sont posés tout de suite, avant le moindre `await` : un worker qui plante
   // (script introuvable, message non clonable…) fait échouer la lecture au lieu de la laisser pendante.
-  let echouer: (e: ErreurPdf) => void = () => {}
+  let echouer: (e: Error) => void = () => {}
   const echec = new Promise<never>((_, rejeter) => {
     echouer = rejeter
   })
   echec.catch(() => {}) // jamais « non gérée » si l'échec survient hors d'une attente
   worker.onerror = (e) => echouer(new ErreurPdf('illisible', { cause: e }))
   worker.onmessageerror = () => echouer(new ErreurPdf('illisible'))
+  // Annulation : le worker est arrêté tout de suite et la lecture échoue avec une AbortError.
+  const annuler = () => {
+    echouer(new DOMException('Analyse annulée', 'AbortError'))
+    worker.terminate()
+  }
+  signal?.addEventListener('abort', annuler, { once: true })
 
   // Un rappel de progression qui lève ne doit ni interrompre ni bloquer la lecture.
   const progres = (fait: number, total: number) => {
@@ -74,6 +83,7 @@ export async function lirePdf(
     progres(debut.nbPages, debut.nbPages)
     return { ...resultat, nbPages: debut.nbPages }
   } finally {
+    signal?.removeEventListener('abort', annuler)
     worker.terminate()
   }
 }
