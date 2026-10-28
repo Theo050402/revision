@@ -32,6 +32,34 @@ export function etatTours(creneaux: Creneau[], itemId: string): EtatTour[] {
 }
 
 /**
+ * États des tours de tous les items en une seule passe sur les créneaux (listes longues : `etatTours`
+ * rescanne tout à chaque appel). Même résultat que `etatTours` ; un item sans créneau est absent (= non vu).
+ */
+export function etatToursParItem(creneaux: Creneau[]): Map<string, EtatTour[]> {
+  const parItem = new Map<string, Map<number, boolean>>() // itemId -> tour -> tous faits ?
+  for (const c of creneaux) {
+    let tours = parItem.get(c.itemId)
+    if (!tours) parItem.set(c.itemId, (tours = new Map()))
+    tours.set(c.tour, (tours.get(c.tour) ?? true) && c.fait)
+  }
+  const res = new Map<string, EtatTour[]>()
+  for (const [itemId, tours] of parItem) {
+    res.set(
+      itemId,
+      [...tours.entries()].sort(([a], [b]) => a - b).map(([, tousFaits]) => (tousFaits ? 'fait' : 'planifie')),
+    )
+  }
+  return res
+}
+
+/** Plus grand numéro de tour par item, en une passe : `prochainTour` vaut `(get ?? 0) + 1`. */
+export function dernierTourParItem(creneaux: Creneau[]): Map<string, number> {
+  const res = new Map<string, number>()
+  for (const c of creneaux) if (c.tour > (res.get(c.itemId) ?? 0)) res.set(c.itemId, c.tour)
+  return res
+}
+
+/**
  * Anneau de progression : numéros d'items distincts (tous collèges confondus) dont le T1 est
  * « fait » au sens d'etatTours (tous les créneaux/parties du T1 de l'item sont faits) dans au
  * moins un collège. Placé ou dans le bac. Les créneaux dont l'item n'existe plus sont ignorés.

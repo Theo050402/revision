@@ -152,3 +152,28 @@ describe('progression', () => {
     expect(progression(e).vus).toBe(0)
   })
 })
+
+describe('etatToursParItem / dernierTourParItem (une passe sur tous les créneaux)', () => {
+  const creneaux = [
+    cr({ itemId: 'a:1', tour: 1, fait: true }),
+    cr({ itemId: 'a:1', tour: 2 }),
+    cr({ itemId: 'a:2', tour: 1, partie: { i: 1, n: 2 }, fait: true }),
+    cr({ itemId: 'a:2', tour: 1, partie: { i: 2, n: 2 } }),
+    cr({ itemId: 'a:3', tour: 2 }), // T1 supprimé : pas de renumérotation
+  ]
+
+  test('donne les mêmes états que etatTours, item par item', async () => {
+    const { etatToursParItem } = await import('../../src/domain/tours')
+    const m = etatToursParItem(creneaux)
+    for (const id of ['a:1', 'a:2', 'a:3']) expect(m.get(id)).toEqual(etatTours(creneaux, id))
+    expect(m.get('a:1')).toEqual(['fait', 'planifie'])
+    expect(m.get('a:2')).toEqual(['planifie']) // une partie non faite
+    expect(m.has('a:9')).toBe(false) // item sans créneau : absent = non vu
+  })
+
+  test('dernierTourParItem : prochainTour = dernier + 1', async () => {
+    const { dernierTourParItem } = await import('../../src/domain/tours')
+    const m = dernierTourParItem(creneaux)
+    for (const id of ['a:1', 'a:2', 'a:3', 'a:9']) expect((m.get(id) ?? 0) + 1).toBe(prochainTour(creneaux, id))
+  })
+})

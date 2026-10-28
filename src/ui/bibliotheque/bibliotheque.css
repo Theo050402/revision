@@ -1,0 +1,578 @@
+/* Bibliothèque d'items (spec §8, §13). Couleurs : uniquement les jetons de theme/tokens.css ; la pastille garde
+   l'encre #1e2a5a sur le surligneur dans les deux thèmes (la teinte identifie le collège, spec §13.2).
+   Cibles tactiles ≥ 44 px : les pastilles de filtre, plus petites à l'œil, étendent leur zone d'appui. */
+
+.sr-seul {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Progression ---------- */
+
+.bib-progres {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bib-progres small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-2);
+}
+
+.bib-progres-nombre {
+  display: block;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-size: var(--fs-4);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.bib-anneau {
+  flex: none;
+}
+
+.bib-anneau circle {
+  fill: none;
+  stroke-width: 6;
+}
+
+.bib-anneau-fond {
+  stroke: var(--line);
+}
+
+.bib-anneau-trait {
+  stroke: var(--accent);
+  transition: stroke-dasharray 400ms ease;
+}
+
+.bib-anneau text {
+  fill: var(--ink);
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* ---------- Recherche et filtres ---------- */
+
+.bib-recherche input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--rayon);
+  background: var(--field);
+  color: var(--ink);
+  /* 16 px : en dessous, Safari zoome la page au focus du champ. */
+  font: inherit;
+  font-size: 16px;
+}
+
+.bib-recherche input::placeholder {
+  color: var(--muted);
+}
+
+.bib-filtres {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bib-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 6px;
+}
+
+.bib-pastille {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-2);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+/* Zone d'appui de 46 px de haut autour d'une pastille de 32 px. */
+.bib-pastille::after {
+  content: '';
+  position: absolute;
+  inset: -7px -2px;
+}
+
+.bib-pastille[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+.bib-point {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #1e2a5a 35%, transparent);
+}
+
+.bib-effacer {
+  align-self: flex-start;
+  padding: 0 4px;
+}
+
+/* ---------- Sections ---------- */
+
+.bib-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bib-titre {
+  margin: 0;
+  font-size: var(--fs-3);
+  font-weight: 700;
+}
+
+.bib-titre-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bib-sous,
+.bib-compte {
+  margin: 0;
+  font-size: var(--fs-2);
+}
+
+.bib-petit {
+  font-size: var(--fs-2);
+  padding: 0 8px;
+}
+
+.bib-vide {
+  padding: 12px 0;
+}
+
+.bib-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--now);
+  color: var(--panel);
+  font-size: var(--fs-1);
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
+.bib-bac {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--now);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--now) 7%, var(--panel));
+}
+
+.bib-segments {
+  display: flex;
+}
+
+.bib-segments .segment {
+  flex: 1;
+  padding: 0 8px;
+}
+
+.bib-cartes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Collèges repliables. */
+.bib-groupe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bib-groupe-tete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--rayon);
+  background: transparent;
+  color: var(--ink);
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-size: var(--fs-3);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bib-chevron {
+  transition: transform 150ms ease;
+}
+
+.bib-groupe-tete[aria-expanded='true'] .bib-chevron {
+  transform: rotate(90deg);
+}
+
+.bib-groupe-n {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  font-size: var(--fs-2);
+  font-weight: 400;
+}
+
+/* ---------- Cartes ---------- */
+
+.carte-item {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.carte-item[data-selectionnee='true'] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--card));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.carte-corps {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.carte-pastille {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 40px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--c0);
+  color: #1e2a5a;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: var(--fs-3);
+}
+
+/* Anomalie à vérifier (import) : petit repère orange sur la pastille. */
+.carte-verifier {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1.5px solid #1e2a5a;
+  border-radius: 50%;
+  background: var(--c3);
+}
+
+.carte-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.carte-titre {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--fs-2);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.carte-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: var(--fs-2);
+}
+
+.carte-points {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* ○ non vu, ◐ planifié, ● fait. */
+.point-tour {
+  box-sizing: border-box;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+}
+
+.point-tour[data-etat='planifie'] {
+  background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
+}
+
+.point-tour[data-etat='fait'] {
+  background: var(--ink);
+}
+
+@media (hover: hover) {
+  .carte-corps:hover {
+    background: var(--field);
+  }
+}
+
+/* Case à cocher : 44 px d'appui, l'entrée native est invisible mais reste l'élément focalisé. */
+.carte-case {
+  position: relative;
+  flex: none;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.carte-case input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.carte-case-visuel {
+  pointer-events: none;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: transparent;
+}
+
+.carte-case-visuel svg {
+  fill: none;
+  stroke: var(--on-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.carte-case input:checked + .carte-case-visuel {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.carte-case input:checked + .carte-case-visuel svg {
+  opacity: 1;
+}
+
+.carte-case input:focus-visible + .carte-case-visuel {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Fiche d'item ---------- */
+
+.fiche {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fiche-retour {
+  align-self: flex-start;
+  padding-left: 4px;
+}
+
+.fiche-entete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fiche-pastille {
+  flex: none;
+  min-width: 56px;
+  height: 44px;
+  font-size: var(--fs-4);
+}
+
+.fiche-titre {
+  margin: 0;
+  font-size: var(--fs-4);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.fiche-alerte {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--c3);
+  border-radius: 6px;
+  background: var(--field);
+  font-size: var(--fs-3);
+}
+
+.fiche-infos {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 14px;
+  margin: 0;
+  font-size: var(--fs-3);
+}
+
+.fiche-infos dt {
+  color: var(--muted);
+}
+
+.fiche-infos dd {
+  margin: 0;
+}
+
+.fiche-tours-texte {
+  color: var(--muted);
+}
+
+.fiche-sous-titre {
+  margin: 4px 0 0;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-size: var(--fs-3);
+  font-weight: 700;
+}
+
+.fiche-creneaux {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fiche-creneaux li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  font-size: var(--fs-3);
+}
+
+.fiche-creneau-etat {
+  flex: none;
+  color: var(--muted);
+}
+
+.fiche-planifier {
+  margin-top: 4px;
+}
+
+.fiche-planifier .btn-principal {
+  width: 100%;
+}
+
+.fiche-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fiche-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-2);
+  color: var(--muted);
+}
+
+.fiche-form input,
+.fiche-form select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--rayon);
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.fiche-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.bib-plus {
+  align-self: flex-start;
+  padding: 0 4px;
+  font-size: var(--fs-2);
+}
+
+/* Liste déroulante : même aspect que les champs voisins (le sélecteur natif d'iOS s'ouvre quand même). */
+.fiche-form select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7493' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 18px;
+}

@@ -3,7 +3,8 @@ import { BarreHaut } from './BarreHaut'
 import { Calendrier } from './calendrier/Calendrier'
 import { useAujourdhui } from './calendrier/maintenant'
 import type { Ecran, Vue } from './ecran'
-import { EmplacementBibliotheque, EmplacementRestauration } from './Emplacements'
+import { Bibliotheque } from './bibliotheque/Bibliotheque'
+import { EmplacementRestauration } from './Emplacements'
 import { Feuille } from './Feuille'
 import { fermerImport, useDemandeImport } from './importDemande'
 import { Import } from './screens/Import'
@@ -134,7 +135,7 @@ function Coque() {
           <aside id="panneau-bibliotheque" className="panneau" aria-label="Bibliothèque d'items">
             <div className="panneau-contenu">
               <h2 className="panneau-titre">Items</h2>
-              <EmplacementBibliotheque />
+              <Bibliotheque />
             </div>
           </aside>
         )}
@@ -218,7 +219,7 @@ function Coque() {
 
       {feuilleVisible && (
         <Feuille titre="Items" onFermer={fermerFeuille}>
-          <EmplacementBibliotheque />
+          <Bibliotheque />
         </Feuille>
       )}
       <Toasts />

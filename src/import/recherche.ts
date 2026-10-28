@@ -2,13 +2,14 @@ import { OFFICIELS } from './catalog'
 
 export type Officiel = { numero: number; titre: string }
 
-/** Minuscules sans accents : « Cancérologie » et « cancerologie » se valent. */
+/** Minuscules sans accents, ligatures éclatées : « Œsophage » et « oesophage » se valent (œ → oe, æ → ae). */
 export function normaliser(s: string): string {
   return s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/œ/gi, 'oe')
     .toLowerCase()
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
 }
 
 let index: { numero: number; titre: string; norme: string }[] | undefined

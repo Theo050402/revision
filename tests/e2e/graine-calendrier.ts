@@ -16,7 +16,7 @@ const college = (id: string, nom: string, couleur: number): Ligne => ({
   importeLe: '2026-10-01T10:00',
 })
 
-const item = (collegeId: string, numero: number, titre: string, pages: number): Ligne => ({
+export const item = (collegeId: string, numero: number, titre: string, pages: number): Ligne => ({
   id: `${collegeId}:${numero}`,
   collegeId,
   numero,
@@ -106,9 +106,13 @@ export const DONNEES = {
  * Écrit les tables dans IndexedDB, puis recharge la page. Attend d'abord que l'app ait créé son schéma
  * (Dexie le fait à l'ouverture de la base) : on n'ouvre jamais la base avant, ce qui en créerait une vide.
  */
-export async function semer(page: Page, extra: { creneaux?: Ligne[]; reglages?: Ligne } = {}): Promise<void> {
+export async function semer(page: Page, extra: { creneaux?: Ligne[]; items?: Ligne[]; reglages?: Ligne } = {}): Promise<void> {
   await page.getByRole('region', { name: 'Calendrier' }).waitFor()
-  const donnees = { ...DONNEES, creneaux: [...DONNEES.creneaux, ...(extra.creneaux ?? [])] }
+  const donnees = {
+    ...DONNEES,
+    items: [...DONNEES.items, ...(extra.items ?? [])],
+    creneaux: [...DONNEES.creneaux, ...(extra.creneaux ?? [])],
+  }
   await page.evaluate(
     async ([d, reglages]) => {
       const tables = ['colleges', 'items', 'creneaux', 'indispos', 'meta'] as const

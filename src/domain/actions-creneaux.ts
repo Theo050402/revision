@@ -25,7 +25,7 @@ const fmtDate = new Intl.DateTimeFormat('fr-FR', {
 })
 
 /** 14:00 → « 14h », 14:30 → « 14h30 », 07:05 → « 7h05 ». */
-function libelleHeure(minutes: number): string {
+export function libelleHeure(minutes: number): string {
   const hh = Math.floor(minutes / 60)
   const mm = minutes % 60
   return mm === 0 ? `${hh}h` : `${hh}h${String(mm).padStart(2, '0')}`
