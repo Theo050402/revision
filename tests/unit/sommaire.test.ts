@@ -42,15 +42,18 @@ describe('analyserSommaire', () => {
     )
   })
 
-  test("« Chapitre 9 » à gauche, à la même hauteur qu'un titre, n'est jamais pris pour une page", () => {
-    const fr = [
-      f('Chapitre 9', 60, 100),
-      ...bloc(100, 'Titre un', 17, 'Item 1'),
-      ...bloc(150, 'Titre deux', 29, 'Item 2'),
-      f('Chapitre 9', 60, 200),
-      ...bloc(200, 'Titre trois', 41, 'Item 3'),
+  test("« Chapitre 9 » seul sur sa ligne entre le titre et « Item N » : seul le filtre de colonne l'écarte", () => {
+    // « Chapitre 9 » (x=60 < 125-20) est sur sa propre ligne, dans la fenêtre 4×h, sous la ligne du numéro de page.
+    // Sans le critère `x >= xItem - 20`, le parcours de bas en haut retiendrait 9 comme page.
+    const avecChapitre = (y: number, titre: string, numPage: number, item: string): Fragment[] => [
+      ...bloc(y, titre, numPage, item),
+      f('Chapitre 9', 60, y + 6),
     ]
-    // « Chapitre 9 » est au même y que le titre mais x=60 < 125-20 : exclu avant le regroupement
+    const fr = [
+      ...avecChapitre(100, 'Titre un', 17, 'Item 1'),
+      ...avecChapitre(150, 'Titre deux', 29, 'Item 2'),
+      ...avecChapitre(200, 'Titre trois', 41, 'Item 3'),
+    ]
     expect(analyserSommaire([page(1, fr)])).toEqual([
       { numeros: [1], pageDebut: 17 },
       { numeros: [2], pageDebut: 29 },
@@ -117,6 +120,12 @@ describe('analyserTitres', () => {
   test('« Item 12 » en bas de page ignoré', () => {
     const pages = [page(3, [f('Item 12 – Titre', 50, 700)])]
     expect(analyserTitres(pages)).toEqual([])
+  })
+
+  test('ignore une page de sommaire (au moins 3 « Item N »)', () => {
+    const sommaire = page(2, [f('Item 1', 50, 50), f('Item 2', 50, 100), f('Item 3', 50, 150)])
+    const reelle = page(9, [f('Item 2 – Titre', 50, 80)])
+    expect(analyserTitres([sommaire, reelle])).toEqual([{ numeros: [2], pageDebut: 9 }])
   })
 
   test('garde la première page pour un numéro répété', () => {

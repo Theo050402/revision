@@ -19,6 +19,8 @@ for (let p = 1; p <= doc.numPages; p++) {
   const contenu = await page.getTextContent()
   const fragments = contenu.items
     .filter((it) => 'str' in it && it.str.trim() !== '')
+    // Pied de page publicitaire (filigrane du PDF source) : retiré pour ne pas publier d'URL tierces dans le dépôt public.
+    .filter((it) => !/amis-med|t\.me\/|Pour avoir plus d/i.test(it.str))
     .map((it) => ({
       str: it.str,
       x: arrondi(it.transform[4]),
