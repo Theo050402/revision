@@ -1,7 +1,7 @@
 # Planning de révisions d'Emma : spec de design
 
 - **Date :** 28 octobre 2026
-- **Statut :** en relecture
+- **Statut :** validée le 28 octobre 2026 (poussée en cascade : sens « insertion »)
 - **Nom affiché sur l'écran d'accueil :** « Révisions »
 
 ## 1. Objectif
@@ -252,7 +252,7 @@ duree  = max(dureeMin, arrondi)
 - **États d'un item, affichés par des points ●○○ :**
   - non vu : aucun créneau ;
   - planifié : créneau sans « Fait » ;
-  - fait : au moins un créneau du tour coché « Fait ».
+  - fait : tous les créneaux du tour (toutes ses parties) sont cochés « Fait ».
 - **Anneau de progression :** nombre de numéros d'items distincts, tous collèges confondus, ayant au moins un créneau T1 « Fait », sur 367.
 - Supprimer un créneau ne renumérote pas les autres tours.
 
@@ -303,7 +303,7 @@ Un tap ouvre la fiche : pages, historique des créneaux, dates.
 
 - **Créneau :**
   - fond surligneur à la couleur du collège, trait d'encre à gauche, coins de 3 px ;
-  - texte « 300 · Col utérin », puis « T1 · 22 p · 2h45 » ;
+  - texte « 300 · » suivi du titre officiel tronqué par une ellipse, puis « T1 · 22 p · 2h45 » ;
   - « · 1/2 » si c'est une partie ;
   - un point s'il n'a pas encore été exporté ;
   - une coche s'il est « Fait ».
@@ -315,7 +315,7 @@ Un tap ouvre la fiche : pages, historique des créneaux, dates.
 |---|---|
 | Glisser une carte de la bibliothèque | Crée un créneau (tour suivant) au dépôt |
 | Appui long (150 ms) sur un créneau, puis glisser | Le déplace (autre heure ou autre jour) |
-| Tirer le bord bas d'un créneau | Le redimensionne au pas de la grille |
+| Tirer le bord bas d'un créneau | Le redimensionne au pas de la grille, sans descendre sous un pas ; il s'arrête au début du bloc suivant ou à la fin de la journée |
 | Glisser un créneau vers la corbeille (visible pendant le geste) | Le supprime |
 | Tap sur un créneau | Ouvre sa fiche : Fait, durée, tour, note, Supprimer |
 | Tap sur un emplacement libre | Active « Pour combler ce trou » |
@@ -329,7 +329,7 @@ Entrée : l'état du jour, le créneau déposé S (durée d), l'heure magnétis�
 
 1. S occupe `[t, t + d]`. Si S chevauche un bloc verrouillé ou sort des bornes de la journée : **refus**.
 2. Si S ne chevauche aucun créneau : placement direct.
-3. Sinon, soit C le créneau sous le doigt (à défaut, le premier créneau chevauché) :
+3. Sinon, soit C le créneau sous le doigt (à défaut, le premier créneau chevauché, traité comme « moitié haute ») :
    - **doigt sur la moitié haute de C** : S s'insère avant C. C et les créneaux qui le suivent sont poussés **vers le bas** ;
    - **doigt sur la moitié basse de C** : S s'insère après C. C et les créneaux qui le précèdent sont poussés **vers le haut**.
 4. **Poussée vers le bas :** chaque créneau poussé commence à la fin du précédent (S ou le créneau poussé avant lui). S'il chevauche alors un bloc verrouillé, il **saute** pour commencer à la fin de ce bloc. On continue tant qu'un chevauchement subsiste. La poussée vers le haut est symétrique.
@@ -340,7 +340,7 @@ Un déplacement d'un créneau existant suit la même logique, après l'avoir ret
 
 ### 9.5 Dépôt multiple (`domain/multidrop.ts`)
 
-Les créneaux sont placés dans l'ordre des numéros, à partir de t. Chacun prend le premier intervalle libre suffisant (en sautant créneaux et blocs verrouillés), avec `pauseMultiple` entre deux créneaux. Ce qui ne tient pas avant la fin de la journée va dans le bac « À placer », et un toast l'indique : « 2 items mis dans À placer ». **Le dépôt multiple ne pousse jamais les créneaux existants.**
+Les créneaux sont placés dans l'ordre des numéros, à partir de t. Chacun prend le premier intervalle libre suffisant (en sautant créneaux et blocs verrouillés), avec `pauseMultiple` entre deux créneaux. Dès qu'un créneau ne tient pas avant la fin de la journée, lui et tous les suivants vont dans le bac « À placer » (l'ordre est conservé), et un toast l'indique : « 2 items mis dans À placer ». **Le dépôt multiple ne pousse jamais les créneaux existants.**
 
 ### 9.6 Annuler / Rétablir
 
@@ -401,7 +401,7 @@ Sections et valeurs par défaut :
 | `SEQUENCE` | `<version>` |
 | `DTSTAMP` | heure de l'export, en UTC |
 | `DTSTART` / `DTEND` | `TZID=Europe/Paris` |
-| `SUMMARY` | `📚 300 · Col utérin · T1` (et ` · 1/2` pour une partie) |
+| `SUMMARY` | `📚 300 · Tumeurs du col utérin, tumeurs du corps utérin · T1` (titre officiel complet, et ` · 1/2` pour une partie) |
 | `DESCRIPTION` | `Cancérologie · p. 153–175 (22 p)`, puis la note |
 | `CATEGORIES` | nom du collège |
 | `VALARM` | si un rappel est réglé : `TRIGGER:-PT15M`, `ACTION:DISPLAY` |
