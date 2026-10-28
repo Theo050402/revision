@@ -1,0 +1,1470 @@
+[
+  {
+    "numero": 1,
+    "titre": "La relation médecin-malade. La communication avec le patient et son entourage. L'annonce d'une maladie grave ou létale ou d'un dommage associé aux soins. La formation du patient. La personnalisation de la prise en charge médicale."
+  },
+  {
+    "numero": 2,
+    "titre": "Les valeurs professionnelles du médecin et des autres professions de santé"
+  },
+  {
+    "numero": 3,
+    "titre": "Le raisonnement et la décision en médecine. La médecine fondée sur les preuves (Evidence Based Medicine, EBM). La décision médicale partagée. La controverse."
+  },
+  {
+    "numero": 4,
+    "titre": "Qualité et sécurité des soins. La sécurité du patient. La gestion des risques. Les événements indésirables associés aux soins (EIAS). Démarche qualité et évaluation des pratiques professionnelles"
+  },
+  {
+    "numero": 5,
+    "titre": "La gestion des erreurs et des plaintes ; l'aléa thérapeutique"
+  },
+  {
+    "numero": 6,
+    "titre": "L'organisation de l'exercice clinique et les méthodes qui permettent de sécuriser le parcours du patient"
+  },
+  {
+    "numero": 7,
+    "titre": "Les droits individuels et collectifs du patient"
+  },
+  {
+    "numero": 8,
+    "titre": "Les discriminations"
+  },
+  {
+    "numero": 9,
+    "titre": "Introduction à l'éthique médicale"
+  },
+  {
+    "numero": 10,
+    "titre": "Approches transversales du corps"
+  },
+  {
+    "numero": 11,
+    "titre": "Violences et santé"
+  },
+  {
+    "numero": 12,
+    "titre": "Violences sexuelles"
+  },
+  {
+    "numero": 13,
+    "titre": "Certificats médicaux. Décès et législation."
+  },
+  {
+    "numero": 14,
+    "titre": "La mort"
+  },
+  {
+    "numero": 15,
+    "titre": "Soins psychiatriques sans consentement"
+  },
+  {
+    "numero": 16,
+    "titre": "Organisation du système de soins. Sa régulation. Les indicateurs. Parcours de soins."
+  },
+  {
+    "numero": 17,
+    "titre": "Télémédecine, télésanté et téléservices en santé"
+  },
+  {
+    "numero": 18,
+    "titre": "Santé et numérique"
+  },
+  {
+    "numero": 19,
+    "titre": "La sécurité sociale. L'assurance maladie. Les assurances complémentaires. La complémentaire santé solidaire (CSS). Protection sociale. Consommation médicale et économie de la santé."
+  },
+  {
+    "numero": 20,
+    "titre": "La méthodologie de la recherche en santé"
+  },
+  {
+    "numero": 21,
+    "titre": "Mesure de l'état de santé de la population"
+  },
+  {
+    "numero": 22,
+    "titre": "Maladies rares"
+  },
+  {
+    "numero": 23,
+    "titre": "Grossesse normale"
+  },
+  {
+    "numero": 24,
+    "titre": "Principales complications de la grossesse"
+  },
+  {
+    "numero": 25,
+    "titre": "Grossesse extra-utérine (GEU)"
+  },
+  {
+    "numero": 26,
+    "titre": "Douleur abdominale aiguë chez une femme enceinte"
+  },
+  {
+    "numero": 27,
+    "titre": "Prévention des risques fœtaux : infection, médicaments, toxiques, irradiation"
+  },
+  {
+    "numero": 28,
+    "titre": "Connaître les particularités de l'infection urinaire au cours de la grossesse"
+  },
+  {
+    "numero": 29,
+    "titre": "Connaître les principaux risques professionnels pour la maternité, liés au travail de la mère"
+  },
+  {
+    "numero": 30,
+    "titre": "Prématurité et retard de croissance intra-utérin (RCIU) : facteurs de risque et prévention"
+  },
+  {
+    "numero": 31,
+    "titre": "Accouchement, délivrance et suites de couches normales"
+  },
+  {
+    "numero": 32,
+    "titre": "Évaluation et soins du nouveau-né à terme"
+  },
+  {
+    "numero": 33,
+    "titre": "Allaitement maternel"
+  },
+  {
+    "numero": 34,
+    "titre": "Suites de couches pathologiques : pathologie maternelle dans les 40 jours"
+  },
+  {
+    "numero": 35,
+    "titre": "Anomalies du cycle menstruel et métrorragies"
+  },
+  {
+    "numero": 36,
+    "titre": "Contraception"
+  },
+  {
+    "numero": 37,
+    "titre": "Interruption volontaire de grossesse (IVG)"
+  },
+  {
+    "numero": 38,
+    "titre": "Infertilité du couple : conduite de la première consultation"
+  },
+  {
+    "numero": 39,
+    "titre": "Assistance médicale à la procréation (AMP) : principaux aspects biologiques, médicaux et éthiques"
+  },
+  {
+    "numero": 40,
+    "titre": "Algies pelviennes chez la femme"
+  },
+  {
+    "numero": 41,
+    "titre": "Endométriose"
+  },
+  {
+    "numero": 42,
+    "titre": "Aménorrhée"
+  },
+  {
+    "numero": 43,
+    "titre": "Hémorragie génitale chez la femme"
+  },
+  {
+    "numero": 44,
+    "titre": "Tuméfaction pelvienne chez la femme"
+  },
+  {
+    "numero": 45,
+    "titre": "Spécificités des maladies génétiques"
+  },
+  {
+    "numero": 46,
+    "titre": "Médecine génomique"
+  },
+  {
+    "numero": 47,
+    "titre": "Suivi d'un nourrisson, d'un enfant et d'un adolescent normal. Dépistage des anomalies orthopédiques, des troubles visuels, auditifs et dentaires. Examens de santé obligatoires. Médecine scolaire. Mortalité et morbidité infantiles."
+  },
+  {
+    "numero": 48,
+    "titre": "Alimentation et besoins nutritionnels du nourrisson et de l'enfant"
+  },
+  {
+    "numero": 49,
+    "titre": "Puberté normale et pathologique"
+  },
+  {
+    "numero": 50,
+    "titre": "Pathologie génito-scrotale chez le garçon et chez l'homme"
+  },
+  {
+    "numero": 51,
+    "titre": "Troubles de la miction chez l'enfant"
+  },
+  {
+    "numero": 52,
+    "titre": "Strabisme et amblyopie de l'enfant"
+  },
+  {
+    "numero": 53,
+    "titre": "Retard de croissance staturo-pondérale"
+  },
+  {
+    "numero": 54,
+    "titre": "Boiterie chez l'enfant"
+  },
+  {
+    "numero": 55,
+    "titre": "Développement psychomoteur du nourrisson et de l'enfant"
+  },
+  {
+    "numero": 56,
+    "titre": "L'enfant handicapé"
+  },
+  {
+    "numero": 57,
+    "titre": "Maltraitance, enfants en danger, protection maternelle et infantile"
+  },
+  {
+    "numero": 58,
+    "titre": "Sexualité normale et ses troubles"
+  },
+  {
+    "numero": 59,
+    "titre": "Sujets en situation de précarité"
+  },
+  {
+    "numero": 60,
+    "titre": "Connaître les facteurs de risque, prévention, dépistage des troubles psychiques de l'enfant à la personne âgée"
+  },
+  {
+    "numero": 61,
+    "titre": "Connaître les bases des classifications des troubles mentaux de l'enfant à la personne âgée"
+  },
+  {
+    "numero": 62,
+    "titre": "Décrire l'organisation de l'offre de soins en psychiatrie, de l'enfant à la personne âgée"
+  },
+  {
+    "numero": 63,
+    "titre": "Trouble schizophrénique"
+  },
+  {
+    "numero": 64,
+    "titre": "Trouble bipolaire"
+  },
+  {
+    "numero": 65,
+    "titre": "Trouble délirant persistant"
+  },
+  {
+    "numero": 66,
+    "titre": "Diagnostiquer : trouble dépressif, trouble anxieux généralisé (TAG), trouble panique, trouble phobique, trouble obsessionnel compulsif (TOC), état de stress post-traumatique (PTSD), trouble de l'adaptation, trouble de la personnalité."
+  },
+  {
+    "numero": 67,
+    "titre": "Troubles envahissants du développement (TED)"
+  },
+  {
+    "numero": 68,
+    "titre": "Troubles du comportement de l'adolescent"
+  },
+  {
+    "numero": 69,
+    "titre": "Troubles psychiques de la grossesse et du post-partum"
+  },
+  {
+    "numero": 70,
+    "titre": "Troubles psychiques du sujet âgé"
+  },
+  {
+    "numero": 71,
+    "titre": "Troubles des conduites alimentaires (TCA)"
+  },
+  {
+    "numero": 72,
+    "titre": "Troubles à symptomatologie somatique et apparentés"
+  },
+  {
+    "numero": 73,
+    "titre": "Différents types de techniques psychothérapeutiques"
+  },
+  {
+    "numero": 74,
+    "titre": "Prescription et surveillance des psychotropes"
+  },
+  {
+    "numero": 75,
+    "titre": "Addiction au tabac"
+  },
+  {
+    "numero": 76,
+    "titre": "Addiction à l'alcool"
+  },
+  {
+    "numero": 77,
+    "titre": "Addiction aux médicaments psychotropes"
+  },
+  {
+    "numero": 78,
+    "titre": "Addiction au cannabis, cocaïne, amphétamines, opiacés, drogues de synthèse"
+  },
+  {
+    "numero": 79,
+    "titre": "Addictions comportementales"
+  },
+  {
+    "numero": 80,
+    "titre": "Dopage et conduites dopantes"
+  },
+  {
+    "numero": 81,
+    "titre": "Altération chronique de la vision"
+  },
+  {
+    "numero": 82,
+    "titre": "Altération aiguë de la vision"
+  },
+  {
+    "numero": 83,
+    "titre": "Infections et inflammations oculaires"
+  },
+  {
+    "numero": 84,
+    "titre": "Glaucomes"
+  },
+  {
+    "numero": 85,
+    "titre": "Troubles de la réfraction"
+  },
+  {
+    "numero": 86,
+    "titre": "Pathologie des paupières"
+  },
+  {
+    "numero": 87,
+    "titre": "Épistaxis"
+  },
+  {
+    "numero": 88,
+    "titre": "Trouble aigu de la parole et dysphonie"
+  },
+  {
+    "numero": 89,
+    "titre": "Altération de la fonction auditive"
+  },
+  {
+    "numero": 90,
+    "titre": "Pathologie des glandes salivaires"
+  },
+  {
+    "numero": 91,
+    "titre": "Déficit neurologique récent"
+  },
+  {
+    "numero": 92,
+    "titre": "Déficit moteur et/ou sensitif des membres"
+  },
+  {
+    "numero": 93,
+    "titre": "Compression médullaire non traumatique et syndrome de la queue de cheval"
+  },
+  {
+    "numero": 94,
+    "titre": "Rachialgie"
+  },
+  {
+    "numero": 95,
+    "titre": "Radiculalgie et syndrome canalaire"
+  },
+  {
+    "numero": 96,
+    "titre": "Neuropathies périphériques"
+  },
+  {
+    "numero": 97,
+    "titre": "Polyradiculonévrite aiguë inflammatoire (syndrome de Guillain-Barré)"
+  },
+  {
+    "numero": 98,
+    "titre": "Myasthénie"
+  },
+  {
+    "numero": 99,
+    "titre": "Migraine, névralgie du trijumeau et algies de la face"
+  },
+  {
+    "numero": 100,
+    "titre": "Céphalée inhabituelle aiguë et chronique"
+  },
+  {
+    "numero": 101,
+    "titre": "Paralysie faciale"
+  },
+  {
+    "numero": 102,
+    "titre": "Diplopie"
+  },
+  {
+    "numero": 103,
+    "titre": "Vertige"
+  },
+  {
+    "numero": 104,
+    "titre": "Sclérose en plaques (SEP)"
+  },
+  {
+    "numero": 105,
+    "titre": "Épilepsie"
+  },
+  {
+    "numero": 106,
+    "titre": "Maladie de Parkinson"
+  },
+  {
+    "numero": 107,
+    "titre": "Mouvements anormaux"
+  },
+  {
+    "numero": 108,
+    "titre": "Confusion, démences"
+  },
+  {
+    "numero": 109,
+    "titre": "Troubles de la marche et de l'équilibre"
+  },
+  {
+    "numero": 110,
+    "titre": "Troubles du sommeil"
+  },
+  {
+    "numero": 111,
+    "titre": "Dermatoses faciales : acné, rosacée, dermatite séborrhéique"
+  },
+  {
+    "numero": 112,
+    "titre": "Dermatose bulleuse"
+  },
+  {
+    "numero": 113,
+    "titre": "Hémangiomes et malformations vasculaires cutanées"
+  },
+  {
+    "numero": 114,
+    "titre": "Exanthème et érythrodermie"
+  },
+  {
+    "numero": 115,
+    "titre": "Toxidermies"
+  },
+  {
+    "numero": 116,
+    "titre": "Prurit"
+  },
+  {
+    "numero": 117,
+    "titre": "Psoriasis"
+  },
+  {
+    "numero": 118,
+    "titre": "La personne handicapée : bases de l'évaluation fonctionnelle et thérapeutique"
+  },
+  {
+    "numero": 119,
+    "titre": "Soin et accompagnement dans la maladie chronique et le handicap"
+  },
+  {
+    "numero": 120,
+    "titre": "Complications de l'immobilité et du décubitus. Prévention et prise en charge"
+  },
+  {
+    "numero": 121,
+    "titre": "Handicap psychique"
+  },
+  {
+    "numero": 122,
+    "titre": "Principales techniques de rééducation et de réadaptation"
+  },
+  {
+    "numero": 123,
+    "titre": "Vieillissement normal : aspects biologiques, fonctionnels et relationnels. Données épidémiologiques et sociologiques. Prévention du vieillissement pathologique"
+  },
+  {
+    "numero": 124,
+    "titre": "Ménopause, insuffisance ovarienne prématurée, andropause, déficit androgénique lié à l'âge"
+  },
+  {
+    "numero": 125,
+    "titre": "Troubles de la miction et incontinence urinaire de l'adulte et du sujet âgé"
+  },
+  {
+    "numero": 126,
+    "titre": "Trouble de l'érection"
+  },
+  {
+    "numero": 127,
+    "titre": "Hypertrophie bénigne de la prostate (HBP)"
+  },
+  {
+    "numero": 128,
+    "titre": "Ostéopathies fragilisantes"
+  },
+  {
+    "numero": 129,
+    "titre": "Arthrose"
+  },
+  {
+    "numero": 130,
+    "titre": "La personne âgée malade : particularités sémiologiques, psychologiques et thérapeutiques"
+  },
+  {
+    "numero": 131,
+    "titre": "Troubles de la marche et de l'équilibre"
+  },
+  {
+    "numero": 132,
+    "titre": "Troubles cognitifs du sujet âgé"
+  },
+  {
+    "numero": 133,
+    "titre": "Autonomie et dépendance chez le sujet âgé"
+  },
+  {
+    "numero": 134,
+    "titre": "Bases neurophysiologiques, mécanismes physiopathologiques d'une douleur aiguë et d'une douleur chronique"
+  },
+  {
+    "numero": 135,
+    "titre": "Thérapeutiques antalgiques, médicamenteuses et non médicamenteuses"
+  },
+  {
+    "numero": 136,
+    "titre": "Anesthésie locale, locorégionale et générale"
+  },
+  {
+    "numero": 137,
+    "titre": "Douleur chez l'enfant : évaluation et traitements antalgiques"
+  },
+  {
+    "numero": 138,
+    "titre": "Douleur chez la personne vulnérable"
+  },
+  {
+    "numero": 139,
+    "titre": "Soins palliatifs pluridisciplinaires chez un malade en phase palliative ou terminale d'une maladie grave, chronique ou létale (1). Principaux repères cliniques. Modalités d'organisation des équipes, en établissement de santé et en ambulatoire."
+  },
+  {
+    "numero": 140,
+    "titre": "Soins palliatifs pluridisciplinaires chez un malade en phase palliative ou terminale d'une maladie grave, chronique ou létale (2). Accompagnement de la personne malade et de son entourage. Principaux repères éthiques."
+  },
+  {
+    "numero": 141,
+    "titre": "Soins palliatifs pluridisciplinaires. La sédation pour détresse en phase terminale et dans des situations spécifiques et complexes en fin de vie. Réponse à la demande d'euthanasie ou de suicide assisté."
+  },
+  {
+    "numero": 142,
+    "titre": "Connaître les aspects spécifiques des soins palliatifs en pédiatrie"
+  },
+  {
+    "numero": 143,
+    "titre": "Connaître les aspects spécifiques des soins palliatifs en réanimation"
+  },
+  {
+    "numero": 144,
+    "titre": "Deuil normal et pathologique"
+  },
+  {
+    "numero": 145,
+    "titre": "Surveillance des maladies infectieuses transmissibles"
+  },
+  {
+    "numero": 146,
+    "titre": "Vaccinations"
+  },
+  {
+    "numero": 147,
+    "titre": "Fièvre aiguë chez l'enfant et l'adulte"
+  },
+  {
+    "numero": 148,
+    "titre": "Infections naso-sinusiennes de l'adulte et de l'enfant"
+  },
+  {
+    "numero": 149,
+    "titre": "Angines de l'adulte et de l'enfant et rhinopharyngites de l'enfant"
+  },
+  {
+    "numero": 150,
+    "titre": "Otites infectieuses de l'adulte et de l'enfant"
+  },
+  {
+    "numero": 151,
+    "titre": "Méningite, méningoencéphalite, abcès cérébral chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 152,
+    "titre": "Endocardite infectieuse"
+  },
+  {
+    "numero": 153,
+    "titre": "Surveillance des porteurs de valve et prothèses vasculaires"
+  },
+  {
+    "numero": 154,
+    "titre": "Infections broncho-pulmonaires communautaires de l'adulte et de l'enfant"
+  },
+  {
+    "numero": 155,
+    "titre": "Infections cutanéo-muqueuses et des phanères, bactériennes et mycosiques de l'adulte et de l'enfant"
+  },
+  {
+    "numero": 156,
+    "titre": "Infections ostéo-articulaires (IOA) de l'enfant et de l'adulte"
+  },
+  {
+    "numero": 157,
+    "titre": "Septicémie / Bactériémie / Fongémie de l'adulte et de l'enfant"
+  },
+  {
+    "numero": 158,
+    "titre": "Sepsis et choc septique de l'enfant et de l'adulte"
+  },
+  {
+    "numero": 159,
+    "titre": "Tuberculose de l'adulte et de l'enfant"
+  },
+  {
+    "numero": 160,
+    "titre": "Tétanos"
+  },
+  {
+    "numero": 161,
+    "titre": "Infections urinaires de l'enfant et de l'adulte"
+  },
+  {
+    "numero": 162,
+    "titre": "Infections sexuellement transmissibles (IST) : gonococcies, chlamydioses, syphilis, papillomavirus humain (HPV), trichomonose"
+  },
+  {
+    "numero": 163,
+    "titre": "Coqueluche"
+  },
+  {
+    "numero": 164,
+    "titre": "Exanthèmes fébriles de l'enfant"
+  },
+  {
+    "numero": 165,
+    "titre": "Oreillons"
+  },
+  {
+    "numero": 166,
+    "titre": "Grippe"
+  },
+  {
+    "numero": 167,
+    "titre": "Hépatites virales"
+  },
+  {
+    "numero": 168,
+    "titre": "Infections à herpès virus du sujet immunocompétent"
+  },
+  {
+    "numero": 169,
+    "titre": "Infections à VIH"
+  },
+  {
+    "numero": 170,
+    "titre": "Paludisme"
+  },
+  {
+    "numero": 171,
+    "titre": "Gale et pédiculose"
+  },
+  {
+    "numero": 172,
+    "titre": "Parasitoses digestives : giardiose, amoebose, téniasis, ascaridiose, oxyurose, anguillulose, cryptosporidiose"
+  },
+  {
+    "numero": 173,
+    "titre": "Zoonoses"
+  },
+  {
+    "numero": 174,
+    "titre": "Pathologie infectieuse chez les migrants adultes et enfants"
+  },
+  {
+    "numero": 175,
+    "titre": "Voyage en pays tropical de l'adulte et de l'enfant : conseils avant le départ, pathologies du retour : fièvre, diarrhée, manifestations cutanées"
+  },
+  {
+    "numero": 176,
+    "titre": "Diarrhées infectieuses de l'adulte et de l'enfant"
+  },
+  {
+    "numero": 177,
+    "titre": "Prescription et surveillance des anti-infectieux chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 178,
+    "titre": "Risques émergents, bioterrorisme, maladies hautement transmissibles"
+  },
+  {
+    "numero": 179,
+    "titre": "Risques sanitaires liés à l'eau et à l'alimentation. Toxi-infections alimentaires (TIAC)"
+  },
+  {
+    "numero": 180,
+    "titre": "Risques sanitaires liés aux irradiations. Radioprotection"
+  },
+  {
+    "numero": 181,
+    "titre": "La sécurité sanitaire des produits destinés à l'homme. La veille sanitaire."
+  },
+  {
+    "numero": 182,
+    "titre": "Environnement professionnel et santé au travail"
+  },
+  {
+    "numero": 183,
+    "titre": "Organisation de la médecine du travail. Prévention des risques professionnels."
+  },
+  {
+    "numero": 184,
+    "titre": "Accidents du travail et maladies professionnelles"
+  },
+  {
+    "numero": 185,
+    "titre": "Réaction inflammatoire : aspects biologiques et cliniques. Conduite à tenir"
+  },
+  {
+    "numero": 186,
+    "titre": "Hypersensibilités et allergies chez l'enfant et l'adulte : aspects physiopathologiques, épidémiologiques, diagnostiques et principes de traitement"
+  },
+  {
+    "numero": 187,
+    "titre": "Hypersensibilités et allergies cutanéo-muqueuses chez l'enfant et l'adulte. Urticaire, dermatites atopique et de contact, conjonctivite allergique"
+  },
+  {
+    "numero": 188,
+    "titre": "Hypersensibilité et allergies respiratoires chez l'enfant et chez l'adulte. Asthme, rhinite"
+  },
+  {
+    "numero": 189,
+    "titre": "Déficit immunitaire"
+  },
+  {
+    "numero": 190,
+    "titre": "Fièvre prolongée"
+  },
+  {
+    "numero": 191,
+    "titre": "Fièvre chez un patient immunodéprimé"
+  },
+  {
+    "numero": 192,
+    "titre": "Pathologies auto-immunes : aspects épidémiologiques, diagnostiques et principes de traitement"
+  },
+  {
+    "numero": 193,
+    "titre": "Connaître les principaux types de vascularite systémique : les organes cibles, les outils diagnostiques et les moyens thérapeutiques"
+  },
+  {
+    "numero": 194,
+    "titre": "Lupus systémique. Syndrome des anti-phospholipides (SAPL)"
+  },
+  {
+    "numero": 195,
+    "titre": "Artérite à cellules géantes"
+  },
+  {
+    "numero": 196,
+    "titre": "Polyarthrite rhumatoïde (PR)"
+  },
+  {
+    "numero": 197,
+    "titre": "Spondyloarthrite"
+  },
+  {
+    "numero": 198,
+    "titre": "Arthropathie microcristalline"
+  },
+  {
+    "numero": 199,
+    "titre": "Syndrome douloureux régional complexe (ex-algodystrophie)"
+  },
+  {
+    "numero": 200,
+    "titre": "Douleur et épanchement articulaire. Arthrite d'évolution récente."
+  },
+  {
+    "numero": 201,
+    "titre": "Transplantation d'organes : aspects épidémiologiques et immunologiques ; principes de traitement ; complications et pronostic ; aspects éthiques et légaux. Prélèvements d'organes et législation."
+  },
+  {
+    "numero": 202,
+    "titre": "Biothérapies et thérapies ciblées"
+  },
+  {
+    "numero": 203,
+    "titre": "Dyspnée aiguë et chronique"
+  },
+  {
+    "numero": 204,
+    "titre": "Toux chez l'enfant et chez l'adulte (avec le traitement)"
+  },
+  {
+    "numero": 205,
+    "titre": "Hémoptysie"
+  },
+  {
+    "numero": 206,
+    "titre": "Épanchement pleural liquidien"
+  },
+  {
+    "numero": 207,
+    "titre": "Opacités et masses intra-thoraciques chez l'enfant et chez l'adulte"
+  },
+  {
+    "numero": 208,
+    "titre": "Insuffisance respiratoire chronique chez l'adulte"
+  },
+  {
+    "numero": 209,
+    "titre": "Bronchopneumopathie chronique obstructive (BPCO)"
+  },
+  {
+    "numero": 210,
+    "titre": "Pneumopathie interstitielle diffuse (PID)"
+  },
+  {
+    "numero": 211,
+    "titre": "Sarcoïdose"
+  },
+  {
+    "numero": 212,
+    "titre": "Hémogramme chez l'adulte et l'enfant : indications et interprétation"
+  },
+  {
+    "numero": 213,
+    "titre": "Anémie chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 214,
+    "titre": "Thrombopénie chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 215,
+    "titre": "Purpuras chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 216,
+    "titre": "Syndrome hémorragique d'origine hématologique"
+  },
+  {
+    "numero": 217,
+    "titre": "Syndrome mononucléosique"
+  },
+  {
+    "numero": 218,
+    "titre": "Éosinophilie"
+  },
+  {
+    "numero": 219,
+    "titre": "Pathologie du fer chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 220,
+    "titre": "Adénopathie superficielle de l'adulte et de l'enfant"
+  },
+  {
+    "numero": 221,
+    "titre": "Athérome : épidémiologie et physiopathologie. Le malade polyathéromateux"
+  },
+  {
+    "numero": 222,
+    "titre": "Facteurs de risque cardio-vasculaire et prévention"
+  },
+  {
+    "numero": 223,
+    "titre": "Dyslipidémies"
+  },
+  {
+    "numero": 224,
+    "titre": "Hypertension artérielle (HTA) de l'adulte et de l'enfant"
+  },
+  {
+    "numero": 225,
+    "titre": "Artériopathie oblitérante de l'aorte (AOMI), des artères viscérales et des membres inférieurs ; anévrysmes"
+  },
+  {
+    "numero": 226,
+    "titre": "Thrombose veineuse profonde (TVP) et embolie pulmonaire (EP)"
+  },
+  {
+    "numero": 227,
+    "titre": "Insuffisance veineuse chronique et varices"
+  },
+  {
+    "numero": 228,
+    "titre": "Ulcère de jambe"
+  },
+  {
+    "numero": 229,
+    "titre": "Surveillance et complications des abords veineux"
+  },
+  {
+    "numero": 230,
+    "titre": "Douleur thoracique aiguë"
+  },
+  {
+    "numero": 231,
+    "titre": "Électrocardiogramme (ECG) : indications et interprétations"
+  },
+  {
+    "numero": 232,
+    "titre": "Fibrillation atriale (FA)"
+  },
+  {
+    "numero": 233,
+    "titre": "Valvulopathies"
+  },
+  {
+    "numero": 234,
+    "titre": "Insuffisance cardiaque de l'adulte"
+  },
+  {
+    "numero": 235,
+    "titre": "Péricardite aiguë"
+  },
+  {
+    "numero": 236,
+    "titre": "Troubles de la conduction intracardiaque"
+  },
+  {
+    "numero": 237,
+    "titre": "Palpitations"
+  },
+  {
+    "numero": 238,
+    "titre": "Souffle cardiaque chez l'enfant"
+  },
+  {
+    "numero": 239,
+    "titre": "Acrosyndromes (phénomène de Raynaud, érythermalgie, acrocyanose, engelures, ischémie digitale)"
+  },
+  {
+    "numero": 240,
+    "titre": "Hypoglycémie chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 241,
+    "titre": "Goitre, nodules thyroïdiens et cancers thyroïdiens"
+  },
+  {
+    "numero": 242,
+    "titre": "Hyperthyroïdie"
+  },
+  {
+    "numero": 243,
+    "titre": "Hypothyroïdie"
+  },
+  {
+    "numero": 244,
+    "titre": "Adénome hypophysaire"
+  },
+  {
+    "numero": 245,
+    "titre": "Insuffisance surrénale chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 246,
+    "titre": "Gynécomastie"
+  },
+  {
+    "numero": 247,
+    "titre": "Diabète sucré de types 1 et 2 de l'enfant et de l'adulte. Complications"
+  },
+  {
+    "numero": 248,
+    "titre": "Prévention primaire par la nutrition chez l'adulte et chez l'enfant"
+  },
+  {
+    "numero": 249,
+    "titre": "Modifications thérapeutiques du mode de vie (alimentation et activité physique) chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 250,
+    "titre": "Dénutrition chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 251,
+    "titre": "Amaigrissement à tous les âges"
+  },
+  {
+    "numero": 252,
+    "titre": "Troubles nutritionnels chez le sujet âgé"
+  },
+  {
+    "numero": 253,
+    "titre": "Obésité de l'enfant et de l'adulte"
+  },
+  {
+    "numero": 254,
+    "titre": "Besoins nutritionnels et grossesse"
+  },
+  {
+    "numero": 255,
+    "titre": "Diabète gestationnel"
+  },
+  {
+    "numero": 256,
+    "titre": "Aptitude au sport chez l'adulte et l'enfant ; besoins nutritionnels chez le sportif"
+  },
+  {
+    "numero": 257,
+    "titre": "Œdèmes des membres inférieurs localisés ou généralisés"
+  },
+  {
+    "numero": 258,
+    "titre": "Élévation de la créatininémie"
+  },
+  {
+    "numero": 259,
+    "titre": "Protéinurie et syndrome néphrotique chez l'adulte et chez l'enfant"
+  },
+  {
+    "numero": 260,
+    "titre": "Hématurie"
+  },
+  {
+    "numero": 261,
+    "titre": "Néphropathie glomérulaire"
+  },
+  {
+    "numero": 262,
+    "titre": "Néphropathies interstitielles"
+  },
+  {
+    "numero": 263,
+    "titre": "Néphropathies vasculaires"
+  },
+  {
+    "numero": 264,
+    "titre": "Insuffisance rénale chronique chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 265,
+    "titre": "Lithiase urinaire"
+  },
+  {
+    "numero": 266,
+    "titre": "Polykystose rénale"
+  },
+  {
+    "numero": 267,
+    "titre": "Troubles de l'équilibre acido-basique et désordres hydro-électrolytiques : troubles acide-base (acidose métabolique, acidose respiratoire, alcalose métabolique et alcalose respiratoire), hyperkaliémie, hypokaliémie, hypernatrémie, hyponatrémie"
+  },
+  {
+    "numero": 268,
+    "titre": "Hypercalcémie"
+  },
+  {
+    "numero": 269,
+    "titre": "Douleurs abdominales aiguës chez l'enfant et chez l'adulte"
+  },
+  {
+    "numero": 270,
+    "titre": "Douleurs lombaires aiguës chez l'enfant et chez l'adulte"
+  },
+  {
+    "numero": 271,
+    "titre": "Reflux gastro-œsophagien (RGO) chez le nourrisson, chez l'enfant et chez l'adulte. Hernie hiatale"
+  },
+  {
+    "numero": 272,
+    "titre": "Ulcère gastrique et duodénal (UGD). Gastrite."
+  },
+  {
+    "numero": 273,
+    "titre": "Dysphagie"
+  },
+  {
+    "numero": 274,
+    "titre": "Vomissements du nourrisson, de l'enfant et de l'adulte"
+  },
+  {
+    "numero": 275,
+    "titre": "Splénomégalie"
+  },
+  {
+    "numero": 276,
+    "titre": "Hépatomégalie et masse abdominale"
+  },
+  {
+    "numero": 277,
+    "titre": "Lithiase biliaire"
+  },
+  {
+    "numero": 278,
+    "titre": "Ictère"
+  },
+  {
+    "numero": 279,
+    "titre": "Cirrhose et complications"
+  },
+  {
+    "numero": 280,
+    "titre": "Ascite"
+  },
+  {
+    "numero": 281,
+    "titre": "Pancréatite chronique"
+  },
+  {
+    "numero": 282,
+    "titre": "Maladies inflammatoires chroniques de l'intestin (MICI)"
+  },
+  {
+    "numero": 283,
+    "titre": "Constipation chez l'enfant et l'adulte (avec le traitement)"
+  },
+  {
+    "numero": 284,
+    "titre": "Colopathie fonctionnelle"
+  },
+  {
+    "numero": 285,
+    "titre": "Diarrhée chronique chez l'adulte et l'enfant"
+  },
+  {
+    "numero": 286,
+    "titre": "Diarrhée aiguë et déshydratation chez le nourrisson, l'enfant et l'adulte"
+  },
+  {
+    "numero": 287,
+    "titre": "Diverticulose colique et diverticulite aiguë du sigmoïde"
+  },
+  {
+    "numero": 288,
+    "titre": "Pathologie hémorroïdaire"
+  },
+  {
+    "numero": 289,
+    "titre": "Hernie pariétale chez l'enfant et l'adulte"
+  },
+  {
+    "numero": 290,
+    "titre": "Épidémiologie, facteurs de risque, prévention et dépistage des cancers"
+  },
+  {
+    "numero": 291,
+    "titre": "Cancer : cancérogenèse, oncogénétique"
+  },
+  {
+    "numero": 292,
+    "titre": "Diagnostic des cancers : signes d'appel et investigations paracliniques ; caractérisation du stade ; pronostic"
+  },
+  {
+    "numero": 293,
+    "titre": "Le médecin préleveur de cellules et/ou de tissus pour des examens d'anatomie et cytologie pathologiques : connaître les principes de réalisation, transmission et utilisation des prélèvements à visée sanitaire et de recherche"
+  },
+  {
+    "numero": 294,
+    "titre": "Traitement des cancers : principales modalités, classes thérapeutiques et leurs complications majeures. La décision thérapeutique pluridisciplinaire et l'information du malade"
+  },
+  {
+    "numero": 295,
+    "titre": "Prise en charge et accompagnement d'un malade atteint de cancer en abordant les problématiques techniques, relationnelles, sociales et éthiques. Traitements symptomatiques. Modalités de surveillance."
+  },
+  {
+    "numero": 296,
+    "titre": "Agranulocytose médicamenteuse : conduite à tenir"
+  },
+  {
+    "numero": 297,
+    "titre": "Cancer de l'enfant : particularités épidémiologiques, diagnostiques et thérapeutiques"
+  },
+  {
+    "numero": 298,
+    "titre": "Tumeurs de la cavité buccale, naso-sinusiennes et du cavum, et des voies aérodigestives supérieures"
+  },
+  {
+    "numero": 299,
+    "titre": "Tumeurs intracrâniennes"
+  },
+  {
+    "numero": 300,
+    "titre": "Tumeurs du col utérin, tumeur du corps utérin"
+  },
+  {
+    "numero": 301,
+    "titre": "Tumeurs du côlon et du rectum"
+  },
+  {
+    "numero": 302,
+    "titre": "Tumeurs cutanées, épithéliales et mélaniques"
+  },
+  {
+    "numero": 303,
+    "titre": "Tumeurs de l'estomac"
+  },
+  {
+    "numero": 304,
+    "titre": "Tumeurs du foie, primitives et secondaires"
+  },
+  {
+    "numero": 305,
+    "titre": "Tumeurs de l'œsophage"
+  },
+  {
+    "numero": 306,
+    "titre": "Tumeurs de l'ovaire"
+  },
+  {
+    "numero": 307,
+    "titre": "Tumeurs des os primitives et secondaires"
+  },
+  {
+    "numero": 308,
+    "titre": "Tumeurs du pancréas"
+  },
+  {
+    "numero": 309,
+    "titre": "Tumeurs du poumon, primitives et secondaires"
+  },
+  {
+    "numero": 310,
+    "titre": "Tumeurs de la prostate"
+  },
+  {
+    "numero": 311,
+    "titre": "Tumeurs du rein de l'adulte"
+  },
+  {
+    "numero": 312,
+    "titre": "Tumeurs du sein"
+  },
+  {
+    "numero": 313,
+    "titre": "Tumeurs du testicule"
+  },
+  {
+    "numero": 314,
+    "titre": "Tumeurs vésicales"
+  },
+  {
+    "numero": 315,
+    "titre": "Leucémies aiguës"
+  },
+  {
+    "numero": 316,
+    "titre": "Syndromes myélodysplasiques"
+  },
+  {
+    "numero": 317,
+    "titre": "Syndromes myéloprolifératifs"
+  },
+  {
+    "numero": 318,
+    "titre": "Leucémies lymphoïdes chroniques (LLC)"
+  },
+  {
+    "numero": 319,
+    "titre": "Lymphomes malins"
+  },
+  {
+    "numero": 320,
+    "titre": "Myélome multiple des os"
+  },
+  {
+    "numero": 321,
+    "titre": "Principe du bon usage du médicament"
+  },
+  {
+    "numero": 322,
+    "titre": "La décision thérapeutique personnalisée : bon usage dans des situations à risque"
+  },
+  {
+    "numero": 323,
+    "titre": "Analyser et utiliser les résultats des études cliniques dans la perspective du bon usage : analyse critique, recherche clinique et niveaux de preuve"
+  },
+  {
+    "numero": 324,
+    "titre": "Éducation thérapeutique, observance et automédication"
+  },
+  {
+    "numero": 325,
+    "titre": "Identification et gestion des risques liés aux médicaments et aux biomatériaux, risque iatrogène, erreur médicamenteuse"
+  },
+  {
+    "numero": 326,
+    "titre": "Cadre réglementaire de la prescription thérapeutique et recommandations pour le bon usage"
+  },
+  {
+    "numero": 327,
+    "titre": "Principes de la médecine intégrative, utilité et risques des interventions non médicamenteuses et des thérapies complémentaires"
+  },
+  {
+    "numero": 328,
+    "titre": "Thérapeutiques non médicamenteuses et dispositifs médicaux"
+  },
+  {
+    "numero": 329,
+    "titre": "Transfusion sanguine et produits dérivés du sang : indications, complications. Hémovigilance"
+  },
+  {
+    "numero": 330,
+    "titre": "Prescription et surveillance des classes de médicaments les plus courantes chez l'adulte et chez l'enfant, hors anti-infectieux"
+  },
+  {
+    "numero": 331,
+    "titre": "Arrêt cardiorespiratoire (ACR)"
+  },
+  {
+    "numero": 332,
+    "titre": "État de choc. Principales étiologies : hypovolémique, septique, cardiogénique, anaphylactique"
+  },
+  {
+    "numero": 333,
+    "titre": "Situations sanitaires exceptionnelles"
+  },
+  {
+    "numero": 334,
+    "titre": "Prise en charge pré-hospitalière et à l'hôpital : brûlé, traumatisé sévère, traumatisé thoracique, traumatisé abdominal, traumatisé des membres et/ou du bassin, traumatisé du rachis ou vertébromédullaire, traumatisé crânien"
+  },
+  {
+    "numero": 335,
+    "titre": "Orientation diagnostique et conduite à tenir devant un traumatisme maxillo-facial et oculaire"
+  },
+  {
+    "numero": 336,
+    "titre": "Coma non traumatique chez l'adulte et chez l'enfant"
+  },
+  {
+    "numero": 337,
+    "titre": "Principales intoxications aiguës"
+  },
+  {
+    "numero": 338,
+    "titre": "Œdème de Quincke et anaphylaxie"
+  },
+  {
+    "numero": 339,
+    "titre": "Syndromes coronariens aigus (SCA)"
+  },
+  {
+    "numero": 340,
+    "titre": "Accidents vasculaires cérébraux (AVC)"
+  },
+  {
+    "numero": 341,
+    "titre": "Hémorragie méningée"
+  },
+  {
+    "numero": 342,
+    "titre": "Malaise, perte de connaissance, crise convulsive chez l'adulte"
+  },
+  {
+    "numero": 343,
+    "titre": "État confusionnel et trouble de conscience chez l'adulte et chez l'enfant"
+  },
+  {
+    "numero": 344,
+    "titre": "Prééclampsie"
+  },
+  {
+    "numero": 345,
+    "titre": "Malaise grave du nourrisson et mort inattendue du nourrisson"
+  },
+  {
+    "numero": 346,
+    "titre": "Convulsions chez le nourrisson et chez l'enfant"
+  },
+  {
+    "numero": 347,
+    "titre": "Rétention aiguë d'urine"
+  },
+  {
+    "numero": 348,
+    "titre": "Insuffisance rénale aiguë, anurie"
+  },
+  {
+    "numero": 349,
+    "titre": "Infection aiguë des parties molles (abcès, panaris, phlegmon des gaines)"
+  },
+  {
+    "numero": 350,
+    "titre": "Grosse jambe rouge aiguë"
+  },
+  {
+    "numero": 351,
+    "titre": "Agitation et délire aigus"
+  },
+  {
+    "numero": 352,
+    "titre": "Crise d'angoisse aiguë et attaque de panique"
+  },
+  {
+    "numero": 353,
+    "titre": "Risque et conduite suicidaires chez l'enfant, l'adolescent et l'adulte : identification et prise en charge"
+  },
+  {
+    "numero": 354,
+    "titre": "Syndrome occlusif de l'enfant et de l'adulte"
+  },
+  {
+    "numero": 355,
+    "titre": "Hémorragie digestive"
+  },
+  {
+    "numero": 356,
+    "titre": "Appendicite de l'enfant et de l'adulte"
+  },
+  {
+    "numero": 357,
+    "titre": "Péritonite aiguë chez l'enfant et chez l'adulte"
+  },
+  {
+    "numero": 358,
+    "titre": "Pancréatite aiguë"
+  },
+  {
+    "numero": 359,
+    "titre": "Détresse et insuffisance respiratoire aiguë du nourrisson, de l'enfant et de l'adulte"
+  },
+  {
+    "numero": 360,
+    "titre": "Pneumothorax"
+  },
+  {
+    "numero": 361,
+    "titre": "Lésions péri-articulaires et ligamentaires du genou, de la cheville et de l'épaule"
+  },
+  {
+    "numero": 362,
+    "titre": "Prothèses et ostéosynthèses"
+  },
+  {
+    "numero": 363,
+    "titre": "Fractures fréquentes de l'adulte et du sujet âgé"
+  },
+  {
+    "numero": 364,
+    "titre": "Fractures chez l'enfant : particularités épidémiologiques, diagnostiques et thérapeutiques"
+  },
+  {
+    "numero": 365,
+    "titre": "Surveillance d'un malade sous plâtre/résine, diagnostiquer une complication"
+  },
+  {
+    "numero": 366,
+    "titre": "Exposition accidentelle aux liquides biologiques : conduite à tenir"
+  },
+  {
+    "numero": 367,
+    "titre": "Impact de l'environnement sur la santé"
+  }
+]
