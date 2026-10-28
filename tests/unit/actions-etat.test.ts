@@ -91,11 +91,43 @@ describe('collèges', () => {
   it('reimporterCollege remplace les items par numéro et garde les créneaux', () => {
     const e0 = avec(base(), creneau('k1', 'c1:300'), creneau('k2', 'c1:301'))
     const e = reimporterCollege(e0, 'c1', [extrait(300, 160, 30, 'Nouveau titre'), extrait(302, 200, 5)])
-    expect(Object.keys(e.items).sort()).toEqual(['c1:300', 'c1:302'])
+    // 301 a disparu mais k2 le référence : l'item est gardé, titre figé, à vérifier
+    expect(Object.keys(e.items).sort()).toEqual(['c1:300', 'c1:301', 'c1:302'])
+    expect(e.items['c1:301']).toEqual({ ...e0.items['c1:301'], aVerifier: true })
     expect(e.items['c1:300']).toMatchObject({ pageDebut: 160, pages: 30, titre: 'Nouveau titre' })
     // les deux créneaux sont conservés, y compris celui dont le numéro a disparu
     expect(e.creneaux.k1).toBe(e0.creneaux.k1)
     expect(e.creneaux.k2).toBe(e0.creneaux.k2)
+  })
+
+  it('reimporterCollege garde (aVerifier) un item disparu tant qu un créneau le référence, sinon le retire', () => {
+    const e0 = avec(
+      ajouterCollege(base(), 'Cardio', [], () => 'c2'),
+      creneau('k1', 'c1:301', { versionExportee: null }),
+    )
+    // 300 (sans créneau) et 301 (avec créneau) disparaissent, 302 apparaît
+    const e = reimporterCollege(e0, 'c1', [extrait(302, 200, 5)])
+    expect(Object.keys(e.items).sort()).toEqual(['c1:301', 'c1:302'])
+    expect(e.items['c1:301']).toEqual({ ...e0.items['c1:301'], aVerifier: true })
+    expect(e.items['c1:300']).toBeUndefined()
+    expect(e.creneaux.k1).toBe(e0.creneaux.k1)
+    // le créneau est exporté normalement, avec son titre figé
+    expect(evenementsExport(e, 'tout').map((v) => v.resume)).toEqual(['📚 301 · Item 301 · T1'])
+    expect(changementsEnAttente(e).nouveaux.map((c) => c.id)).toEqual(['k1'])
+  })
+
+  it("changementsEnAttente et evenementsExport s'accordent même pour un état sans item", () => {
+    const e = avec(
+      base(),
+      creneau('ok', 'c1:300'),
+      creneau('orphelin', 'c1:999', { debut: '2026-11-04T09:00' }),
+      creneau('orphelinMod', 'c1:998', { debut: '2026-11-04T10:00', version: 2, versionExportee: 1 }),
+    )
+    const ch = changementsEnAttente(e)
+    expect(ch.nouveaux.length).toBe(evenementsExport(e, 'nouveaux').length)
+    expect(ch.modifies.length).toBe(evenementsExport(e, 'modifies').length)
+    expect(evenementsExport(e, 'tout')).toHaveLength(1)
+    expect(ch.nouveaux.map((c) => c.id)).toEqual(['ok'])
   })
 
   it("reimporterCollege ne touche pas aux items d'un autre collège", () => {

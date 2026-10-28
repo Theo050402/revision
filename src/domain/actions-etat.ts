@@ -71,12 +71,21 @@ export function ajouterCollege(
 
 /**
  * Réimport (§5.7) : les items du collège sont remplacés, rapprochés par numéro. Les créneaux ne
- * sont pas touchés, y compris ceux dont le numéro a disparu (l'interface les signale).
+ * sont pas touchés. Un item absent du nouvel import est conservé, titre figé et `aVerifier`
+ * à true, tant qu'au moins un créneau le référence ; sinon il est retiré.
  */
 export function reimporterCollege(e: Etat, collegeId: string, items: ItemExtrait[]): Etat {
   if (!e.colleges[collegeId]) return e
+  const nouveaux = itemsDe(collegeId, items)
+  const references = new Set(Object.values(e.creneaux).map((c) => c.itemId))
   const autres = filtrer(e.items, (it) => it.collegeId !== collegeId)
-  return { ...e, items: { ...autres, ...itemsDe(collegeId, items) } }
+  const figes: Record<string, Item> = {}
+  for (const it of Object.values(e.items)) {
+    if (it.collegeId === collegeId && !(it.id in nouveaux) && references.has(it.id)) {
+      figes[it.id] = { ...it, aVerifier: true }
+    }
+  }
+  return { ...e, items: { ...autres, ...figes, ...nouveaux } }
 }
 
 export function modifierCollege(
@@ -216,6 +225,21 @@ export function conflits(e: Etat): { indispoId: string; creneauIds: string[] }[]
 const parDebut = (a: Creneau, b: Creneau): number =>
   (a.debut ?? '').localeCompare(b.debut ?? '') || a.id.localeCompare(b.id)
 
+type Place = Creneau & { debut: string }
+
+/**
+ * Créneaux placés (hors bac) dont l'item et le collège sont connus, triés par début. Source
+ * unique du compteur de changements et du fichier exporté : ils ne peuvent pas diverger.
+ */
+function placesExportables(e: Etat): Place[] {
+  const res: Place[] = []
+  for (const c of Object.values(e.creneaux)) {
+    const item = e.items[c.itemId]
+    if (c.debut !== null && item && e.colleges[item.collegeId]) res.push({ ...c, debut: c.debut })
+  }
+  return res.sort(parDebut)
+}
+
 /**
  * Ce qui reste à exporter (§12.1) : créneaux placés jamais exportés, créneaux placés exportés
  * puis modifiés, et suppressions en attente. Le bac « À placer » n'est jamais exporté.
@@ -225,20 +249,19 @@ export function changementsEnAttente(e: Etat): {
   modifies: Creneau[]
   suppressions: SuppressionEnAttente[]
 } {
-  const places = Object.values(e.creneaux)
-    .filter((c) => c.debut !== null)
-    .sort(parDebut)
+  return { ...partage(placesExportables(e)), suppressions: Object.values(e.suppressions) }
+}
+
+function partage(places: Place[]): { nouveaux: Place[]; modifies: Place[] } {
   return {
     nouveaux: places.filter((c) => c.versionExportee === null),
     modifies: places.filter((c) => c.versionExportee !== null && c.versionExportee !== c.version),
-    suppressions: Object.values(e.suppressions),
   }
 }
 
-function enEvenement(e: Etat, c: Creneau & { debut: string }): EvenementIcs | null {
+function enEvenement(e: Etat, c: Place): EvenementIcs {
   const item = e.items[c.itemId]
-  const college = item && e.colleges[item.collegeId]
-  if (!item || !college) return null
+  const college = e.colleges[item.collegeId]
   return {
     uid: `${c.id}@revisions-emma`,
     sequence: c.version,
@@ -248,29 +271,19 @@ function enEvenement(e: Etat, c: Creneau & { debut: string }): EvenementIcs | nu
       `📚 ${item.numero} · ${item.titre} · T${c.tour}` + (c.partie ? ` · ${c.partie.i}/${c.partie.n}` : ''),
     description:
       `${college.nom} · p. ${item.pageDebut}–${item.pageDebut + item.pages} (${item.pages} p)` +
-      (c.note ? `\n${c.note}` : ''),
+      (c.note ? `
+${c.note}` : ''),
     categorie: college.nom,
     rappel: e.reglages.rappel,
   }
 }
 
-/**
- * Événements à écrire dans le .ics. Un créneau dont l'item a disparu (réimport) n'est pas
- * exporté : son titre n'est plus connu.
- */
+/** Événements à écrire dans le .ics, sur le même ensemble de créneaux que `changementsEnAttente`. */
 export function evenementsExport(e: Etat, portee: 'nouveaux' | 'modifies' | 'tout'): EvenementIcs[] {
-  let creneaux: Creneau[]
-  if (portee === 'tout') {
-    creneaux = Object.values(e.creneaux)
-      .filter((c) => c.debut !== null)
-      .sort(parDebut)
-  } else {
-    const ch = changementsEnAttente(e)
-    creneaux = portee === 'nouveaux' ? ch.nouveaux : ch.modifies
-  }
-  return creneaux
-    .map((c) => enEvenement(e, c as Creneau & { debut: string }))
-    .filter((v): v is EvenementIcs => v !== null)
+  const places = placesExportables(e)
+  const ch = partage(places)
+  const retenus = portee === 'tout' ? places : portee === 'nouveaux' ? ch.nouveaux : ch.modifies
+  return retenus.map((c) => enEvenement(e, c))
 }
 
 /** Après la livraison : `versionExportee = version` ; le premier export est fait. */

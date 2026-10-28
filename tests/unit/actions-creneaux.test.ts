@@ -118,6 +118,13 @@ describe('libelleSuppression', () => {
       '300 · T2 · mardi 5 nov. 9h30',
     )
   })
+
+  it("item disparu : le numéro vient de la fin de l'itemId, jamais d'un identifiant complet", () => {
+    const e = base()
+    expect(libelleSuppression(e, creneau('A', { itemId: 'a1b2-c3d4:302' }))).toBe(
+      '302 · T1 · mardi 5 nov. 14h',
+    )
+  })
 })
 
 describe('deposerItem', () => {

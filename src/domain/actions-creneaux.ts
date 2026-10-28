@@ -33,7 +33,8 @@ function libelleHeure(minutes: number): string {
 
 /** « 300 · T1 · mardi 5 nov. 14h » (spec §4, SuppressionEnAttente.libelle). */
 export function libelleSuppression(e: Etat, c: Creneau): string {
-  const numero = e.items[c.itemId]?.numero ?? c.itemId
+  // Item disparu (réimport) : le numéro est la fin de l'itemId, jamais l'identifiant complet.
+  const numero = e.items[c.itemId]?.numero ?? c.itemId.slice(c.itemId.lastIndexOf(':') + 1)
   const tete = `${numero} · T${c.tour}`
   if (c.debut === null) return `${tete} · à placer`
   const [a, m, j] = jourDe(c.debut).split('-').map(Number)
