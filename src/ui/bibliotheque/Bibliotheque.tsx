@@ -13,7 +13,7 @@ import { effacerTrou, useTrou } from '../trou'
 import { useDisposition } from '../useDisposition'
 import { CarteItem } from './CarteItem'
 import { FicheItem } from './FicheItem'
-import { libelleQuand } from './libelles'
+import { libelleQuand, reutiliser } from './libelles'
 import { FILTRES_VIDES, filtrer, type EtatFiltre, type Filtres, type Longueur } from './recherche'
 import { aPlanifier, dureeProchainTour, pourCombler, trouLibre } from './suggestions'
 import './bibliotheque.css'
@@ -63,9 +63,13 @@ export function Bibliotheque({ onSelectionChange }: Props) {
   const [ficheId, setFicheId] = useState<string | null>(null)
   const dernierOuvert = useRef<string | null>(null)
 
+  // Le rappel du parent est lu par une ref : un rappel en ligne qui modifie l'état du parent ne relance pas l'effet
+  // (sinon : boucle de rendus). L'effet ne dépend que de la sélection.
+  const rappelSelection = useRef(onSelectionChange)
+  rappelSelection.current = onSelectionChange
   useEffect(() => {
-    onSelectionChange?.([...selection])
-  }, [selection, onSelectionChange])
+    rappelSelection.current?.([...selection])
+  }, [selection])
 
   // Une sélection ne survit pas à un item disparu (réimport).
   useEffect(() => {
@@ -77,7 +81,10 @@ export function Bibliotheque({ onSelectionChange }: Props) {
 
   const creneaux = useMemo(() => Object.values(etat.creneaux), [etat.creneaux])
 
-  // Tours, prochain tour et durée de chaque item : une seule passe sur les créneaux par rendu.
+  // Tours, prochain tour et durée de chaque item : une seule passe sur les créneaux par rendu. Les tableaux de
+  // tours gardent leur référence tant que leur contenu ne change pas : sans cela, les 367 cartes mémoïsées se
+  // redessineraient à chaque action sur le calendrier.
+  const vuesPrecedentes = useRef(new Map<string, { etats: EtatTour[]; meta: string }>())
   const vues = useMemo(() => {
     const tours = etatToursParItem(creneaux)
     const derniers = dernierTourParItem(creneaux)
@@ -86,10 +93,11 @@ export function Bibliotheque({ onSelectionChange }: Props) {
       const prochain = (derniers.get(it.id) ?? 0) + 1
       const duree = formaterDuree(dureeProchainTour(etat, it, derniers))
       m.set(it.id, {
-        etats: tours.get(it.id) ?? [],
+        etats: reutiliser(vuesPrecedentes.current.get(it.id)?.etats, tours.get(it.id) ?? []),
         meta: `${it.pages} p · ${prochain > 1 ? `T${prochain} ` : ''}${duree}`,
       })
     }
+    vuesPrecedentes.current = m
     return m
   }, [etat, creneaux])
 

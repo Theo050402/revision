@@ -30,3 +30,12 @@ export function descriptionTours(etats: EtatTour[]): string {
   if (etats.length === 0) return 'Pas encore vu'
   return etats.map((e, i) => `T${i + 1} ${e === 'fait' ? 'fait' : 'planifié'}`).join(', ')
 }
+
+/**
+ * Garde la référence du tableau précédent quand son contenu est identique : les cartes (mémoïsées) ne se
+ * redessinent alors pas à chaque modification de l'état, seulement quand leurs tours changent.
+ */
+export function reutiliser(precedent: EtatTour[] | undefined, suivant: EtatTour[]): EtatTour[] {
+  if (precedent && precedent.length === suivant.length && precedent.every((e, i) => e === suivant[i])) return precedent
+  return suivant
+}

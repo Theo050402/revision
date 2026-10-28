@@ -6,10 +6,10 @@ export type Officiel = { numero: number; titre: string }
 export function normaliser(s: string): string {
   return s
     .toLowerCase()
-    .replace(/œ/g, 'oe')
-    .replace(/æ/g, 'ae')
+    .replace(/\u0153/g, 'oe')
+    .replace(/\u00e6/g, 'ae')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
 }
 
 let index: { numero: number; titre: string; norme: string }[] | undefined

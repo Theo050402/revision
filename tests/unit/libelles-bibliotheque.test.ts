@@ -27,3 +27,21 @@ describe('pointsTours', () => {
     expect(descriptionTours(['fait', 'planifie'])).toBe('T1 fait, T2 planifié')
   })
 })
+
+describe('reutiliser (stabilité des références pour le memo des cartes)', () => {
+  test('garde la référence précédente si le contenu est identique', async () => {
+    const { reutiliser } = await import('../../src/ui/bibliotheque/libelles')
+    const avant: ('fait' | 'planifie')[] = ['fait', 'planifie']
+    expect(reutiliser(avant, ['fait', 'planifie'])).toBe(avant)
+    expect(reutiliser([], [])).toEqual([])
+  })
+  test('prend la nouvelle référence si le contenu change ou s\'il n\'y avait rien avant', async () => {
+    const { reutiliser } = await import('../../src/ui/bibliotheque/libelles')
+    const avant: ('fait' | 'planifie')[] = ['fait', 'planifie']
+    const suivant: ('fait' | 'planifie')[] = ['fait', 'fait']
+    expect(reutiliser(avant, suivant)).toBe(suivant)
+    expect(reutiliser(avant, ['fait'])).toEqual(['fait'])
+    const nouveau: ('fait' | 'planifie')[] = ['planifie']
+    expect(reutiliser(undefined, nouveau)).toBe(nouveau)
+  })
+})

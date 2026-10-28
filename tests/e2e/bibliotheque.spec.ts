@@ -216,3 +216,41 @@ test('iPad : pas de « Planifier… » (le glisser-déposer le remplacera)', asy
   await expect(b.getByRole('heading', { name: /Tumeurs de la cavité buccale/ })).toBeVisible()
   await expect(b.getByRole('button', { name: 'Planifier…' })).toHaveCount(0)
 })
+
+test('thème sombre : cartes, titres et pastilles prennent les jetons de « Garde de nuit »', async ({ page }, info) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  const b = await ouvrir(page, info)
+  /** Valeur calculée d'un jeton de couleur, lue sur un élément témoin (le jeton lui-même est une chaîne brute). */
+  const jeton = (propriete: 'background-color' | 'color', nom: string) =>
+    page.evaluate(
+      ([p, n]) => {
+        const temoin = document.createElement('div')
+        temoin.style.setProperty(p, `var(${n})`)
+        document.body.append(temoin)
+        const v = getComputedStyle(temoin).getPropertyValue(p)
+        temoin.remove()
+        return v
+      },
+      [propriete, nom] as const,
+    )
+
+  // §13.2 : cartes #33264A, texte #E6E6FA. Les couleurs s'animent en 120 ms : on attend qu'elles aient fini.
+  expect(await jeton('background-color', '--card')).toBe('rgb(51, 38, 74)')
+  expect(await jeton('color', '--ink')).toBe('rgb(230, 230, 250)')
+  const carte = liste(b).locator('.carte-item').first()
+  await expect.poll(() => carte.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(51, 38, 74)')
+  await expect(carte.locator('.carte-titre')).toHaveCSS('color', 'rgb(230, 230, 250)')
+  await expect(b.getByRole('button', { name: 'Hépato-gastro', exact: true })).toHaveCSS('color', 'rgb(230, 230, 250)')
+  // La pastille de numéro garde l'encre sombre sur le surligneur, dans les deux thèmes.
+  await expect(carte.locator('.carte-pastille')).toHaveCSS('color', 'rgb(30, 42, 90)')
+
+  // iPhone : les champs de « Planifier… » sont aussi thémés (fond des champs, texte).
+  if (info.project.name === 'iphone') {
+    await carte.locator('.carte-corps').click()
+    await b.getByRole('button', { name: 'Planifier…' }).click()
+    for (const champ of [b.getByLabel('Jour', { exact: true }), b.locator('.fiche-form select')]) {
+      await expect(champ).toHaveCSS('background-color', await jeton('background-color', '--field'))
+      await expect(champ).toHaveCSS('color', 'rgb(230, 230, 250)')
+    }
+  }
+})
