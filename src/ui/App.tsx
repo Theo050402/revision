@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { jourDe, utcVersLocal } from '../domain/temps'
 import { BarreHaut } from './BarreHaut'
+import { Calendrier } from './calendrier/Calendrier'
+import { useAujourdhui } from './calendrier/maintenant'
 import type { Ecran, Vue } from './ecran'
-import { EmplacementBibliotheque, EmplacementCalendrier, EmplacementRestauration } from './Emplacements'
+import { EmplacementBibliotheque, EmplacementRestauration } from './Emplacements'
 import { Feuille } from './Feuille'
 import { fermerImport, useDemandeImport } from './importDemande'
 import { Import } from './screens/Import'
@@ -86,8 +87,16 @@ function Coque() {
   const [vue, setVue] = useState<Vue>(() => (disposition === 'ipad' ? 'semaine' : 'jour'))
   const [panneauOuvert, setPanneauOuvert] = useState(true)
   const [feuilleOuverte, setFeuilleOuverte] = useState(false)
-  // Jour affiché par le calendrier (aujourd'hui, en heure de Paris) ; le calendrier le pilotera.
-  const [jour] = useState(() => jourDe(utcVersLocal(new Date())))
+  // Jour affiché par le calendrier. « Aujourd'hui » est le vrai jour de Paris, rafraîchi chaque minute :
+  // si Emma regarde le jour courant quand minuit passe, l'affichage suit.
+  const aujourdhui = useAujourdhui()
+  const [jour, setJour] = useState(aujourdhui)
+  const veille = useRef(aujourdhui)
+  useEffect(() => {
+    const precedent = veille.current
+    veille.current = aujourdhui
+    setJour((j) => (j === precedent ? aujourdhui : j))
+  }, [aujourdhui])
 
   const coque = useRef<HTMLDivElement>(null)
   const boutonItems = useRef<HTMLButtonElement>(null)
@@ -161,8 +170,19 @@ function Coque() {
             </p>
           )}
 
-          <main className="zone">
-            {ecran === 'calendrier' && <EmplacementCalendrier vue={vue} />}
+          <main className={ecran === 'calendrier' ? 'zone zone-calendrier' : 'zone'}>
+            {ecran === 'calendrier' && (
+              <Calendrier
+                vue={vue}
+                jour={jour}
+                disposition={disposition}
+                onJour={setJour}
+                onOuvrirJour={(j) => {
+                  setJour(j)
+                  setVue('jour')
+                }}
+              />
+            )}
             {ecran === 'reglages' && <Reglages onRetour={() => setEcran('calendrier')} />}
             {ecran === 'import' && (
               <Import

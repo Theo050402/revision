@@ -19,18 +19,6 @@ export function EmplacementBibliotheque() {
   )
 }
 
-/** Zone du calendrier (tâches 17 et suivantes). */
-export function EmplacementCalendrier({ vue }: { vue: string }) {
-  return (
-    <section className="ecran ecran-centre" aria-labelledby="titre-calendrier" data-emplacement="calendrier">
-      <div className="carte carte-vide">
-        <h1 id="titre-calendrier">Calendrier</h1>
-        <p>La vue {vue} arrive ici.</p>
-      </div>
-    </section>
-  )
-}
-
 /** Point d'entrée de la restauration d'une sauvegarde quand la lecture a échoué (tâche 19). */
 export function EmplacementRestauration() {
   return (

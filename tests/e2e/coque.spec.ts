@@ -71,7 +71,7 @@ test('changer de vue met à jour la sélection', async ({ page }) => {
   await page.goto('./')
   await page.getByRole('button', { name: 'Mois', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Mois', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('region', { name: 'Calendrier' })).toContainText('vue mois')
+  await expect(page.locator('.mois-vue')).toBeVisible()
 })
 
 test('le thème suit le réglage Apparence', async ({ page }) => {

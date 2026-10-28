@@ -15,6 +15,14 @@
   --now: #d9473f;
   --margin: #f3b9b4;
   --lock-bg: #eef2f8;
+  /* Blocs du calendrier (spec §13) : dégradé de la teinte du collège (opacité 0,85 → 0,6) et trait d'encre
+     en clair ; carte sombre, bord et lueur de la teinte en sombre. `--teinte` est posée sur chaque bloc. */
+  --bloc-a1: 85%;
+  --bloc-a2: 60%;
+  --bloc-fond: transparent;
+  --bloc-trait: 3px;
+  --bloc-trait-teinte: 0%;
+  --bloc-lueur: 0%;
   color-scheme: light;
 }
 
@@ -33,6 +41,12 @@
   --margin: #b86f6a;
   --lock-bg: #3a2d53;
   --grille: #3a2d53;
+  --bloc-a1: 0%;
+  --bloc-a2: 0%;
+  --bloc-fond: var(--card);
+  --bloc-trait: 4px;
+  --bloc-trait-teinte: 100%;
+  --bloc-lueur: 100%;
   color-scheme: dark;
 }
 
@@ -54,6 +68,12 @@
     --margin: #b86f6a;
     --lock-bg: #3a2d53;
     --grille: #3a2d53;
+    --bloc-a1: 0%;
+    --bloc-a2: 0%;
+    --bloc-fond: var(--card);
+    --bloc-trait: 4px;
+    --bloc-trait-teinte: 100%;
+    --bloc-lueur: 100%;
     color-scheme: dark;
   }
 }
