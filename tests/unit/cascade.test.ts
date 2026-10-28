@@ -144,9 +144,11 @@ describe('placer', () => {
   it('invariant : après la cascade, ni pose/pose ni pose/verrou ne se chevauchent, tout reste dans les bornes', () => {
     const chevauche = (a: Intervalle, b: Intervalle) => a.debut < b.fin && b.debut < a.fin
     let verifies = 0
+    let reussis = 0
     for (const { entree: e, attendu } of Object.values(CAS)) {
       const r = placer(e)
       expect(r).toEqual(attendu)
+      if (attendu.ok) reussis++
       if (!r.ok) continue
       const finales = [
         ...e.poses.map((p) => ({ id: p.id, debut: r.debuts[p.id] ?? p.debut, duree: p.duree })),
@@ -161,7 +163,8 @@ describe('placer', () => {
       })
       verifies++
     }
-    expect(verifies).toBe(7)
+    expect(verifies).toBe(reussis)
+    expect(verifies).toBeGreaterThan(0)
   })
 
   it('une pose non déplacée n’apparaît pas dans debuts', () => {
@@ -175,5 +178,72 @@ describe('placer', () => {
       }),
     )
     expect(r).toEqual({ ok: true, debuts: { N: 600, A: 660 } })
+  })
+
+  it('une pose déjà hors bornes et non déplacée ne provoque pas de refus', () => {
+    const r = placer(
+      entree({
+        poses: [pose('A', 600, 660), pose('Z', 1350, 1410)],
+        nouveau: { id: 'N', duree: 60 },
+        t: 600,
+        cibleId: 'A',
+        moitie: 'haute',
+      }),
+    )
+    expect(r).toEqual({ ok: true, debuts: { N: 600, A: 660 } })
+  })
+
+  it('cible qui chevauche S sans être la première chevauchée', () => {
+    const r = placer(
+      entree({
+        poses: [pose('A', 780, 840), pose('B', 840, 900)],
+        nouveau: { id: 'N', duree: 60 },
+        t: 810,
+        cibleId: 'B',
+        moitie: 'haute',
+      }),
+    )
+    expect(r).toEqual({ ok: true, debuts: { N: 810, B: 870, A: 750 } })
+  })
+
+  it('cible qui ne chevauche pas S : repli sur la première chevauchée, moitié haute', () => {
+    const r = placer(
+      entree({
+        poses: [pose('A', 780, 840), pose('B', 1000, 1060)],
+        nouveau: { id: 'N', duree: 120 },
+        t: 720,
+        cibleId: 'B',
+        moitie: 'basse',
+      }),
+    )
+    expect(r).toEqual({ ok: true, debuts: { N: 720, A: 840 } })
+  })
+
+  it('saut de verrou vers le haut puis dépassement de bornes.debut : refus', () => {
+    const r = placer(
+      entree({
+        poses: [pose('A', 780, 840)],
+        verrous: [{ debut: 450, fin: 780 }],
+        nouveau: { id: 'N', duree: 60 },
+        t: 800,
+        cibleId: 'A',
+        moitie: 'basse',
+      }),
+    )
+    expect(r).toEqual({ ok: false })
+  })
+
+  it('l’ordre des poses en entrée ne change pas le résultat', () => {
+    const base = entree({
+      poses: [pose('A', 840, 960), pose('B', 960, 1020), pose('C', 780, 840)],
+      nouveau: { id: 'N', duree: 60 },
+      t: 930,
+      cibleId: 'A',
+      moitie: 'basse',
+    })
+    const trie = placer(base)
+    const melange = placer({ ...base, poses: [base.poses[1], base.poses[2], base.poses[0]] })
+    expect(trie.ok).toBe(true)
+    expect(melange).toEqual(trie)
   })
 })

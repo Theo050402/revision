@@ -55,8 +55,10 @@ export function placer(e: EntreePlacement): ResultatPlacement {
         v = verrous.find((x) => chevauche({ debut: nd, fin: nd + p.duree }, x))
       }
     }
-    if (nd + p.duree > bornes.fin) return { ok: false }
-    if (nd !== p.debut) debuts[p.id] = nd
+    if (nd !== p.debut) {
+      if (nd + p.duree > bornes.fin) return { ok: false }
+      debuts[p.id] = nd
+    }
     curseur = nd + p.duree
   }
 
@@ -72,8 +74,10 @@ export function placer(e: EntreePlacement): ResultatPlacement {
         v = verrous.find((x) => chevauche({ debut: nf - p.duree, fin: nf }, x))
       }
     }
-    if (nf - p.duree < bornes.debut) return { ok: false }
-    if (nf !== fin0) debuts[p.id] = nf - p.duree
+    if (nf !== fin0) {
+      if (nf - p.duree < bornes.debut) return { ok: false }
+      debuts[p.id] = nf - p.duree
+    }
     curseur = nf - p.duree
   }
 
