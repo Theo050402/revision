@@ -32,15 +32,19 @@ export function etatTours(creneaux: Creneau[], itemId: string): EtatTour[] {
 }
 
 /**
- * Anneau de progression : numéros d'items distincts (tous collèges confondus) ayant au moins
- * un créneau T1 « Fait », placé ou dans le bac. Les créneaux dont l'item n'existe plus sont ignorés.
+ * Anneau de progression : numéros d'items distincts (tous collèges confondus) dont le T1 est
+ * « fait » au sens d'etatTours (tous les créneaux/parties du T1 de l'item sont faits) dans au
+ * moins un collège. Placé ou dans le bac. Les créneaux dont l'item n'existe plus sont ignorés.
  */
 export function progression(etat: Etat): { vus: number; total: 367 } {
-  const numeros = new Set<number>()
+  const t1Complet = new Map<string, boolean>() // itemId -> tous les créneaux T1 faits ?
   for (const c of Object.values(etat.creneaux)) {
-    if (c.tour !== 1 || !c.fait) continue
-    const item = etat.items[c.itemId]
-    if (item) numeros.add(item.numero)
+    if (c.tour !== 1 || !etat.items[c.itemId]) continue
+    t1Complet.set(c.itemId, (t1Complet.get(c.itemId) ?? true) && c.fait)
+  }
+  const numeros = new Set<number>()
+  for (const [itemId, complet] of t1Complet) {
+    if (complet) numeros.add(etat.items[itemId].numero)
   }
   return { vus: numeros.size, total: TOTAL_ITEMS }
 }

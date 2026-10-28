@@ -128,6 +128,25 @@ describe('progression', () => {
     expect(progression(e).vus).toBe(1)
   })
 
+  test('T1 en 2 parties : une seule faite → 0 ; les deux faites → 1', () => {
+    const p = (i: number, fait: boolean) =>
+      cr({ itemId: 'a:8', tour: 1, partie: { i, n: 2 }, fait })
+    expect(progression(etatAvec([item('a', 8)], [p(1, true), p(2, false)])).vus).toBe(0)
+    expect(progression(etatAvec([item('a', 8)], [p(1, true), p(2, true)])).vus).toBe(1)
+  })
+
+  test('même numéro dans 2 collèges : compte si un collège a son T1 entièrement fait', () => {
+    const e = etatAvec(
+      [item('a', 6), item('b', 6)],
+      [
+        cr({ itemId: 'a:6', tour: 1, partie: { i: 1, n: 2 }, fait: true }),
+        cr({ itemId: 'a:6', tour: 1, partie: { i: 2, n: 2 }, fait: false }),
+        cr({ itemId: 'b:6', tour: 1, fait: true }),
+      ],
+    )
+    expect(progression(e).vus).toBe(1)
+  })
+
   test('ignore les créneaux dont l’item n’existe plus', () => {
     const e = etatAvec([], [cr({ itemId: 'a:42', tour: 1, fait: true })])
     expect(progression(e).vus).toBe(0)
