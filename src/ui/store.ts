@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import { etatVide } from '../domain/defaults'
 import type { Etat } from '../domain/types'
-import { chargerTout, demanderPersistance, enregistrer } from '../storage/db'
+import { chargerTout, demanderPersistance, enregistrer, remplacerTout } from '../storage/db'
 
 export const NIVEAUX_ANNULATION = 50
 
@@ -18,7 +18,7 @@ type StoreState = {
   futur: Etat[]
   pret: boolean
   erreur: string | null
-  /** `null` ou la même référence = refus : aucun effet, renvoie `false`. */
+  /** `null` ou la même référence = refus : aucun effet, renvoie `false`. Refusé aussi tant que `pret` est faux. */
   appliquer: (f: (e: Etat) => Etat | null) => boolean
   annuler: () => void
   retablir: () => void
@@ -32,11 +32,14 @@ let persiste: Etat = etatVide()
 /** Chaîne des écritures : chacune attend la précédente, elles ne s'entrelacent jamais. */
 let file: Promise<void> = Promise.resolve()
 
-function estQuota(e: unknown): boolean {
-  let x: unknown = e
-  for (let n = 0; n < 4 && typeof x === 'object' && x !== null; n++) {
-    if ((x as { name?: unknown }).name === 'QuotaExceededError') return true
-    x = (x as { inner?: unknown }).inner
+function estQuota(e: unknown, profondeur = 0): boolean {
+  if (profondeur > 4 || typeof e !== 'object' || e === null) return false
+  const { name, inner, failures } = e as { name?: unknown; inner?: unknown; failures?: unknown }
+  if (name === 'QuotaExceededError') return true
+  if (estQuota(inner, profondeur + 1)) return true
+  // Dexie `BulkError` (bulkPut / bulkDelete) : les vraies erreurs sont dans `failures`.
+  if (typeof failures === 'object' && failures !== null) {
+    return Object.values(failures).some((f) => estQuota(f, profondeur + 1))
   }
   return false
 }
@@ -52,10 +55,11 @@ function messageErreur(e: unknown): string {
  * (et non de l'état précédent en mémoire) : après un échec, l'écriture suivante rattrape ce qui
  * manquait en base. Un échec renseigne `erreur` ; il ne remonte jamais à l'appelant.
  */
-function persister(cible: Etat): void {
+function persister(cible: Etat, remplacement = false): void {
   file = file.then(async () => {
     try {
-      await enregistrer(persiste, cible)
+      if (remplacement) await remplacerTout(cible)
+      else await enregistrer(persiste, cible)
       persiste = cible
       if (useStore.getState().erreur !== null) useStore.setState({ erreur: null })
     } catch (e) {
@@ -77,7 +81,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   erreur: null,
 
   appliquer(f) {
-    const { etat, passe } = get()
+    const { etat, passe, pret } = get()
+    if (!pret) return false
     const suivant = f(etat)
     if (suivant === null || suivant === etat) return false
     set({ etat: suivant, passe: [...passe, etat].slice(-NIVEAUX_ANNULATION), futur: [] })
@@ -86,7 +91,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   annuler() {
-    const { etat, passe, futur } = get()
+    const { etat, passe, futur, pret } = get()
+    if (!pret) return
     const precedent = passe[passe.length - 1]
     if (precedent === undefined) return
     set({ etat: precedent, passe: passe.slice(0, -1), futur: [...futur, etat] })
@@ -94,7 +100,8 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   retablir() {
-    const { etat, passe, futur } = get()
+    const { etat, passe, futur, pret } = get()
+    if (!pret) return
     const suivant = futur[futur.length - 1]
     if (suivant === undefined) return
     set({ etat: suivant, passe: [...passe, etat].slice(-NIVEAUX_ANNULATION), futur: futur.slice(0, -1) })
@@ -102,8 +109,11 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   restaurer(etat) {
-    set({ etat, passe: [], futur: [] })
-    persister(etat)
+    // Chemin de récupération : permis même si la lecture initiale a échoué. Dans ce cas la base
+    // n'a jamais été lue, donc on la remplace en entier plutôt que de la différencier.
+    const horsLecture = !get().pret
+    set({ etat, passe: [], futur: [], pret: true })
+    persister(etat, horsLecture)
   },
 
   async initialiser() {
@@ -114,7 +124,9 @@ export const useStore = create<StoreState>()((set, get) => ({
       void demanderPersistance()
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e)
-      set({ pret: true, erreur: `Lecture impossible : ${detail}` })
+      // `pret` reste faux : l'interface affiche l'erreur et aucune modification n'est acceptée
+      // par-dessus une base non lue (seule `restaurer` reste possible).
+      set({ pret: false, erreur: `Lecture impossible : ${detail}` })
     }
   },
 }))

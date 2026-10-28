@@ -119,6 +119,55 @@ describe('lireSauvegarde', () => {
     expect(lireSauvegarde(JSON.stringify(o))).toEqual({ ok: false, raison: 'créneau invalide' })
   })
 
+  it('premierExportFait invalide a sa propre raison', () => {
+    const o = { ...brut(etatRempli()), premierExportFait: 'oui' }
+    expect(lireSauvegarde(JSON.stringify(o))).toEqual({ ok: false, raison: 'premierExportFait invalide' })
+  })
+
+  describe('intégrité référentielle', () => {
+    const incoherent = { ok: false, raison: 'références incohérentes' }
+    const lignes = (o: Record<string, unknown>, t: string) => o[t] as Record<string, unknown>[]
+
+    it('item dont le collège n’existe pas', () => {
+      const o = brut(etatRempli())
+      lignes(o, 'items')[0]!.collegeId = 'inconnu'
+      expect(lireSauvegarde(JSON.stringify(o))).toEqual(incoherent)
+    })
+
+    it('item dont l’id ne vaut pas collegeId:numero', () => {
+      const o = brut(etatRempli())
+      lignes(o, 'items')[0]!.numero = 301
+      expect(lireSauvegarde(JSON.stringify(o))).toEqual(incoherent)
+    })
+
+    it('créneau dont l’item n’existe pas', () => {
+      const o = brut(etatRempli())
+      lignes(o, 'creneaux')[0]!.itemId = 'c1:999'
+      expect(lireSauvegarde(JSON.stringify(o))).toEqual(incoherent)
+    })
+
+    it('créneau pointant vers un nom hérité d’Object.prototype', () => {
+      const o = brut(etatRempli())
+      lignes(o, 'creneaux')[0]!.itemId = 'constructor'
+      expect(lireSauvegarde(JSON.stringify(o))).toEqual(incoherent)
+    })
+
+    it('indisponibilité récurrente dont la récurrence n’existe pas (ou sans sourceId)', () => {
+      const o = brut(etatRempli())
+      lignes(o, 'indispos')[0]!.sourceId = 'rX'
+      expect(lireSauvegarde(JSON.stringify(o))).toEqual(incoherent)
+      lignes(o, 'indispos')[0]!.sourceId = null
+      expect(lireSauvegarde(JSON.stringify(o))).toEqual(incoherent)
+    })
+
+    it('une indisponibilité ics ou ponctuelle n’exige pas de récurrence', () => {
+      const o = brut(etatRempli())
+      lignes(o, 'indispos')[0]!.source = 'ics'
+      lignes(o, 'indispos')[0]!.sourceId = 'fichier.ics'
+      expect(lireSauvegarde(JSON.stringify(o)).ok).toBe(true)
+    })
+  })
+
   it('ignore les champs inconnus et complète les réglages manquants par les valeurs par défaut', () => {
     const e = etatRempli()
     const o = brut(e)

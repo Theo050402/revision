@@ -155,6 +155,30 @@ function table<T>(brut: unknown, lire: (x: unknown) => T | null, cle: (x: T) => 
   return r
 }
 
+/** Intégrité référentielle : une sauvegarde valide ne doit pas laisser de référence pendante. */
+function referencesCoherentes(
+  colleges: Record<string, College>,
+  items: Record<string, Item>,
+  creneaux: Record<string, Creneau>,
+  indispos: Record<string, Indispo>,
+  recurrences: Record<string, Recurrence>,
+  suppressions: Record<string, SuppressionEnAttente>,
+): boolean {
+  for (const it of Object.values(items)) {
+    if (!Object.hasOwn(colleges, it.collegeId) || it.id !== `${it.collegeId}:${it.numero}`) return false
+  }
+  for (const c of Object.values(creneaux)) {
+    if (!Object.hasOwn(items, c.itemId)) return false
+  }
+  for (const [cle, s] of Object.entries(suppressions)) {
+    if (cle !== s.creneauId) return false
+  }
+  for (const i of Object.values(indispos)) {
+    if (i.source === 'recurrente' && (i.sourceId === null || !Object.hasOwn(recurrences, i.sourceId))) return false
+  }
+  return true
+}
+
 const echec = (raison: string): ResultatLecture => ({ ok: false, raison })
 
 export function lireSauvegarde(texte: string): ResultatLecture {
@@ -183,7 +207,11 @@ export function lireSauvegarde(texte: string): ResultatLecture {
   if (!reglagesLus) return echec('réglages invalides')
 
   const premierExportFait = racine.premierExportFait ?? etatVide().premierExportFait
-  if (!estBool(premierExportFait)) return echec('réglages invalides')
+  if (!estBool(premierExportFait)) return echec('premierExportFait invalide')
+
+  if (!referencesCoherentes(colleges, items, creneaux, indispos, recurrences, suppressions)) {
+    return echec('références incohérentes')
+  }
 
   return {
     ok: true,

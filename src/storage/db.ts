@@ -99,6 +99,14 @@ export async function enregistrer(avant: Etat, apres: Etat): Promise<void> {
   })
 }
 
+/** Remplace tout le contenu de la base par `etat` (restauration quand la base n'a pas pu être lue). */
+export async function remplacerTout(etat: Etat): Promise<void> {
+  await db.transaction('rw', db.tables, async () => {
+    await Promise.all(db.tables.map((t) => t.clear()))
+    await enregistrer(etatVide(), etat)
+  })
+}
+
 /** Réglages lus en base, complétés par les valeurs par défaut (réglage ajouté dans une version ultérieure). */
 function reglagesComplets(stockes: Partial<Reglages> | undefined): Reglages {
   const d = REGLAGES_DEFAUT

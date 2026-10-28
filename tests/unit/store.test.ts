@@ -146,6 +146,27 @@ describe('store : persistance', () => {
     expect(Object.keys((await chargerTout()).creneaux).sort()).toEqual(['a', 'b'])
   })
 
+  it('BulkError Dexie : quota détecté dans failures', async () => {
+    const quota = Object.assign(new Error('quota'), { name: 'QuotaExceededError' })
+    const bulk = Object.assign(new Error('bulk'), { name: 'BulkError', failures: [new Error('autre'), quota] })
+    vi.spyOn(db, 'transaction').mockImplementationOnce(() => {
+      throw bulk
+    })
+    s().appliquer(ajoute(creneau('a')))
+    await attendreEcritures()
+    expect(s().erreur).toBe(MSG_QUOTA)
+  })
+
+  it('BulkError sans quota : message générique', async () => {
+    const bulk = Object.assign(new Error('bulk'), { name: 'BulkError', failures: [new Error('autre')] })
+    vi.spyOn(db, 'transaction').mockImplementationOnce(() => {
+      throw bulk
+    })
+    s().appliquer(ajoute(creneau('a')))
+    await attendreEcritures()
+    expect(s().erreur).toBe('Enregistrement impossible : bulk')
+  })
+
   it('autre échec : message générique « Enregistrement impossible : … »', async () => {
     vi.spyOn(db, 'transaction').mockImplementationOnce(() => {
       throw new Error('disque en feu')
@@ -168,6 +189,50 @@ describe('store : restaurer', () => {
     expect(s().passe).toHaveLength(0)
     expect(s().futur).toHaveLength(0)
     await attendreEcritures()
+    expect(await chargerTout()).toEqual(restaure)
+  })
+})
+
+describe('store : échec de lecture initiale', () => {
+  async function initialiserEnEchec() {
+    vi.spyOn(db, 'transaction').mockImplementationOnce(() => {
+      throw new Error('base illisible')
+    })
+    useStore.setState({ pret: false, erreur: null })
+    await s().initialiser()
+  }
+
+  it('pret reste faux, erreur « Lecture impossible : … »', async () => {
+    await initialiserEnEchec()
+    expect(s().pret).toBe(false)
+    expect(s().erreur).toBe('Lecture impossible : base illisible')
+  })
+
+  it('appliquer, annuler et rétablir refusent tant que pret est faux', async () => {
+    s().appliquer(ajoute(creneau('a')))
+    s().annuler()
+    await attendreEcritures()
+    await initialiserEnEchec()
+    const e = s().etat
+    expect(s().appliquer(ajoute(creneau('b')))).toBe(false)
+    s().annuler()
+    s().retablir()
+    expect(s().etat).toBe(e)
+    expect(s().passe).toHaveLength(0)
+    await attendreEcritures()
+    expect(Object.keys((await chargerTout()).creneaux)).toEqual([])
+  })
+
+  it('restaurer reste possible, remplace entièrement la base et rend le store prêt', async () => {
+    s().appliquer(ajoute(creneau('ancien')))
+    await attendreEcritures()
+    await initialiserEnEchec()
+
+    const restaure: Etat = { ...etatVide(), creneaux: { r: creneau('r') } }
+    s().restaurer(restaure)
+    await attendreEcritures()
+    expect(s().pret).toBe(true)
+    expect(s().erreur).toBeNull()
     expect(await chargerTout()).toEqual(restaure)
   })
 })
