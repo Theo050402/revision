@@ -261,3 +261,17 @@
     transform: none;
   }
 }
+
+/* ---------- Limites de mise en page (fluidité du geste) ----------
+   Sans elles, chaque image du glisser (fantôme déplacé, texte de l'horaire, bloc écarté) relançait la mise en page
+   et la peinture du document entier (≈ 7 500 boîtes, bibliothèque comprise). Les zones qui défilent et les colonnes
+   ont une taille fixée par leur parent : on peut la contenir. */
+.calendrier-defilement,
+.panneau-contenu {
+  contain: strict;
+}
+
+.colonne,
+.bloc {
+  contain: size layout style;
+}

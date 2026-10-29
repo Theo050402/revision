@@ -22,10 +22,15 @@ const NOUVEAUX = [
 type Point = { x: number; y: number }
 type TypePointeur = 'pointerdown' | 'pointermove' | 'pointerup'
 
-/** Un événement de pointeur tactile au point (x, y), envoyé à l'élément qui s'y trouve. */
-async function pointeur(page: Page, type: TypePointeur, p: Point): Promise<void> {
-  await page.evaluate(
-    ([type, x, y]) => {
+type Evenement = { type: TypePointeur; x: number; y: number; id?: number }
+
+/**
+ * Événements de pointeur tactiles, envoyés à l'élément sous chaque point, tous dans la même tâche (aucune image ne
+ * passe entre eux). `id` : 7 par défaut (le doigt du geste), un autre nombre pour un deuxième doigt.
+ */
+async function pointeurs(page: Page, evenements: Evenement[]): Promise<void> {
+  await page.evaluate((evs) => {
+    for (const { type, x, y, id } of evs) {
       const cible = document.elementFromPoint(x, y) ?? document.body
       cible.dispatchEvent(
         new PointerEvent(type, {
@@ -34,16 +39,28 @@ async function pointeur(page: Page, type: TypePointeur, p: Point): Promise<void>
           composed: true,
           clientX: x,
           clientY: y,
-          pointerId: 7,
+          pointerId: id ?? 7,
           pointerType: 'touch',
-          isPrimary: true,
+          isPrimary: (id ?? 7) === 7,
           button: type === 'pointermove' ? -1 : 0,
           buttons: type === 'pointerup' ? 0 : 1,
         }),
       )
-    },
-    [type, p.x, p.y] as const,
-  )
+    }
+  }, evenements)
+}
+
+/** Un événement de pointeur tactile au point (x, y), envoyé à l'élément qui s'y trouve. */
+async function pointeur(page: Page, type: TypePointeur, p: Point, id?: number): Promise<void> {
+  await pointeurs(page, [{ type, x: p.x, y: p.y, id }])
+}
+
+/**
+ * Attend deux images : la boucle du glisser (une fois par image) a lu la dernière position du doigt. Le lâcher
+ * dépose ce que l'aperçu montrait ; sans cette attente, une machine chargée pourrait lâcher avant l'aperçu.
+ */
+async function images(page: Page): Promise<void> {
+  await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
 }
 
 /** Appui long (200 ms > 150 ms) puis déplacement par petits pas, sans lâcher. */
@@ -57,7 +74,7 @@ async function deplacer(page: Page, de: Point, vers: Point, pas = 8): Promise<vo
   for (let i = 1; i <= pas; i++) {
     await pointeur(page, 'pointermove', { x: de.x + ((vers.x - de.x) * i) / pas, y: de.y + ((vers.y - de.y) * i) / pas })
   }
-  await page.waitForTimeout(50) // une image : l'aperçu suit le doigt
+  await images(page) // l'aperçu a traité la dernière position
 }
 
 async function lacher(page: Page, p: Point): Promise<void> {
@@ -70,8 +87,11 @@ async function glisser(page: Page, de: Point, vers: Point): Promise<void> {
   await lacher(page, vers)
 }
 
-async function centre(l: Locator): Promise<Point> {
-  await l.scrollIntoViewIfNeeded()
+async function centre(l: Locator, defiler = true): Promise<Point> {
+  if (defiler) {
+    await l.scrollIntoViewIfNeeded()
+    await images(l.page()) // mesure après le défilement
+  }
   const b = await l.boundingBox()
   if (!b) throw new Error('élément invisible')
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
@@ -191,7 +211,8 @@ test.describe('iPad', () => {
     await saisir(page, de, { x: de.x + 10, y: de.y + 10 }, 2)
     // Visible seulement pendant le glisser d'un créneau.
     await expect(corbeille).toHaveAttribute('data-visible', 'true')
-    const vers = await centre(corbeille)
+    await page.waitForTimeout(250) // fin de l'apparition (translateY, 180 ms)
+    const vers = await centre(corbeille, false)
     await deplacer(page, { x: de.x + 10, y: de.y + 10 }, vers)
     await expect(corbeille).toHaveAttribute('data-survol', 'true')
     await lacher(page, vers)
@@ -284,6 +305,105 @@ test.describe('iPad', () => {
   })
 })
 
+test.describe('iPad : robustesse', () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 900, 'panneau iPad')
+
+  /** Rien ne reste de l'aperçu, rien n'est écrit. */
+  async function intact(page: Page, avant: number): Promise<void> {
+    await expect(page.locator('.fantome')).toHaveCount(0)
+    await expect(page.locator('.bloc-creneau[style*="translateY"]')).toHaveCount(0)
+    await expect(page.locator('.grille')).toHaveAttribute('data-glisse', 'false')
+    await expect(page.locator('.bloc-creneau[data-creneau]')).toHaveCount(avant)
+    await expect(page.getByRole('button', { name: 'Annuler' })).toBeDisabled()
+  }
+
+  test('le lâcher dépose ce que l’aperçu montrait, même si le doigt a bougé juste avant', async ({ page }) => {
+    await ouvrir(page)
+    // 15h15 : moitié haute de 300 (14h–16h45) ; 15h30 : moitié basse, dont la cascade serait refusée.
+    const haut = await pointGrille(page, MARDI, 15, 15)
+    const bas = await pointGrille(page, MARDI, 15, 30)
+    await saisir(page, await centre(carte(page, 'c1:296')), haut)
+    await expect(page.locator(`.colonne[data-jour="${MARDI}"] .fantome`)).toContainText('15h15 → 16h15')
+    // Le doigt glisse sur l'autre moitié et se lève dans la même tâche : aucune image n'a montré cette position.
+    await pointeurs(page, [
+      { type: 'pointermove', ...bas },
+      { type: 'pointerup', ...bas },
+    ])
+    await expect(page.locator(`.colonne[data-jour="${MARDI}"] [data-debut="${MARDI}T15:15"]`)).toHaveCount(1)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MARDI}T16:15`)
+  })
+
+  test('Échap pendant le glisser : rien ne reste, rien n’est écrit', async ({ page }) => {
+    await ouvrir(page)
+    const avant = await page.locator('.bloc-creneau[data-creneau]').count()
+    const vers = await pointGrille(page, MARDI, 14, 30)
+    await saisir(page, await centre(carte(page, 'c1:296')), vers)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('style', /translateY/)
+    await page.keyboard.press('Escape')
+    await lacher(page, vers)
+    await intact(page, avant)
+  })
+
+  test('lâcher hors de la grille : rien ne reste, rien n’est écrit', async ({ page }) => {
+    await ouvrir(page)
+    const avant = await page.locator('.bloc-creneau[data-creneau]').count()
+    const de = await centre(bloc(page, 'cr-a'))
+    const vers = await pointGrille(page, MARDI, 18)
+    await saisir(page, de, vers)
+    await expect(page.locator('.fantome')).toHaveCount(1)
+    const dehors = { x: 150, y: 400 } // panneau de la bibliothèque
+    await deplacer(page, vers, dehors)
+    await lacher(page, dehors)
+    await intact(page, avant)
+  })
+
+  test('un deuxième doigt n’annule ni l’appui long ni le glisser', async ({ page }) => {
+    await ouvrir(page)
+    const b = (await bloc(page, 'cr-a').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    await pointeur(page, 'pointerdown', de)
+    // Pendant l'appui long : un autre doigt bouge de 80 px (au-delà de la tolérance de 6 px).
+    await pointeurs(page, [
+      { type: 'pointerdown', x: 900, y: 600, id: 9 },
+      { type: 'pointermove', x: 980, y: 600, id: 9 },
+    ])
+    await page.waitForTimeout(200)
+    await expect(page.locator('.grille')).toHaveAttribute('data-glisse', 'true')
+    const vers = await pointGrille(page, MARDI, 18, 0, 10)
+    await deplacer(page, de, vers)
+    // Pendant le glisser : l'autre doigt se lève ; le glisser continue.
+    await pointeur(page, 'pointerup', { x: 980, y: 600 }, 9)
+    await expect(page.locator('.grille')).toHaveAttribute('data-glisse', 'true')
+    await lacher(page, vers)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MARDI}T18:00`)
+  })
+
+  test('après un glisser, chaque colonne garde sa place et les poignées restent dans leur jour', async ({ page }) => {
+    await ouvrir(page)
+    // Un glisser annulé qui pose un fantôme mercredi et estompe 300 mardi.
+    const de = await centre(bloc(page, 'cr-a'))
+    const vers = await pointGrille(page, '2026-11-04', 17)
+    await saisir(page, de, vers)
+    await page.keyboard.press('Escape')
+    await lacher(page, vers)
+    const largeurs = await page
+      .locator('.colonne')
+      .evaluateAll((cs) => cs.map((c) => Math.round(c.getBoundingClientRect().width)))
+    expect(new Set(largeurs).size).toBe(1)
+    const col = (await page.locator('.colonne[data-jour="2026-11-04"]').boundingBox())!
+    const poignee = (await page.locator('[data-poignee="cr-d"]').boundingBox())!
+    expect(poignee.x).toBeGreaterThanOrEqual(col.x)
+    expect(poignee.x + poignee.width).toBeLessThanOrEqual(col.x + col.width + 0.5)
+    // Le centre de 304 (jeudi) est bien 304, et non la poignée d'un bloc de mercredi.
+    const c = await centre(bloc(page, 'cr-e'))
+    const sous = await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y)?.closest('[data-creneau]')?.getAttribute('data-creneau'),
+      [c.x, c.y],
+    )
+    expect(sous).toBe('cr-e')
+  })
+})
+
 test.describe('iPhone', () => {
   test.skip(({ viewport }) => (viewport?.width ?? 1000) >= 900, 'vue Jour du téléphone')
 
@@ -341,7 +461,9 @@ test.describe('captures', () => {
       // Corbeille : un créneau saisi, au-dessus de la corbeille.
       const de = await centre(bloc(page, 'cr-e'))
       await saisir(page, de, { x: de.x + 10, y: de.y }, 2)
-      const vers = await centre(page.locator('[data-corbeille]'))
+      // Sans scrollIntoView : la pilule glisse encore depuis le bas pendant son apparition.
+      await page.waitForTimeout(250)
+      const vers = await centre(page.locator('[data-corbeille]'), false)
       await deplacer(page, { x: de.x + 10, y: de.y }, { x: vers.x + 30, y: vers.y - 20 })
       await page.waitForTimeout(300)
       await page.screenshot({ path: `${dossier}/task-18-ipad-${theme}-corbeille.png` })

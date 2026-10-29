@@ -5,7 +5,8 @@
 .zone-calendrier {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* `clip` et non `hidden` : aucun défilement programmatique (scrollIntoView, focus) ne décale la zone. */
+  overflow: clip;
   background-image: none;
 }
 
@@ -145,8 +146,16 @@
 }
 
 /* Colonne d'un jour : lignes d'heures et de demi-heures ; l'origine (haut) est plage.debut. */
+/* Les colonnes sont posées en absolu dans le corps (et non comme éléments de grille) : dans WebKit, une colonne de
+   grille dont les enfants (tous en absolu) changent pendant un glisser perdait sa boîte (largeur de la grille,
+   hauteur nulle) ; les poignées posées ensuite débordaient alors sur les jours voisins. `--i` : rang du jour. */
 .colonne {
-  position: relative;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--largeur-heures) + (100% - var(--largeur-heures)) * var(--i) / var(--nb-jours));
+  width: calc((100% - var(--largeur-heures)) / var(--nb-jours));
+  box-sizing: border-box;
   border-left: 1px solid var(--line);
   background-image:
     linear-gradient(var(--line) 1px, transparent 1px),

@@ -4,7 +4,7 @@
 import { useCallback, useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Intervalle } from '../../domain/cascade'
 import { redimensionner } from '../../domain/actions-creneaux'
-import { marquerGeste, useRedim } from '../dnd/glisse'
+import { marquerGeste, pointeurOccupe, useRedim } from '../dnd/glisse'
 import { useStore } from '../store'
 import { yVersMinutes } from './geometrie'
 
@@ -56,7 +56,7 @@ export function useAppuiVide(
 
   return useCallback(
     (e: ReactPointerEvent<HTMLElement>) => {
-      if (!e.isPrimary || e.button !== 0) return
+      if (!e.isPrimary || e.button !== 0 || pointeurOccupe()) return
       if ((e.target as HTMLElement).closest('.bloc, .poignee-redim, .fantome, .trace-indispo')) return
       const col = e.currentTarget
       const x0 = e.clientX
@@ -131,7 +131,7 @@ export function useRedimension(g: Geometrie) {
   const geo = useRef(g)
   geo.current = g
   return useCallback((e: ReactPointerEvent<HTMLElement>, id: string, duree0: number) => {
-    if (!e.isPrimary || e.button !== 0) return
+    if (!e.isPrimary || e.button !== 0 || pointeurOccupe()) return
     // Ni glisser du bloc (dnd-kit), ni tracé, ni balayage : la poignée garde le geste pour elle.
     e.stopPropagation()
     e.preventDefault()

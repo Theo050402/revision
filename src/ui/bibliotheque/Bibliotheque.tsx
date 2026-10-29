@@ -1,7 +1,7 @@
 // Bibliothèque d'items (spec §8) : progression, bac « À placer », recherche, filtres, suggestions et liste.
 // Dans le panneau de gauche (iPad) ou la feuille du bas (iPhone). Les cartes sont sélectionnables ;
 // le glisser-déposer (délégué à la racine, voir `trouverCarte`) emporte la sélection si la carte saisie est cochée.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { libelleHeure } from '../../domain/actions-creneaux'
 import { dernierTourParItem, etatToursParItem, progression, type EtatTour } from '../../domain/tours'
 import type { Item } from '../../domain/types'
@@ -47,7 +47,12 @@ type Props = {
 }
 
 export function Bibliotheque({ onSelectionChange }: Props) {
-  const etat = useStore((s) => s.etat)
+  // Valeur différée : après une écriture (un dépôt sur la grille, surtout), la grille se redessine d'abord ; la
+  // bibliothèque suit dans un rendu de basse priorité, interruptible, qui ne bloque pas le fil principal (tâche 18).
+  const etat = useDeferredValue(useStore((s) => s.etat))
+  // Les dérivées ne dépendent que des créneaux, des items, des collèges et des réglages : un changement
+  // d'indisponibilité (tracé dans la grille) ne les recalcule pas.
+  const base = useMemo(() => etat, [etat.creneaux, etat.items, etat.colleges, etat.reglages])
   const disposition = useDisposition()
   const aujourdhui = useAujourdhui()
   // Un seul import à la fois : pendant qu'il est ouvert, un second lancerait une autre cible sur l'état en cours.
@@ -90,9 +95,9 @@ export function Bibliotheque({ onSelectionChange }: Props) {
     const tours = etatToursParItem(creneaux)
     const derniers = dernierTourParItem(creneaux)
     const m = new Map<string, { etats: EtatTour[]; meta: string }>()
-    for (const it of Object.values(etat.items)) {
+    for (const it of Object.values(base.items)) {
       const prochain = (derniers.get(it.id) ?? 0) + 1
-      const duree = formaterDuree(dureeProchainTour(etat, it, derniers))
+      const duree = formaterDuree(dureeProchainTour(base, it, derniers))
       m.set(it.id, {
         etats: reutiliser(vuesPrecedentes.current.get(it.id)?.etats, tours.get(it.id) ?? []),
         meta: `${it.pages} p · ${prochain > 1 ? `T${prochain} ` : ''}${duree}`,
@@ -100,9 +105,9 @@ export function Bibliotheque({ onSelectionChange }: Props) {
     }
     vuesPrecedentes.current = m
     return m
-  }, [etat, creneaux])
+  }, [base, creneaux])
 
-  const progres = useMemo(() => progression(etat), [etat])
+  const progres = useMemo(() => progression(base), [base])
   const colleges = useMemo(
     () =>
       Object.values(etat.colleges).sort(
@@ -115,7 +120,7 @@ export function Bibliotheque({ onSelectionChange }: Props) {
     [etat.items, etat.colleges],
   )
   const actif = requete.trim() !== '' || filtres.colleges.length + filtres.etats.length + filtres.longueurs.length > 0
-  const visibles = useMemo(() => filtrer(tous, requete, filtres, etat), [tous, requete, filtres, etat])
+  const visibles = useMemo(() => filtrer(tous, requete, filtres, base), [tous, requete, filtres, base])
 
   const bac = useMemo(
     () =>
@@ -129,7 +134,7 @@ export function Bibliotheque({ onSelectionChange }: Props) {
         ),
     [creneaux, etat.items],
   )
-  const suivants = useMemo(() => aPlanifier(etat), [etat])
+  const suivants = useMemo(() => aPlanifier(base), [base])
   const combler = useMemo(() => (trou ? pourCombler(etat, trou.jour, trou.t).slice(0, MAX_COMBLER) : []), [etat, trou])
 
   // Glisser-déposer (spec §9.3, §9.5), délégué à la racine : la carte saisie est trouvée au `pointerdown`. Une

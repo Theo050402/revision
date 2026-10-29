@@ -7,10 +7,10 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { ajouterIndispo } from '../../domain/actions-etat'
 import type { Intervalle } from '../../domain/cascade'
-import { hm, jourDe, local, minutesDe } from '../../domain/temps'
-import type { Creneau, Etat } from '../../domain/types'
+import { hm, local, minutesDe } from '../../domain/temps'
+import type { Etat } from '../../domain/types'
 import { SourceGlisse } from '../dnd/ContexteDnd'
-import { useGlisse, useRedim } from '../dnd/glisse'
+import { apercuColonne, cleColonne, useGlisse, useRedim } from '../dnd/glisse'
 import { libelleJourCourt } from '../periode'
 import { useStore } from '../store'
 import { BlocCreneau, BlocFantome, BlocIndispo, heureCourte } from './Bloc'
@@ -136,9 +136,10 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
             </span>
           ))}
         </div>
-        {jours.map((j) => (
+        {jours.map((j, i) => (
           <ColonneJour
             key={j}
+            indice={i}
             jour={j}
             blocs={blocs[j]}
             plage={plage}
@@ -163,6 +164,8 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
 }
 
 type ColonneProps = {
+  /** Rang du jour dans la grille (position de la colonne, voir calendrier.css). */
+  indice: number
   jour: string
   blocs: BlocsDuJour
   plage: Intervalle
@@ -180,9 +183,10 @@ type ColonneProps = {
   onOuvrirIndispo: (id: string) => void
 }
 
-type Fantome = { creneau: Creneau; debut: number; refus: boolean }
+const AUCUN_REDIM = { id: null, duree: 0 }
 
 const ColonneJour = memo(function ColonneJour({
+  indice,
   jour,
   blocs,
   plage,
@@ -198,12 +202,10 @@ const ColonneJour = memo(function ColonneJour({
   onOuvrirCreneau,
   onOuvrirIndispo,
 }: ColonneProps) {
-  // Aperçu du glisser en cours : ne change que si la minute, le jour, la cible ou la moitié changent.
-  const source = useGlisse((s) => s.source)
-  const survol = useGlisse((s) => (s.survol?.type === 'colonne' && s.survol.cible.jour === jour ? s.survol : null))
-  const vu = useGlisse((s) => s.apercu)
-  const fantomeSource = useGlisse((s) => s.fantome)
-  const redim = useRedim()
+  // Aperçu du glisser en cours, réduit à ce jour : la colonne ne se redessine que si ce qui la concerne change.
+  const cle = useGlisse((s) => cleColonne(s, jour))
+  const { idSource, debuts, fantomes, refus } = useMemo(() => apercuColonne(useGlisse.getState(), jour), [cle, jour])
+  const redim = useRedim((s) => (s.id !== null && blocs.creneaux.some((c) => c.id === s.id) ? s : AUCUN_REDIM))
 
   const appuiVide = useAppuiVide(jour, { plage, pxHeure, pas }, onTapTrou, onTrace)
   const redimensionner = useRedimension({ plage, pxHeure, pas })
@@ -211,32 +213,19 @@ const ColonneJour = memo(function ColonneJour({
   const y = (m: number) => minutesVersY(m, plage, pxHeure)
   const hauteurDe = (debut: number, duree: number) =>
     Math.max(HAUTEUR_MIN_BLOC, (Math.min(duree, plage.fin - debut) * pxHeure) / 60)
-  const idSource = source?.type === 'creneau' ? source.id : null
-
-  // Fantômes : là où l'aperçu pose le(s) créneau(x) ; sinon (refus) le créneau glissé à l'heure visée.
-  const fantomes: Fantome[] = []
-  if (survol && source) {
-    if (vu?.ok) {
-      if (idSource !== null) {
-        const c = fantomeSource
-        const debut = vu.positions[idSource] ?? c?.debut
-        if (c && debut && jourDe(debut) === jour) fantomes.push({ creneau: c, debut: minutesDe(debut), refus: false })
-      } else {
-        for (const n of vu.nouveaux) {
-          if (jourDe(n.debut as string) === jour) fantomes.push({ creneau: n, debut: minutesDe(n.debut as string), refus: false })
-        }
-      }
-    } else if (fantomeSource) {
-      fantomes.push({ creneau: fantomeSource, debut: survol.cible.t, refus: vu !== null })
-    }
-  }
-  const refus = survol !== null && vu !== null && !vu.ok
 
   // Heures hors des bornes de la journée (réglages) mais dans la plage affichée : grisées.
   const avant = Math.max(0, Math.min(bornes.debut, plage.fin) - plage.debut)
   const apres = Math.max(0, plage.fin - Math.max(bornes.fin, plage.debut))
   return (
-    <div className="colonne" data-jour={jour} data-aujourdhui={aujourdhui} data-refus={refus || undefined} onPointerDown={appuiVide}>
+    <div
+      className="colonne"
+      style={{ '--i': indice } as CSSProperties}
+      data-jour={jour}
+      data-aujourdhui={aujourdhui}
+      data-refus={refus || undefined}
+      onPointerDown={appuiVide}
+    >
       {avant > 0 && <div className="hors-bornes" style={{ top: 0, height: (avant * pxHeure) / 60 }} />}
       {apres > 0 && <div className="hors-bornes" style={{ bottom: 0, height: (apres * pxHeure) / 60 }} />}
 
@@ -261,8 +250,7 @@ const ColonneJour = memo(function ColonneJour({
         const debut = minutesDe(c.debut as string)
         const item = items[c.itemId]
         const college = item ? colleges[item.collegeId] : undefined
-        const nouvelle = vu?.ok && c.id !== idSource ? vu.positions[c.id] : undefined
-        const decalage = nouvelle && jourDe(nouvelle) === jour ? y(minutesDe(nouvelle)) - y(debut) : 0
+        const decalage = c.id in debuts ? y(debuts[c.id]) - y(debut) : 0
         const duree = redim.id === c.id ? redim.duree : c.duree
         const hauteur = hauteurDe(debut, duree)
         return (

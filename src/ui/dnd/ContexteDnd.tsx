@@ -34,7 +34,16 @@ import { toast } from '../Toast'
 import { trembler } from '../trembler'
 import { apercu, cibleMois, creneauFantome, deposer, type Apercu, type Source } from './apercu'
 import { cleSurvol, lire } from './cibles'
-import { bloquerDefilement, GLISSE_VIDE, marquerGeste, useGlisse, type Survol } from './glisse'
+import {
+  bloquerDefilement,
+  filtrerPointeurs,
+  GLISSE_VIDE,
+  marquerGeste,
+  pointeurOccupe,
+  saisirPointeur,
+  useGlisse,
+  type Survol,
+} from './glisse'
 import './dnd.css'
 
 /** Ce que la source donne au `pointerdown` ; lu par dnd-kit au début du geste. */
@@ -79,6 +88,8 @@ export function ContexteDnd({ children, onDepose }: Props) {
     y: number
     sale: boolean
     cle: string | null
+    /** Élément de la dernière cible évaluée (colonne, carreau du mois, corbeille) : il tremble en cas de refus. */
+    el: HTMLElement | null
     /** Inclinaison de −1,5° du fantôme flottant, sauf en mouvement réduit. */
     incliner: boolean
     image: number
@@ -86,6 +97,7 @@ export function ContexteDnd({ children, onDepose }: Props) {
   } | null>(null)
 
   useEffect(() => bloquerDefilement(), [])
+  useEffect(() => filtrerPointeurs(), [])
 
   /** Survol complet (avec la première heure libre d'un jour du mois) et aperçu correspondant. */
   const evaluer = useCallback((e: Etat, source: Source, survol: Survol) => {
@@ -121,22 +133,27 @@ export function ContexteDnd({ children, onDepose }: Props) {
     g.sale = false
 
     const e = useStore.getState().etat
-    const { survol } = lire(g.x, g.y, g.source, g.prise, e)
+    const { survol, el } = lire(g.x, g.y, g.source, g.prise, e)
     const f = flottant.current
     if (f) {
       const pos = `translate3d(${g.x - PRISE_FLOTTANT.x}px, ${g.y - PRISE_FLOTTANT.y}px, 0)`
       f.style.transform = g.incliner ? `${pos} rotate(-1.5deg)` : pos
       // Au-dessus d'une colonne, le fantôme se pose dans la grille à l'heure magnétisée : le flottant s'efface.
-      f.dataset.cache = String(survol?.type === 'colonne')
-      f.dataset.surCorbeille = String(survol?.type === 'corbeille')
+      // Écrits seulement s'ils changent : pas de recalcul de style à chaque image.
+      const cache = String(survol?.type === 'colonne')
+      const surCorbeille = String(survol?.type === 'corbeille')
+      if (f.dataset.cache !== cache) f.dataset.cache = cache
+      if (f.dataset.surCorbeille !== surCorbeille) f.dataset.surCorbeille = surCorbeille
     }
     const cle = cleSurvol(survol)
     if (cle === g.cle) return
     g.cle = cle
+    g.el = el
     useGlisse.setState(evaluer(e, g.source, survol))
   }, [evaluer])
 
   const terminer = useCallback(() => {
+    saisirPointeur(null)
     const g = geste.current
     geste.current = null
     // Le fantôme flottant n'est pas piloté par React : il repart caché au prochain geste.
@@ -174,6 +191,7 @@ export function ContexteDnd({ children, onDepose }: Props) {
         y: pe.clientY,
         sale: true,
         cle: null,
+        el: null,
         incliner: !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         image: 0,
         arreter: () => {
@@ -199,11 +217,18 @@ export function ContexteDnd({ children, onDepose }: Props) {
     (_ev: DragEndEvent) => {
       const g = terminer()
       if (!g) return
-      const depuisFeuille = useGlisse.getState().depuisFeuille
+      const { depuisFeuille, survol: vu } = useGlisse.getState()
       const { appliquer, etat } = useStore.getState()
-      // Lecture au point du lâcher (pas celle de la dernière image : le doigt a pu bouger depuis).
-      const { survol: brut, el } = lire(g.x, g.y, g.source, g.prise, etat)
-      const { survol } = evaluer(etat, g.source, brut)
+      // Le lâcher dépose ce que l'aperçu montrait : le dernier survol évalué, et non une relecture au dernier
+      // `pointermove` qu'aucune image n'a encore traité (il pourrait viser une autre minute ou l'autre moitié).
+      // Relecture seulement si rien n'a encore été évalué (lâcher avant la première image).
+      let survol = vu
+      let el = g.el
+      if (g.cle === null) {
+        const lu = lire(g.x, g.y, g.source, g.prise, etat)
+        survol = evaluer(etat, g.source, lu.survol).survol
+        el = lu.el
+      }
 
       let reussi = false
       let versBac = 0
@@ -215,7 +240,8 @@ export function ContexteDnd({ children, onDepose }: Props) {
         let refus = cible === null
         if (cible) {
           const source = g.source
-          appliquer((e) => {
+          // `appliquer` renvoie faux si rien n'est écrit (refus, lâcher sur place, store pas prêt) : pas de succès.
+          reussi = appliquer((e) => {
             const r = deposer(e, source, cible)
             if (!r.ok) {
               refus = true
@@ -224,7 +250,7 @@ export function ContexteDnd({ children, onDepose }: Props) {
             versBac = r.versBac
             return r.etat
           })
-          reussi = !refus
+          if (!reussi) versBac = 0
         }
         // Refus (spec §14) : tremblement et teinte rouge, sans message ; l'état ne change pas.
         if (refus && el) trembler(el)
@@ -251,6 +277,8 @@ export function ContexteDnd({ children, onDepose }: Props) {
       onDragStart={debut}
       onDragEnd={fin}
       onDragCancel={annuler}
+      // Appui long abandonné (tap, défilement) : le pointeur est libéré.
+      onDragAbort={() => saisirPointeur(null)}
       accessibility={{
         announcements: ANNONCES,
         screenReaderInstructions: { draggable: 'Appui long puis glisser pour déplacer.' },
@@ -320,11 +348,15 @@ export function SourceGlisse({
 
   const onPointerDown = useCallback(
     (e: PointerEvent) => {
+      // Un deuxième doigt pendant un geste ne remplace pas ce qui est saisi.
+      if (pointeurOccupe()) return
       const cible = e.target as HTMLElement
       const d = rappel.current(cible, e)
       if (!d) return
       porteur.courant = { ...d, depuisFeuille: cible.closest('.feuille') !== null }
       listeners?.onPointerDown?.(e)
+      // Le capteur a pris ce pointeur : les autres sont ignorés jusqu'à la fin (voir `filtrerPointeurs`).
+      if ((e.nativeEvent as globalThis.PointerEvent & { dndKit?: unknown }).dndKit) saisirPointeur(e.pointerId)
     },
     [listeners, porteur],
   )
