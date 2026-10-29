@@ -104,7 +104,7 @@
 }
 
 /* Glisser depuis la feuille de la bibliothèque (iPhone) : elle s'efface et découvre la grille. */
-.racine[data-glisse-feuille='true'] .feuille-fond {
+.feuille-fond[data-efface='true'] {
   opacity: 0;
   pointer-events: none;
   transition: opacity 160ms ease;
@@ -253,7 +253,7 @@
   .glisse-flottant,
   .glisse-carte,
   .corbeille,
-  .racine[data-glisse-feuille='true'] .feuille-fond {
+  .feuille-fond[data-efface='true'] {
     transition: none;
   }
 

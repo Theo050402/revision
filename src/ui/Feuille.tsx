@@ -1,20 +1,28 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * Feuille modale qui monte du bas (bibliothèque sur iPhone). Échap, le fond et « Fermer » la
  * ferment ; le focus entre dans la feuille. Le parent rend le reste de l'interface inerte pendant
  * ce temps et rend le focus au bouton qui l'a ouverte.
+ *
+ * Rendue dans `document.body` (portail) : un ancêtre contenu (`contain`) ou transformé deviendrait sinon le bloc
+ * conteneur de son fond `position: fixed`, qui ne couvrirait plus l'écran (ex. la feuille d'une indisponibilité
+ * tracée dans la grille, qui défile).
  */
 export function Feuille({
   titre,
   onFermer,
   className,
+  efface = false,
   children,
 }: {
   titre: string
   onFermer: () => void
   /** Classe en plus (ex. feuille étroite et centrée sur iPad). */
   className?: string
+  /** Effacée le temps d'un glisser parti de la feuille (elle découvre la grille, sans se fermer). */
+  efface?: boolean
   children: ReactNode
 }) {
   const fermer = useRef<HTMLButtonElement>(null)
@@ -28,8 +36,8 @@ export function Feuille({
     return () => document.removeEventListener('keydown', touche)
   }, [onFermer])
 
-  return (
-    <div className="feuille-fond" onClick={onFermer}>
+  return createPortal(
+    <div className="feuille-fond" data-efface={efface || undefined} onClick={onFermer}>
       <div
         className={className ? `feuille ${className}` : 'feuille'}
         role="dialog"
@@ -46,6 +54,7 @@ export function Feuille({
         </div>
         <div className="feuille-corps">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

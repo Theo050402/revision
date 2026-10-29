@@ -357,6 +357,30 @@ test.describe('iPad : robustesse', () => {
     await intact(page, avant)
   })
 
+  test('grille défilée : la feuille de l’indisponibilité couvre tout l’écran', async ({ page }) => {
+    await ouvrir(page)
+    // La grille (contenue, `contain: strict`) défile : la feuille, rendue en portail, n'en dépend pas.
+    await page.locator('.calendrier-defilement').evaluate((el) => {
+      el.scrollTop = 300
+    })
+    const de = await pointGrille(page, SAMEDI, 15, 0, 6)
+    const vers = await pointGrille(page, SAMEDI, 17, 0, 0)
+    await saisir(page, de, vers)
+    await lacher(page, vers)
+    await expect(page.getByRole('dialog', { name: "Titre de l'indisponibilité" })).toBeVisible()
+
+    const fond = await page.locator('.feuille-fond').boundingBox()
+    const vue = page.viewportSize()!
+    expect(fond).toEqual({ x: 0, y: 0, width: vue.width, height: vue.height })
+    // La barre du haut est couverte : le point central de ↶ appartient au fond de la feuille.
+    const annuler = await centre(page.locator('.barre button[aria-label="Annuler"]'), false)
+    const couvert = await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y)?.closest('.feuille-fond') !== null,
+      [annuler.x, annuler.y],
+    )
+    expect(couvert).toBe(true)
+  })
+
   test('un deuxième doigt n’annule ni l’appui long ni le glisser', async ({ page }) => {
     await ouvrir(page)
     const b = (await bloc(page, 'cr-a').boundingBox())!
@@ -425,7 +449,7 @@ test.describe('iPhone', () => {
     await expect(feuille).toBeVisible()
     const de = await centre(feuille.locator('[data-testid="suivants"] [data-item-id="c1:296"]'))
     await saisir(page, de, { x: 200, y: 400 })
-    await expect(page.locator('.racine')).toHaveAttribute('data-glisse-feuille', 'true')
+    await expect(page.locator('.feuille-fond')).toHaveAttribute('data-efface', 'true')
     const vers = await pointGrille(page, '2026-11-04', 17, 0, 3)
     await deplacer(page, { x: 200, y: 400 }, vers, 6)
     await lacher(page, vers)

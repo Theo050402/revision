@@ -84,7 +84,15 @@ export function saisirPointeur(id: number | null): void {
  */
 export function filtrerPointeurs(): () => void {
   const filtrer = (e: PointerEvent) => {
-    if (pointeurSaisi !== null && e.pointerId !== pointeurSaisi) e.stopImmediatePropagation()
+    if (pointeurSaisi === null) return
+    if (e.pointerId !== pointeurSaisi) {
+      e.stopImmediatePropagation()
+      return
+    }
+    // Filet de sécurité : le doigt du geste se lève ou est annulé. Si la source a disparu pendant l'appui long,
+    // dnd-kit ne prévient pas (son `onAbort` sort tôt) et le pointeur resterait saisi ; tout geste serait refusé.
+    // L'événement poursuit sa route : le capteur le traite normalement.
+    if (e.type === 'pointerup' || e.type === 'pointercancel') pointeurSaisi = null
   }
   const types = ['pointermove', 'pointerup', 'pointercancel'] as const
   for (const t of types) window.addEventListener(t, filtrer, { capture: true })

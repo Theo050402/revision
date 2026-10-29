@@ -5,7 +5,9 @@
 .zone-calendrier {
   display: flex;
   flex-direction: column;
-  /* `clip` et non `hidden` : aucun défilement programmatique (scrollIntoView, focus) ne décale la zone. */
+  /* `clip` et non `hidden` : aucun défilement programmatique (scrollIntoView, focus) ne décale la zone.
+     `hidden` d'abord : repli pour Safari < 16, qui ignore `clip`. */
+  overflow: hidden;
   overflow: clip;
   background-image: none;
 }

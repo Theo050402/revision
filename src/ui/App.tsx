@@ -149,7 +149,7 @@ function Coque() {
 
   return (
     <ContexteDnd onDepose={apresDepot}>
-      <div className="racine" data-dispo={disposition} data-glisse-feuille={glisseDepuisFeuille}>
+      <div className="racine" data-dispo={disposition}>
         <div
           className="coque"
           ref={coque}
@@ -245,7 +245,7 @@ function Coque() {
         </div>
 
         {feuilleVisible && (
-          <Feuille titre="Items" onFermer={fermerFeuille}>
+          <Feuille titre="Items" onFermer={fermerFeuille} efface={glisseDepuisFeuille}>
             <Bibliotheque />
           </Feuille>
         )}
