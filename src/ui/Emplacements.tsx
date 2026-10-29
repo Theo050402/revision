@@ -1,11 +1,14 @@
-// Emplacements des écrans des tâches suivantes. Chacun est remplacé tel quel par le vrai contenu ;
-// aucun ne contient de logique.
+// Point d'entrée de la restauration quand la lecture de la base a échoué : seul chemin de récupération.
+// Affiché seulement une fois `initialiser` terminé en échec (l'écran d'erreur de la coque), donc la
+// restauration n'est jamais proposée pendant le chargement.
+import { Restauration } from './screens/Restauration'
+import './screens/reglages.css'
 
-/** Point d'entrée de la restauration d'une sauvegarde quand la lecture a échoué (tâche 19). */
 export function EmplacementRestauration() {
   return (
     <div className="emplacement" data-emplacement="restauration">
-      <p>La restauration depuis une sauvegarde sera proposée ici.</p>
+      <p>Si tu as une sauvegarde, tu peux repartir d'elle.</p>
+      <Restauration />
     </div>
   )
 }

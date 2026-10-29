@@ -1,7 +1,7 @@
 // Blocs de la grille (spec §9.2, §13). Le glisser-déposer est délégué à la grille (un seul `useDraggable`, voir
 // dnd/ContexteDnd.tsx) : ici, seulement le tap (`onOuvrir`, fiche de la tâche 19), le décalage de l'aperçu
 // (`transform`, jamais `top` pendant le geste) et le fantôme. `data-creneau` / `data-indispo` servent de cibles.
-import { memo, type CSSProperties } from 'react'
+import { memo, type CSSProperties, type KeyboardEvent } from 'react'
 import { versHm } from '../../domain/temps'
 import type { Creneau, Indispo, Item } from '../../domain/types'
 import { descriptionCreneau, etiquetteCreneau } from './etiquette'
@@ -12,6 +12,13 @@ const HAUTEUR_LIGNE_TITRE = 15
 const HAUTEUR_LIGNE_META = 13
 const MARGES_VERTICALES = 6
 const LIGNES_TITRE_MAX = 3
+
+/** Entrée ou espace sur un bloc : même effet qu'un tap (la fiche s'ouvre, le focus y revient à la fermeture). */
+function ouvrirAuClavier(ev: KeyboardEvent, ouvrir: () => void): void {
+  if (ev.target !== ev.currentTarget || (ev.key !== 'Enter' && ev.key !== ' ')) return
+  ev.preventDefault()
+  ouvrir()
+}
 
 const teinte = (couleur: number): string => `var(--c${((couleur % 6) + 6) % 6})`
 
@@ -66,6 +73,8 @@ export const BlocCreneau = memo(function BlocCreneau({
       style={style}
       role="group"
       aria-label={descriptionCreneau(creneau, item)}
+      tabIndex={onOuvrir ? 0 : undefined}
+      onKeyDown={onOuvrir && ((ev) => ouvrirAuClavier(ev, () => onOuvrir(creneau.id)))}
       onClick={onOuvrir && (() => onOuvrir(creneau.id))}
     >
       <span className={lignes === 1 ? 'bloc-titre bloc-titre-une' : 'bloc-titre'}>
@@ -110,6 +119,8 @@ export const BlocIndispo = memo(function BlocIndispo({ indispo, debut, fin, haut
       style={{ top: haut, height: hauteur }}
       role="group"
       aria-label={`${indispo.titre}, indisponible de ${heureCourte(debut)} à ${heureCourte(fin)}`}
+      tabIndex={onOuvrir ? 0 : undefined}
+      onKeyDown={onOuvrir && ((ev) => ouvrirAuClavier(ev, () => onOuvrir(indispo.id)))}
       onClick={onOuvrir && (() => onOuvrir(indispo.id))}
     >
       <span className="bloc-titre">{indispo.titre}</span>

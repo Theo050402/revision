@@ -6,13 +6,16 @@ import type { Ecran, Vue } from './ecran'
 import { Bibliotheque } from './bibliotheque/Bibliotheque'
 import { EmplacementRestauration } from './Emplacements'
 import { Feuille } from './Feuille'
+import { FicheCreneau } from './feuilles/FicheCreneau'
+import { FicheIndispo } from './feuilles/FicheIndispo'
+import { sauvegarder } from './sauvegarde'
 import { fermerImport, useDemandeImport } from './importDemande'
 import { Import } from './screens/Import'
 import { Reglages } from './screens/Reglages'
 import { TestExport } from './screens/TestExport'
 import { ContexteDnd } from './dnd/ContexteDnd'
 import { useGlisse } from './dnd/glisse'
-import { useStore } from './store'
+import { MESSAGE_QUOTA, useStore } from './store'
 import { Toasts } from './Toast'
 import { choisirTrou } from './trou'
 import { useDisposition } from './useDisposition'
@@ -102,10 +105,22 @@ function Coque() {
     setJour((j) => (j === precedent ? aujourdhui : j))
   }, [aujourdhui])
 
+  // Fiche ouverte par un tap sur un bloc (créneau ou indisponibilité), et récurrence à modifier dans Réglages.
+  const [fiche, setFiche] = useState<{ type: 'creneau' | 'indispo'; id: string } | null>(null)
+  const [recurrenceCible, setRecurrenceCible] = useState<string | null>(null)
+  const ouvrirCreneau = useCallback((id: string) => setFiche({ type: 'creneau', id }), [])
+  const ouvrirIndispo = useCallback((id: string) => setFiche({ type: 'indispo', id }), [])
+  const fermerFiche = useCallback(() => setFiche(null), [])
+  useEffect(() => {
+    if (ecran !== 'reglages') setRecurrenceCible(null)
+  }, [ecran])
+
   const coque = useRef<HTMLDivElement>(null)
   const boutonItems = useRef<HTMLButtonElement>(null)
   const feuilleVisible = feuilleOuverte && disposition === 'iphone'
   const feuilleDejaVue = useRef(false)
+  const feuilleVisibleRef = useRef(feuilleVisible)
+  feuilleVisibleRef.current = feuilleVisible
 
   // Pendant que la feuille est ouverte, le reste est inerte (focus et lecteur d'écran) ;
   // à la fermeture, le focus retourne au bouton qui l'a ouverte.
@@ -117,6 +132,24 @@ function Coque() {
     else if (feuilleDejaVue.current && !useDemandeImport.getState().ouvert) boutonItems.current?.focus({ preventScroll: true })
     return () => el.removeAttribute('inert')
   }, [feuilleVisible])
+
+  // Pendant qu'une fiche est ouverte (rendue hors de la coque), le calendrier est inerte ; à la fermeture, le focus
+  // retourne au bloc touché s'il existe encore.
+  const blocOuvert = useRef<string | null>(null)
+  useEffect(() => {
+    const el = coque.current
+    if (fiche === null) {
+      const sel = blocOuvert.current
+      blocOuvert.current = null
+      if (sel !== null) requestAnimationFrame(() => document.querySelector<HTMLElement>(sel)?.focus({ preventScroll: true }))
+      return
+    }
+    blocOuvert.current = `[data-${fiche.type === 'creneau' ? 'creneau' : 'indispo'}="${CSS.escape(fiche.id)}"]`
+    el?.setAttribute('inert', '')
+    return () => {
+      if (!feuilleVisibleRef.current) el?.removeAttribute('inert')
+    }
+  }, [fiche])
 
   // L'import commence depuis la feuille de la bibliothèque (iPhone) : elle se ferme pour laisser place à l'écran.
   useEffect(() => {
@@ -190,10 +223,14 @@ function Coque() {
 
             {erreur !== null && (
               // Erreur d'écriture (quota…) : reste affichée tant que l'écriture suivante n'a pas réussi.
-              // Le bouton « Sauvegarder » de la §14 viendra avec la tâche 19.
-              <p className="bandeau-erreur" role="alert">
-                {erreur}
-              </p>
+              <div className="bandeau-erreur bandeau-action" role="alert">
+                <p>{erreur}</p>
+                {erreur === MESSAGE_QUOTA && (
+                  <button type="button" className="btn-principal" onClick={() => void sauvegarder()}>
+                    Sauvegarder
+                  </button>
+                )}
+              </div>
             )}
 
             <main className={ecran === 'calendrier' ? 'zone zone-calendrier' : 'zone'}>
@@ -208,10 +245,13 @@ function Coque() {
                     setVue('jour')
                   }}
                   onTapTrou={tapTrou}
-                  // Fiches d'un créneau ou d'une indisponibilité au tap : tâche 19 (onOuvrirCreneau / onOuvrirIndispo).
+                  onOuvrirCreneau={ouvrirCreneau}
+                  onOuvrirIndispo={ouvrirIndispo}
                 />
               )}
-              {ecran === 'reglages' && <Reglages onRetour={() => setEcran('calendrier')} />}
+              {ecran === 'reglages' && (
+                <Reglages onRetour={() => setEcran('calendrier')} recurrenceInitiale={recurrenceCible} />
+              )}
               {ecran === 'import' && (
                 <Import
                   // Cible différente (nouveau collège ou réimport d'un autre) : l'écran repart de zéro.
@@ -244,6 +284,20 @@ function Coque() {
           </div>
         </div>
 
+        {fiche?.type === 'creneau' && <FicheCreneau key={fiche.id} id={fiche.id} onFermer={fermerFiche} />}
+        {fiche?.type === 'indispo' && (
+          <FicheIndispo
+            key={fiche.id}
+            id={fiche.id}
+            onFermer={fermerFiche}
+            onModifierRecurrence={(rid) => {
+              setFiche(null)
+              fermerImport()
+              setRecurrenceCible(rid)
+              setEcran('reglages')
+            }}
+          />
+        )}
         {feuilleVisible && (
           <Feuille titre="Items" onFermer={fermerFeuille} efface={glisseDepuisFeuille}>
             <Bibliotheque />

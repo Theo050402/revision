@@ -118,7 +118,9 @@ test('lecture impossible : message d\'erreur, aucune commande d\'édition', asyn
   await expect(page.getByRole('alert')).toContainText('Lecture impossible : ')
   await expect(page.locator('[data-emplacement="restauration"]')).toBeVisible()
   await expect(page.getByRole('region', { name: 'Calendrier' })).toHaveCount(0)
-  await expect(page.getByRole('button')).toHaveCount(0)
+  // Seule commande offerte : la restauration d'une sauvegarde (chemin de récupération, tâche 19).
+  await expect(page.getByRole('button')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Restaurer une sauvegarde' })).toBeVisible()
 })
 
 test('une erreur d\'écriture reste affichée dans un bandeau', async ({ page }) => {
@@ -137,7 +139,9 @@ test('une erreur d\'écriture reste affichée dans un bandeau', async ({ page })
   await page.getByRole('button', { name: 'Réglages' }).click()
   await page.getByRole('group', { name: 'Apparence' }).getByRole('button', { name: 'Sombre' }).click()
   const bandeau = page.getByRole('alert')
-  await expect(bandeau).toHaveText('Plus d\'espace pour enregistrer. Sauvegarde tes données puis libère de la place.')
+  await expect(bandeau.locator('p')).toHaveText('Plus d\'espace pour enregistrer. Sauvegarde tes données puis libère de la place.')
+  // §14 : le bandeau propose « Sauvegarder ».
+  await expect(bandeau.getByRole('button', { name: 'Sauvegarder' })).toBeVisible()
   // Persistant : toujours là bien après la durée d'un toast.
   await page.waitForTimeout(5500)
   await expect(bandeau).toBeVisible()

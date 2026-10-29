@@ -1,0 +1,281 @@
+/* Réglages (spec §11) et restauration. Couleurs : uniquement les jetons de theme/tokens.css.
+   Cibles tactiles ≥ 44 px. */
+
+.ecran-reglages {
+  max-width: 760px;
+  padding-bottom: max(40px, env(safe-area-inset-bottom));
+}
+
+.reglage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reglage h2,
+.reglage p {
+  margin: 0;
+}
+
+.carte.reglage .segments {
+  margin-top: 0;
+  align-self: flex-start;
+}
+
+.groupe {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.groupe legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+
+/* ---------- Champs ---------- */
+
+.grille-champs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.champ-groupe {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.champ-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.champ-court {
+  min-width: 0;
+  max-width: 120px;
+}
+
+.champ-court[type='time'],
+.champ-court[type='date'] {
+  max-width: none;
+}
+
+.suffixe {
+  color: var(--muted);
+  font-size: var(--fs-3);
+  white-space: nowrap;
+}
+
+.rythme {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rythme .champ-groupe {
+  width: 84px;
+}
+
+.rangee-boutons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.btn-ajout:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.apercu {
+  padding: 10px 12px;
+  border-radius: var(--rayon);
+  background: var(--field);
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: var(--fs-4);
+  line-height: 1.4;
+}
+
+.message-erreur {
+  margin: 0;
+  color: var(--now);
+  font-size: var(--fs-2);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+div.message-erreur p {
+  margin: 0;
+}
+
+.message-info {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--margin);
+  border-radius: 8px;
+  background: var(--field);
+  font-size: var(--fs-3);
+  line-height: 1.4;
+}
+
+div.message-info p {
+  margin: 0;
+}
+
+/* ---------- Listes ---------- */
+
+.liste-reglage {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ligne-reglage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.ligne-reglage:first-child {
+  border-top: 0;
+}
+
+.ligne-texte {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ligne-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* Conflits : en orange, jamais bloquants (spec §10). */
+.conflits {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-left: 4px solid var(--c3);
+  border-radius: 8px;
+  background: var(--field);
+  background: color-mix(in srgb, var(--c3) 22%, var(--panel));
+  color: var(--ink);
+}
+
+.conflit ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: var(--fs-3);
+}
+
+/* ---------- Collèges ---------- */
+
+.ligne-college {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.ligne-college:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.college-haut {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 12px;
+}
+
+.college-haut .champ-court {
+  max-width: none;
+}
+
+.pastilles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pastille-couleur {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: var(--teinte);
+  cursor: pointer;
+}
+
+.pastille-couleur[aria-pressed='true'] {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--ink);
+}
+
+/* ---------- Récurrence ---------- */
+
+.jours-semaine {
+  display: flex;
+  gap: 6px;
+}
+
+.jour-bouton {
+  flex: 1;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--rayon);
+  background: var(--field);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: var(--fs-3);
+  cursor: pointer;
+}
+
+.jour-bouton[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ---------- Restauration ---------- */
+
+.restauration {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.emplacement .restauration {
+  margin-top: 10px;
+  align-items: center;
+}
+
+@media (max-width: 520px) {
+  .college-haut {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

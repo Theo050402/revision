@@ -101,6 +101,9 @@ export async function enregistrer(avant: Etat, apres: Etat): Promise<void> {
 
 /** Remplace tout le contenu de la base par `etat` (restauration quand la base n'a pas pu être lue). */
 export async function remplacerTout(etat: Etat): Promise<void> {
+  // Après un échec de la lecture initiale, Dexie garde l'erreur d'ouverture : on rouvre explicitement, sinon la
+  // restauration (chemin de récupération) n'écrirait rien avant un rechargement de la page.
+  if (!db.isOpen()) await db.open()
   await db.transaction('rw', db.tables, async () => {
     await Promise.all(db.tables.map((t) => t.clear()))
     await enregistrer(etatVide(), etat)

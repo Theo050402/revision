@@ -1,0 +1,159 @@
+/* Fiches (créneau, indisponibilité), confirmations et formulaires en feuille. Couleurs : jetons de
+   theme/tokens.css uniquement. Cibles tactiles ≥ 44 px. */
+
+/* iPad : la feuille étroite est un popover centré plutôt qu'une feuille collée en bas. */
+@media (min-width: 900px) {
+  .feuille-fond:has(.feuille-etroite) {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .feuille.feuille-etroite {
+    width: min(520px, calc(100% - 48px));
+    margin: 0;
+    border-radius: 18px;
+    padding-bottom: 0;
+    animation: apparaitre 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .feuille.feuille-etroite .feuille-poignee {
+    display: none;
+  }
+
+  .feuille.feuille-etroite .feuille-entete {
+    padding-top: 8px;
+  }
+}
+
+@keyframes apparaitre {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.fiche,
+.feuille-confirmation {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fiche-quand {
+  margin: 0;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: var(--fs-4);
+}
+
+.fiche-details {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fiche-details > div {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.fiche-details dt {
+  flex: 0 0 72px;
+  color: var(--muted);
+  font-size: var(--fs-3);
+}
+
+.fiche-details dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pastille {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--muted);
+  font-size: var(--fs-2);
+}
+
+.fiche-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fiche-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fiche-ligne .champ {
+  min-width: 0;
+}
+
+.champ-note {
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.fiche-source {
+  line-height: 1.5;
+}
+
+/* « ✓ Fait » : un interrupteur large, plein quand le créneau est fait. */
+.btn-fait {
+  min-height: 48px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--rayon);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: var(--fs-4);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.btn-fait[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.feuille-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.feuille-confirmation .feuille-actions {
+  justify-content: flex-end;
+}
+
+.btn-danger-texte {
+  color: var(--now);
+}
+
+.btn-danger {
+  background: var(--now);
+  color: var(--bg);
+}
+
+/* Lien dans une phrase. */
+.btn-lien {
+  min-height: 44px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}

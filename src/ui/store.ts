@@ -18,6 +18,8 @@ type StoreState = {
   futur: Etat[]
   pret: boolean
   erreur: string | null
+  /** Réponse de `storage.persist()` : `null` tant qu'elle n'est pas connue, `false` si le navigateur la refuse (§14). */
+  persistance: boolean | null
   /** `null` ou la même référence = refus : aucun effet, renvoie `false`. Refusé aussi tant que `pret` est faux. */
   appliquer: (f: (e: Etat) => Etat | null) => boolean
   /**
@@ -92,6 +94,7 @@ export const useStore = create<StoreState>()((set, get) => ({
   futur: [],
   pret: false,
   erreur: null,
+  persistance: null,
 
   appliquer(f) {
     const { etat, passe, pret } = get()
@@ -146,7 +149,8 @@ export const useStore = create<StoreState>()((set, get) => ({
       const etat = await chargerTout()
       persiste = etat
       set({ etat, passe: [], futur: [], pret: true, erreur: null })
-      void demanderPersistance()
+      // Une seule demande, au démarrage : la réponse alimente le rappel de Réglages › Données.
+      void demanderPersistance().then((ok) => set({ persistance: ok }))
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e)
       // `pret` reste faux : l'interface affiche l'erreur et aucune modification n'est acceptée
