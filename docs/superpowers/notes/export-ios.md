@@ -16,11 +16,12 @@ Sur l'iPad d'Emma, avec un calendrier « Test » créé dans l'app Calendrier :
 Test sur iPad le 28/10/2026.
 
 - Bouton 1 (partage) : la feuille de partage n'offre pas Calendrier, inutilisable.
-- Bouton 2 (téléchargement) : ouvre l'écran d'import natif du Calendrier, événements ajoutés correctement.
-- Bouton 4 (Ouvrir dans Safari) :
-- Bouton 3 (réexport modifié) : à retester en téléchargement (mise à jour ou doublon ?).
+- Bouton 2 (téléchargement) : ouvre l'écran d'import natif du Calendrier, événements ajoutés correctement (« Tout ajouter » fonctionne pour les nouveaux événements).
+- Bouton 4 (Ouvrir dans Safari) : résultat non noté, sans objet puisque le téléchargement fonctionne.
+- Bouton 3 (réexport modifié, en téléchargement) : mise à jour sans doublon (même `UID`, `SEQUENCE` plus élevée), mais iOS demande de valider chaque mise à jour une par une ; « Tout ajouter » ne fonctionne pas pour les mises à jour.
 
 ## Décision
 
 - Livraison par téléchargement (`livrerIcs` : téléchargement par défaut, partage seulement si forcé).
-- `MODE_EXPORT` : en attente du retest du bouton 3 (`'maj'` si déplacé, `'nouveaux'` si dupliqué).
+- Deux fichiers distincts : `revisions-nouveaux.ics` (« Tout ajouter » dans Calendrier) et `revisions-modifies.ics` (mise à jour une par une). Un troisième, `revisions-tout.ics`, sert au planning complet.
+- Pas de `MODE_EXPORT` : les mises à jour fonctionnent (pas de doublon), donc le module `src/ics/mode.ts` est supprimé. Au-delà de 10 créneaux modifiés, la feuille propose en plus « Tout réexporter » : supprimer le calendrier « Révisions » dans Calendrier, le recréer, puis exporter tout le planning.

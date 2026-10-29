@@ -1,0 +1,167 @@
+/* Bouton « Exporter » et feuille d'export. Couleurs : jetons de theme/tokens.css uniquement.
+   Cibles tactiles ≥ 44 px. Contrastes mesurés (texte du bouton) : clair 13,7:1, sombre 5,8:1 ;
+   inactif : texte `--muted` sur `--bg`, 4,5:1 en clair et 6,0:1 en sombre. */
+
+.btn-export {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--rayon);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: var(--fs-3);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.btn-export:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Rien n'a jamais pu être exporté : un contour pâle plutôt qu'un aplat délavé (le texte reste lisible). */
+.btn-export:disabled {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
+
+/* Pastille du nombre de changements : couleurs du bouton inversées. */
+.export-badge {
+  min-width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--on-accent);
+  color: var(--accent);
+  font-size: var(--fs-2);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.btn-secondaire {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--rayon);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: var(--fs-3);
+  cursor: pointer;
+}
+
+.btn-secondaire:disabled,
+.export .btn-principal:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ---------- Feuille ---------- */
+
+.export {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.export-info {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--margin);
+  border-radius: 8px;
+  background: var(--field);
+  font-size: var(--fs-3);
+  line-height: 1.45;
+}
+
+.export-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.export > :first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.export-info + .export-section {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.export-section h3 {
+  margin: 0;
+  font-size: var(--fs-4);
+  font-weight: 700;
+}
+
+.export-section .aide {
+  line-height: 1.45;
+}
+
+.export-section ul,
+.export-section ol,
+.export-alternative ol {
+  margin: 0;
+  padding-left: 22px;
+  font-size: var(--fs-3);
+  line-height: 1.5;
+}
+
+.export-alternative {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+.export-alternative h4 {
+  margin: 0;
+  font-size: var(--fs-3);
+  font-weight: 700;
+}
+
+.export-suppressions ul {
+  align-self: stretch;
+}
+
+/* iPhone : les boutons occupent la largeur de la feuille. */
+@media (max-width: 899px) {
+  .export-section > button,
+  .export-alternative > button {
+    align-self: stretch;
+  }
+}
+
+/* iPhone : la barre est étroite, la pastille chevauche l'angle du bouton plutôt que de l'élargir (sinon le bouton
+   passerait à la ligne). Contour d'encre pour la détacher du fond comme du bouton. */
+.barre[data-dispo='iphone'] .btn-export {
+  position: relative;
+  padding: 0 14px;
+}
+
+.barre[data-dispo='iphone'] .export-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 22px;
+  border: 1.5px solid var(--accent);
+}

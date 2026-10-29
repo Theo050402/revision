@@ -32,7 +32,7 @@ type Props = {
   /** iPad seulement : le panneau de la bibliothèque est-il déplié ? */
   panneauOuvert: boolean
   onItems: () => void
-  /** Emplacement du bouton Exporter (tâche 20). Par défaut : bouton inactif. */
+  /** Bouton Exporter (`export/BoutonExport`). Par défaut : bouton inactif. */
   exporter?: ReactNode
 }
 

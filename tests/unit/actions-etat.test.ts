@@ -308,6 +308,15 @@ describe('export', () => {
     expect(ev.description).toBe('Cancérologie · p. 175–185 (10 p)\nRevoir le schéma')
   })
 
+  it("evenementsExport : un item ajouté à la main (pageDebut 0) n'affiche pas de plage de pages", () => {
+    let e = base()
+    e = { ...e, items: { ...e.items, 'c1:900': { ...e.items['c1:300'], id: 'c1:900', numero: 900, pageDebut: 0, pages: 22 } } }
+    e = avec(e, creneau('k1', 'c1:900', { note: 'Voir cours' }), creneau('k2', 'c1:900'))
+    const evts = evenementsExport(e, 'tout')
+    expect(evts[0].description).toBe('Cancérologie · 22 p\nVoir cours')
+    expect(evts[1].description).toBe('Cancérologie · 22 p')
+  })
+
   it('changementsEnAttente : nouveaux, modifies, suppressions ; bac exclu ; trié par début', () => {
     const e = avec(
       base(),

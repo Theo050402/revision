@@ -5,6 +5,7 @@ import { useAujourdhui } from './calendrier/maintenant'
 import type { Ecran, Vue } from './ecran'
 import { Bibliotheque } from './bibliotheque/Bibliotheque'
 import { EmplacementRestauration } from './Emplacements'
+import { BoutonExport } from './export/BoutonExport'
 import { Feuille } from './Feuille'
 import { FicheCreneau } from './feuilles/FicheCreneau'
 import { FicheIndispo } from './feuilles/FicheIndispo'
@@ -219,6 +220,7 @@ function Coque() {
               onRetablir={retablir}
               panneauOuvert={panneauOuvert}
               onItems={() => setPanneauOuvert((o) => !o)}
+              exporter={<BoutonExport />}
             />
 
             {erreur !== null && (

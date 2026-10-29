@@ -12,7 +12,7 @@ test('s\'ouvre sur le calendrier', async ({ page }, info) => {
   await expect(page.getByRole('button', { name: 'Mois', exact: true })).toHaveAttribute('aria-pressed', 'false')
   // Titre : mois en français et numéro de semaine.
   await expect(page.locator('.barre-titre')).toHaveText(/^\S+\s*semaine \d+$/)
-  // Le bouton Exporter est un emplacement inactif tant que la tâche 20 n'est pas faite.
+  // Rien n'est placé : le bouton Exporter est inactif (export.spec.ts couvre le reste).
   await expect(page.getByRole('button', { name: 'Exporter' })).toBeDisabled()
 })
 

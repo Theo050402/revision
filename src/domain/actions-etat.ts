@@ -262,6 +262,11 @@ function partage(places: Place[]): { nouveaux: Place[]; modifies: Place[] } {
 function enEvenement(e: Etat, c: Place): EvenementIcs {
   const item = e.items[c.itemId]
   const college = e.colleges[item.collegeId]
+  // Item ajouté à la main : pas de pages connues (pageDebut 0), donc pas de plage.
+  const plage =
+    item.pageDebut > 0
+      ? `p. ${item.pageDebut}–${item.pageDebut + item.pages} (${item.pages} p)`
+      : `${item.pages} p`
   return {
     uid: `${c.id}@revisions-emma`,
     sequence: c.version,
@@ -270,20 +275,29 @@ function enEvenement(e: Etat, c: Place): EvenementIcs {
     resume:
       `📚 ${item.numero} · ${item.titre} · T${c.tour}` + (c.partie ? ` · ${c.partie.i}/${c.partie.n}` : ''),
     description:
-      `${college.nom} · p. ${item.pageDebut}–${item.pageDebut + item.pages} (${item.pages} p)` +
-      (c.note ? `
-${c.note}` : ''),
+      `${college.nom} · ${plage}` + (c.note ? `\n${c.note}` : ''),
     categorie: college.nom,
     rappel: e.reglages.rappel,
   }
 }
 
-/** Événements à écrire dans le .ics, sur le même ensemble de créneaux que `changementsEnAttente`. */
-export function evenementsExport(e: Etat, portee: 'nouveaux' | 'modifies' | 'tout'): EvenementIcs[] {
+type Portee = 'nouveaux' | 'modifies' | 'tout'
+
+function retenus(e: Etat, portee: Portee): Place[] {
   const places = placesExportables(e)
+  if (portee === 'tout') return places
   const ch = partage(places)
-  const retenus = portee === 'tout' ? places : portee === 'nouveaux' ? ch.nouveaux : ch.modifies
-  return retenus.map((c) => enEvenement(e, c))
+  return portee === 'nouveaux' ? ch.nouveaux : ch.modifies
+}
+
+/** Événements à écrire dans le .ics, sur le même ensemble de créneaux que `changementsEnAttente`. */
+export function evenementsExport(e: Etat, portee: Portee): EvenementIcs[] {
+  return retenus(e, portee).map((c) => enEvenement(e, c))
+}
+
+/** Identifiants des créneaux de `evenementsExport(e, portee)`, dans le même ordre : à passer à `marquerExporte`. */
+export function creneauxExportes(e: Etat, portee: Portee): string[] {
+  return retenus(e, portee).map((c) => c.id)
 }
 
 /** Après la livraison : `versionExportee = version` ; le premier export est fait. */
