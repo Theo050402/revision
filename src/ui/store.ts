@@ -10,6 +10,14 @@ export const NIVEAUX_ANNULATION = 50
 /** Message de la spec §14 (échec d'écriture, quota). */
 export const MESSAGE_QUOTA = "Plus d'espace pour enregistrer. Sauvegarde tes données puis libère de la place."
 
+export type OptionsSansHistorique = {
+  /**
+   * Vide aussi l'historique (passe et futur) : pour les opérations après lesquelles un état ancien n'a plus de sens
+   * (suppression ou réimport d'un collège : annuler ne doit jamais ressusciter ses créneaux).
+   */
+  viderHistorique?: boolean
+}
+
 type StoreState = {
   etat: Etat
   /** Anciens états, du plus ancien au plus récent (au plus 50). */
@@ -24,9 +32,10 @@ type StoreState = {
   appliquer: (f: (e: Etat) => Etat | null) => boolean
   /**
    * Comme `appliquer` (même garde `pret`, même file d'écriture) mais hors historique : n'empile
-   * rien dans `passe` et ne vide pas `futur`. Pour les champs non annulables (réglages, spec §9.6).
+   * rien dans `passe` et ne vide pas `futur` (sauf `viderHistorique`). Pour les champs non annulables
+   * (réglages, collèges, items, spec §9.6).
    */
-  appliquerSansHistorique: (f: (e: Etat) => Etat | null) => boolean
+  appliquerSansHistorique: (f: (e: Etat) => Etat | null, options?: OptionsSansHistorique) => boolean
   annuler: () => void
   retablir: () => void
   /** Remplace tout l'état (restauration d'une sauvegarde) : vide l'historique et persiste. */
@@ -82,10 +91,16 @@ export function attendreEcritures(): Promise<void> {
 
 /**
  * Un état d'historique rejoué garde les champs non annulables de l'état courant : annuler une
- * opération sur les créneaux ne doit pas ramener d'anciens réglages (spec §9.6).
+ * opération sur les créneaux ne doit pas ramener d'anciens réglages, ni renommer un collège (spec §9.6).
  */
 function rejouer(snapshot: Etat, courant: Etat): Etat {
-  return { ...snapshot, reglages: courant.reglages, premierExportFait: courant.premierExportFait }
+  return {
+    ...snapshot,
+    reglages: courant.reglages,
+    premierExportFait: courant.premierExportFait,
+    colleges: courant.colleges,
+    items: courant.items,
+  }
 }
 
 export const useStore = create<StoreState>()((set, get) => ({
@@ -106,12 +121,12 @@ export const useStore = create<StoreState>()((set, get) => ({
     return true
   },
 
-  appliquerSansHistorique(f) {
+  appliquerSansHistorique(f, options) {
     const { etat, pret } = get()
     if (!pret) return false
     const suivant = f(etat)
     if (suivant === null || suivant === etat) return false
-    set({ etat: suivant })
+    set(options?.viderHistorique ? { etat: suivant, passe: [], futur: [] } : { etat: suivant })
     persister(suivant)
     return true
   },

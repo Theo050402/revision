@@ -5,7 +5,7 @@ import type { Reglages as ReglagesEtat } from '../../domain/types'
 import { sauvegarder } from '../sauvegarde'
 import { useStore } from '../store'
 import { Colleges } from './reglages/Colleges'
-import { Durees, Journee, cleDurees, cleJournee } from './reglages/Durees'
+import { Durees, Journee } from './reglages/Durees'
 import { Indispos } from './reglages/Indispos'
 import { Restauration } from './Restauration'
 import './reglages.css'
@@ -48,8 +48,8 @@ export function Reglages({ onRetour, recurrenceInitiale = null }: Props) {
         </button>
       </div>
 
-      <Durees key={cleDurees(reglages)} />
-      <Journee key={cleJournee(reglages)} />
+      <Durees />
+      <Journee />
       <Indispos recurrenceInitiale={recurrenceInitiale} />
       <Colleges />
 

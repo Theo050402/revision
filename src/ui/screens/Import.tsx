@@ -91,10 +91,13 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
     // Ajouter ou réimporter un collège n'est pas une opération sur les créneaux : hors historique (§9.6).
     const ok = useStore
       .getState()
-      .appliquerSansHistorique((e) =>
-        college && e.colleges[college.id]
-          ? reimporterCollege(e, college.id, items)
-          : ajouterCollege(e, nom, items),
+      .appliquerSansHistorique(
+        (e) =>
+          college && e.colleges[college.id]
+            ? reimporterCollege(e, college.id, items)
+            : ajouterCollege(e, nom, items),
+        // Un réimport remplace les items : annuler ne doit pas ramener l'ancien état (ni ses créneaux).
+        { viderHistorique: Boolean(college) },
       )
     if (!ok) return
     toast(`${college ? 'Collège réimporté' : 'Collège ajouté'} : ${college ? college.nom : nom} (${pluriel(items.length)})`)

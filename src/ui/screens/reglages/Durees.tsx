@@ -1,7 +1,6 @@
 // Réglages › Durées et Journée (spec §6, §11). Les champs sont des brouillons : rien n'est enregistré tant que
 // « Enregistrer » n'est pas pressé, et il reste désactivé tant qu'un champ est invalide. Les créneaux existants
 // gardent leur durée : seuls les prochains dépôts utilisent les nouvelles valeurs.
-import { useState } from 'react'
 import { modifierReglages } from '../../../domain/actions-etat'
 import type { Reglages } from '../../../domain/types'
 import { brutDurees, lireDurees, lireJournee, reglagesPourPas } from '../../../domain/validation'
@@ -9,22 +8,19 @@ import { useStore } from '../../store'
 import { toast } from '../../Toast'
 import { apercuDurees } from '../reglagesLogique'
 import { Champ } from './Champ'
+import { useBrouillon } from './useBrouillon'
 
-/** Le brouillon repart des valeurs enregistrées quand elles changent (restauration, nouveau pas) : voir la clé. */
-export const cleDurees = (r: Reglages): string =>
-  JSON.stringify([r.rythme, r.dureeMin, r.dureeMax, r.coefsTours, r.pauseMultiple, r.pas])
-export const cleJournee = (r: Reglages): string => JSON.stringify([r.journee, r.pas, r.dureeMin, r.dureeMax])
 
 export function Durees() {
   const reglages = useStore((s) => s.etat.reglages)
   const enregistre = brutDurees(reglages)
-  const [brut, setBrut] = useState(enregistre)
+  // Le pas n'est pas un champ de cette section : le changer ailleurs ne touche pas au brouillon en cours.
+  const { brouillon: brut, modifier, reinitialiser, modifie } = useBrouillon(enregistre, JSON.stringify(enregistre))
   const lecture = lireDurees(brut, reglages.pas)
   const erreurs = lecture.ok ? {} : lecture.erreurs
-  const modifie = JSON.stringify(brut) !== JSON.stringify(enregistre)
 
-  const maj = (champs: Partial<typeof brut>) => setBrut((b) => ({ ...b, ...champs }))
-  const majCoef = (i: number, v: string) => setBrut((b) => ({ ...b, coefs: b.coefs.map((c, k) => (k === i ? v : c)) }))
+  const maj = (champs: Partial<typeof brut>) => modifier((b) => ({ ...b, ...champs }))
+  const majCoef = (i: number, v: string) => modifier((b) => ({ ...b, coefs: b.coefs.map((c, k) => (k === i ? v : c)) }))
 
   const enregistrer = () => {
     if (!lecture.ok) return
@@ -121,7 +117,7 @@ export function Durees() {
           Enregistrer les durées
         </button>
         {modifie && (
-          <button type="button" className="btn-texte" onClick={() => setBrut(enregistre)}>
+          <button type="button" className="btn-texte" onClick={reinitialiser}>
             Annuler
           </button>
         )}
@@ -134,12 +130,14 @@ const PAS: ReadonlyArray<Reglages['pas']> = [5, 10, 15]
 
 export function Journee() {
   const reglages = useStore((s) => s.etat.reglages)
-  const [debut, setDebut] = useState(reglages.journee.debut)
-  const [fin, setFin] = useState(reglages.journee.fin)
-  const [pas, setPas] = useState<Reglages['pas']>(reglages.pas)
+  const enregistre = { debut: reglages.journee.debut, fin: reglages.journee.fin, pas: reglages.pas }
+  const { brouillon, modifier, modifie } = useBrouillon(enregistre, JSON.stringify(enregistre))
+  const { debut, fin, pas } = brouillon
+  const setDebut = (v: string) => modifier((b) => ({ ...b, debut: v }))
+  const setFin = (v: string) => modifier((b) => ({ ...b, fin: v }))
+  const setPas = (v: Reglages['pas']) => modifier((b) => ({ ...b, pas: v }))
 
   const lecture = lireJournee(debut, fin)
-  const modifie = debut !== reglages.journee.debut || fin !== reglages.journee.fin || pas !== reglages.pas
   const recale = reglagesPourPas(reglages, pas)
   const recalage = pas !== reglages.pas && (recale.dureeMin !== reglages.dureeMin || recale.dureeMax !== reglages.dureeMax)
 

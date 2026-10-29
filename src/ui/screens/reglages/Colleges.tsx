@@ -58,7 +58,8 @@ function LigneCollege({ college }: { college: College }) {
   }
 
   const supprimer = () => {
-    appliquer((e) => supprimerCollege(e, college.id))
+    // Supprimer un collège vide l'historique : annuler ne doit jamais ressusciter ses créneaux.
+    appliquer((e) => supprimerCollege(e, college.id), { viderHistorique: true })
     setConfirmer(false)
     toast(`Collège « ${college.nom} » supprimé.`)
   }

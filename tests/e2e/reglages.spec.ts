@@ -62,7 +62,7 @@ async function lireTable<T>(page: Page, table: string): Promise<T[]> {
   ) as Promise<T[]>
 }
 
-type Reglages = { rythme: { pages: number }; dureeMax: number; rappel: number }
+type Reglages = { rythme: { pages: number }; dureeMax: number; rappel: number; pas: number }
 
 /** Attend que les réglages écrits en base satisfassent `ok` (l'écriture est asynchrone : avant un rechargement). */
 async function reglagesEnBase(page: Page, ok: (r: Reglages) => boolean) {
@@ -322,6 +322,165 @@ test('une récurrence de plus de 366 jours est refusée', async ({ page }) => {
   await expect(form.getByRole('button', { name: 'Enregistrer' })).toBeDisabled()
   await form.getByLabel('Au', { exact: true }).fill('2026-12-31')
   await expect(form.getByRole('button', { name: 'Enregistrer' })).toBeEnabled()
+})
+
+// ───────────────────────────── Modifier une récurrence ─────────────────────────────
+
+test('modifier une récurrence régénère ses blocs : jours retirés supprimés, horaires changés, conflits mis à jour', async ({ page }) => {
+  await ouvrir(page, { sansCreneaux: ['c1:290'] })
+  await versReglages(page)
+  await page.getByRole('button', { name: '+ Récurrence' }).click()
+  let form = page.getByRole('dialog', { name: 'Nouvelle récurrence' })
+  await form.getByLabel('Titre', { exact: true }).fill('Stage')
+  await form.getByLabel('Du', { exact: true }).fill('2026-11-02')
+  await form.getByLabel('Au', { exact: true }).fill('2026-11-06')
+  await form.getByLabel('De', { exact: true }).fill('08:00')
+  await form.getByLabel('À', { exact: true }).fill('13:00')
+  await form.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(page.getByTestId('conflits')).toContainText('1 créneau chevauche “Stage”')
+
+  type Indispo = { id: string; source: string; debut: string; fin: string }
+  const recurrentes = async () => {
+    const toutes = await lireTable<Indispo>(page, 'indispos')
+    return toutes.filter((i) => i.source === 'recurrente').sort((a, b) => a.debut.localeCompare(b.debut))
+  }
+  await expect.poll(async () => (await recurrentes()).length).toBe(5)
+
+  // Modification : plus de mercredi (où se trouve le créneau en conflit), et de 9 h à 12 h.
+  await page.getByRole('button', { name: 'Modifier Stage' }).click()
+  form = page.getByRole('dialog', { name: 'Modifier la récurrence' })
+  await form.getByRole('button', { name: 'mercredi' }).click()
+  await form.getByLabel('De', { exact: true }).fill('09:00')
+  await form.getByLabel('À', { exact: true }).fill('12:00')
+  await form.getByRole('button', { name: 'Enregistrer' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+
+  await expect(page.getByTestId('conflits')).toHaveCount(0)
+  await expect(page.getByRole('list', { name: 'Récurrences' })).toContainText('lun., mar., jeu., ven. · 9h–12h')
+  await expect
+    .poll(async () => (await recurrentes()).map((i) => `${i.debut}>${i.fin.slice(11)}`))
+    .toEqual(['2026-11-02T09:00>12:00', '2026-11-03T09:00>12:00', '2026-11-05T09:00>12:00', '2026-11-06T09:00>12:00'])
+  expect(await lireTable(page, 'recurrences')).toHaveLength(1)
+
+  await retourCalendrier(page)
+  await expect(colonne(page, '2026-11-04').locator('.bloc-indispo')).toHaveCount(0)
+})
+
+// ───────────────────────────── Historique d'annulation ─────────────────────────────
+
+const annuler = (page: Page) => page.getByRole('button', { name: 'Annuler', exact: true })
+
+test('quitter une note inchangée ne crée aucune étape d’annulation', async ({ page }) => {
+  await ouvrir(page)
+  await expect(annuler(page)).toBeDisabled()
+  await bloc(page, 'cr-d').click()
+  const note = page.getByRole('dialog').getByLabel('Note')
+  await note.focus()
+  await note.blur()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fermer' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(annuler(page)).toBeDisabled()
+
+  // Une note modifiée, elle, est annulable.
+  await bloc(page, 'cr-d').click()
+  await page.getByRole('dialog').getByLabel('Note').fill('à revoir')
+  await page.getByRole('dialog').getByRole('button', { name: 'Fermer' }).click()
+  await expect(annuler(page)).toBeEnabled()
+})
+
+test('une restauration invalide laisse données et historique intacts ; une valide vide l’historique', async ({ page }) => {
+  await ouvrir(page)
+  await bloc(page, 'cr-d').click()
+  await page.getByRole('dialog').getByRole('button', { name: '✓ Fait' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fermer' }).click()
+  await expect(annuler(page)).toBeEnabled()
+
+  await versReglages(page)
+  const champ = page.locator('input[data-champ="restauration"]')
+  await champ.setInputFiles({ name: 'faux.json', mimeType: 'application/json', buffer: Buffer.from('pas du json') })
+  await expect(page.getByText(/^Ce fichier n'est pas une sauvegarde de Révisions \(.+\)\./)).toBeVisible()
+  await expect(annuler(page)).toBeEnabled()
+  const creneaux = await lireTable<{ id: string; fait: boolean }>(page, 'creneaux')
+  expect(creneaux.find((c) => c.id === 'cr-d')?.fait).toBe(true)
+
+  // Valide : le remplacement vide l'historique (↶ désactivé).
+  const { texte } = await contenuTelecharge(page, () => page.getByRole('button', { name: 'Sauvegarder' }).click())
+  await champ.setInputFiles({ name: 'revisions.json', mimeType: 'application/json', buffer: Buffer.from(texte) })
+  await page.getByRole('dialog').getByRole('button', { name: 'Remplacer' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(annuler(page)).toBeDisabled()
+})
+
+test('renommer un collège puis annuler une opération sur un créneau garde le nom ; supprimer un collège vide l’historique', async ({ page }) => {
+  await ouvrir(page)
+  await bloc(page, 'cr-d').click()
+  await page.getByRole('dialog').getByRole('button', { name: '✓ Fait' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Fermer' }).click()
+  await versReglages(page)
+  const ligne = page.locator('.ligne-college[data-college="c1"]')
+  await ligne.getByLabel('Nom du collège').fill('Cancéro')
+  await ligne.getByLabel('Coefficient').click() // quitte le champ : le nom est enregistré
+  await annuler(page).click() // annule « Fait »
+  await expect(ligne.getByLabel('Nom du collège')).toHaveValue('Cancéro')
+  await expect
+    .poll(async () => (await lireTable<{ id: string; nom: string }>(page, 'colleges')).find((c) => c.id === 'c1')?.nom)
+    .toBe('Cancéro')
+
+  await ligne.getByRole('button', { name: 'Supprimer Cancéro' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Supprimer', exact: true }).click()
+  await expect(ligne).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Rétablir' })).toBeDisabled()
+})
+
+// ───────────────────────────── Journée et pas ─────────────────────────────
+
+test('réduire la journée et changer le pas avec des créneaux hors bornes ou hors grille : rien ne casse', async ({ page }) => {
+  const erreurs: string[] = []
+  page.on('pageerror', (e) => erreurs.push(e.message))
+  // cr-odd : hors grille de 10 min (16 h 05, 55 min) ; cr-d (13 h 30) sera hors des nouvelles bornes.
+  await ouvrir(page, { creneaux: [creneau('cr-odd', 'c3:304', '2026-11-04T16:05', 55)] })
+  await versReglages(page)
+  await page.getByLabel('Début de journée').fill('09:00')
+  await page.getByLabel('Fin de journée').fill('12:00')
+  await page.getByRole('group', { name: 'Pas de la grille' }).getByRole('button', { name: '10 min' }).click()
+  await page.getByRole('button', { name: 'Enregistrer la journée' }).click()
+  await reglagesEnBase(page, (r) => r.pas === 10)
+
+  await retourCalendrier(page)
+  for (const [id, debut, duree] of [
+    ['cr-odd', '2026-11-04T16:05', '55'],
+    ['cr-d', '2026-11-04T13:30', '120'],
+  ]) {
+    const b = bloc(page, id)
+    await expect(b).toBeVisible()
+    await expect(b).toHaveAttribute('data-debut', debut)
+    await expect(b).toHaveAttribute('data-duree', duree)
+    const boite = await b.boundingBox()
+    expect(boite?.height ?? 0).toBeGreaterThan(10)
+  }
+  const creneaux = await lireTable<{ id: string; debut: string; duree: number }>(page, 'creneaux')
+  expect(creneaux.find((c) => c.id === 'cr-odd')).toMatchObject({ debut: '2026-11-04T16:05', duree: 55 })
+  expect(creneaux.find((c) => c.id === 'cr-d')).toMatchObject({ debut: '2026-11-04T13:30', duree: 120 })
+  expect(erreurs).toEqual([])
+})
+
+test('enregistrer une section ne fait pas perdre la saisie d’une autre', async ({ page }) => {
+  await ouvrir(page)
+  await versReglages(page)
+  // Saisie en cours (non enregistrée) dans Durées…
+  await page.getByLabel('Pages du rythme').fill('7')
+  // …pendant qu'on enregistre la Journée, pas compris.
+  await page.getByRole('group', { name: 'Pas de la grille' }).getByRole('button', { name: '10 min' }).click()
+  await page.getByRole('button', { name: 'Enregistrer la journée' }).click()
+  await reglagesEnBase(page, (r) => r.pas === 10)
+  await expect(page.getByLabel('Pages du rythme')).toHaveValue('7')
+  await expect(page.getByRole('button', { name: 'Enregistrer les durées' })).toBeEnabled()
+
+  // Et l'inverse : saisie dans Journée, enregistrement des Durées.
+  await page.getByLabel('Début de journée').fill('08:30')
+  await page.getByRole('button', { name: 'Enregistrer les durées' }).click()
+  await reglagesEnBase(page, (r) => r.rythme.pages === 7)
+  await expect(page.getByLabel('Début de journée')).toHaveValue('08:30')
 })
 
 // ───────────────────────────── Import .ics ─────────────────────────────

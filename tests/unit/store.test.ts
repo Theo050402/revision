@@ -2,6 +2,8 @@ import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { etatVide } from '../../src/domain/defaults'
 import type { Creneau, Etat } from '../../src/domain/types'
+import { modifierNote } from '../../src/domain/actions-creneaux'
+import { lireSauvegarde } from '../../src/storage/backup'
 import { chargerTout, db } from '../../src/storage/db'
 import { attendreEcritures, useStore } from '../../src/ui/store'
 
@@ -289,3 +291,89 @@ describe('store : échec de lecture initiale', () => {
     expect(await chargerTout()).toEqual(restaure)
   })
 })
+
+describe('store : collèges et items hors historique (§9.6)', () => {
+  const college = { id: 'c1', nom: 'Cancérologie', couleur: 0, coefficient: 1, importeLe: '2026-10-01T10:00' }
+  const item = { id: 'c1:300', collegeId: 'c1', numero: 300, titre: 'Tumeurs', pageDebut: 1, pages: 10, aVerifier: false }
+  const avecCollege = (e: Etat): Etat => ({ ...e, colleges: { c1: college }, items: { 'c1:300': item } })
+
+  beforeEach(() => {
+    s().appliquerSansHistorique(avecCollege)
+  })
+
+  it('renommer un collège puis annuler une opération sur un créneau garde le nom', () => {
+    s().appliquer(ajoute(creneau('a')))
+    s().appliquerSansHistorique(modifierCollege_('Cancéro'))
+    s().annuler()
+    expect(s().etat.creneaux).toEqual({})
+    expect(s().etat.colleges.c1.nom).toBe('Cancéro')
+    s().retablir()
+    expect(Object.keys(s().etat.creneaux)).toEqual(['a'])
+    expect(s().etat.colleges.c1.nom).toBe('Cancéro')
+    expect(s().etat.items['c1:300']).toEqual(item)
+  })
+
+  it('supprimer un collège (viderHistorique) désactive annuler et rétablir', () => {
+    s().appliquer(ajoute(creneau('a')))
+    s().appliquer(ajoute(creneau('b')))
+    s().annuler()
+    expect(s().passe).toHaveLength(1)
+    expect(s().futur).toHaveLength(1)
+    s().appliquerSansHistorique(
+      (e) => ({ ...e, colleges: {}, items: {}, creneaux: {} }),
+      { viderHistorique: true },
+    )
+    expect(s().passe).toHaveLength(0)
+    expect(s().futur).toHaveLength(0)
+    s().annuler()
+    expect(s().etat.creneaux).toEqual({})
+    expect(s().etat.colleges).toEqual({})
+  })
+
+  it('un réimport (viderHistorique) vide aussi l’historique', () => {
+    s().appliquer(ajoute(creneau('a')))
+    s().appliquerSansHistorique((e) => ({ ...e, items: { ...e.items, 'c1:301': { ...item, id: 'c1:301', numero: 301 } } }), {
+      viderHistorique: true,
+    })
+    expect(s().passe).toHaveLength(0)
+    expect(s().futur).toHaveLength(0)
+  })
+
+  it('restaurer vide l’historique', () => {
+    s().appliquer(ajoute(creneau('a')))
+    s().annuler()
+    s().restaurer(etatVide())
+    expect(s().passe).toHaveLength(0)
+    expect(s().futur).toHaveLength(0)
+  })
+
+  it('sans l’option, l’historique reste intact', () => {
+    s().appliquer(ajoute(creneau('a')))
+    s().appliquerSansHistorique(modifierCollege_('X'))
+    expect(s().passe).toHaveLength(1)
+  })
+
+  it('enregistrer une note inchangée ne crée aucune étape d’annulation', () => {
+    s().appliquer(ajoute(creneau('a', { note: 'revoir' })))
+    const passe = s().passe
+    expect(s().appliquer((e) => modifierNote(e, 'a', 'revoir'))).toBe(false)
+    expect(s().passe).toBe(passe)
+    expect(s().appliquer((e) => modifierNote(e, 'a', 'revoir 2'))).toBe(true)
+    expect(s().passe).toHaveLength(2)
+  })
+
+  it('une restauration refusée (fichier invalide) laisse données et historique intacts', () => {
+    s().appliquer(ajoute(creneau('a')))
+    const etat = s().etat
+    const passe = s().passe
+    const lecture = lireSauvegarde('{"foo":1}')
+    expect(lecture.ok).toBe(false)
+    // L'écran n'appelle `restaurer` que si la lecture réussit : rien ne bouge.
+    expect(s().etat).toBe(etat)
+    expect(s().passe).toBe(passe)
+  })
+})
+
+function modifierCollege_(nom: string) {
+  return (e: Etat): Etat => ({ ...e, colleges: { ...e.colleges, c1: { ...e.colleges.c1, nom } } })
+}
