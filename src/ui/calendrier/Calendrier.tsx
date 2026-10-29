@@ -2,6 +2,8 @@
 // pour changer de période, et la vue choisie (Semaine, Jour ou Mois).
 import { useMemo, useRef, useSyncExternalStore, type PointerEvent } from 'react'
 import { ajouterJours } from '../../domain/temps'
+import { Corbeille } from '../dnd/Corbeille'
+import { gesteDepuis } from '../dnd/glisse'
 import type { Vue } from '../ecran'
 import { ajouterMois, joursDeLaSemaine, libellePeriode } from '../periode'
 import type { Disposition } from '../useDisposition'
@@ -19,6 +21,11 @@ type Props = {
   onJour: (jour: string) => void
   /** Ouvre un jour dans la vue Jour (tap sur un carreau du mois). */
   onOuvrirJour: (jour: string) => void
+  /** Tap sur un emplacement libre de la grille (« Pour combler ce trou »). */
+  onTapTrou?: (jour: string, t: number) => void
+  /** Tap sur un créneau ou une indisponibilité (fiches : tâche 19). */
+  onOuvrirCreneau?: (id: string) => void
+  onOuvrirIndispo?: (id: string) => void
 }
 
 /** iPhone en paysage : la vue Jour montre trois jours (spec §9.1). */
@@ -37,16 +44,17 @@ const SEUIL_BALAYAGE = 60
  * ne garde que le défilement vertical, les mouvements horizontaux arrivent ici jusqu'au `pointerup`.
  */
 function useBalayage(precedent: () => void, suivant: () => void) {
-  const depart = useRef<{ id: number; x: number; y: number } | null>(null)
+  // Un geste de la grille (glisser un créneau, redimensionner, tracer) commencé après le `pointerdown` l'annule.
+  const depart = useRef<{ id: number; x: number; y: number; t: number } | null>(null)
   return {
     onPointerDown(e: PointerEvent) {
       if (e.pointerType === 'mouse' || !e.isPrimary) return
-      depart.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
+      depart.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() }
     },
     onPointerUp(e: PointerEvent) {
       const d = depart.current
       depart.current = null
-      if (!d || d.id !== e.pointerId) return
+      if (!d || d.id !== e.pointerId || gesteDepuis(d.t)) return
       const dx = e.clientX - d.x
       const dy = e.clientY - d.y
       if (Math.abs(dx) < SEUIL_BALAYAGE || Math.abs(dx) < 1.5 * Math.abs(dy)) return
@@ -59,7 +67,7 @@ function useBalayage(precedent: () => void, suivant: () => void) {
   }
 }
 
-export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour }: Props) {
+export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTapTrou, onOuvrirCreneau, onOuvrirIndispo }: Props) {
   const aujourdhui = useAujourdhui()
   const paysage = useSyncExternalStore(abonnerPaysage, () => window.matchMedia(requetePaysage).matches)
 
@@ -107,9 +115,17 @@ export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour }: Pro
           <VueMois mois={jour.slice(0, 7)} onOuvrirJour={onOuvrirJour} />
         ) : (
           // La clé fait repartir le défilement à zéro (ou sur « maintenant ») quand on change de vue.
-          <Grille key={`${vue}-${nbJours}`} jours={jours} pxHeure={pxHeure} />
+          <Grille
+            key={`${vue}-${nbJours}`}
+            jours={jours}
+            pxHeure={pxHeure}
+            onTapTrou={onTapTrou}
+            onOuvrirCreneau={onOuvrirCreneau}
+            onOuvrirIndispo={onOuvrirIndispo}
+          />
         )}
       </div>
+      <Corbeille />
     </section>
   )
 }

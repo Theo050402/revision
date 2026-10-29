@@ -592,13 +592,13 @@ button {
    passe par `trembler(el)` (src/ui/trembler.ts), qui retire la classe après 200 ms. */
 .tremble {
   animation: tremble 200ms ease-in-out;
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--now) 20%, transparent);
 }
 
 @keyframes tremble {
   0%,
   100% {
     transform: translateX(0);
-    box-shadow: inset 0 0 0 100vmax rgb(217 71 63 / 0.18);
   }
   20% {
     transform: translateX(-5px);
@@ -618,6 +618,5 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .tremble {
     animation: none;
-    box-shadow: inset 0 0 0 100vmax rgb(217 71 63 / 0.18);
   }
 }

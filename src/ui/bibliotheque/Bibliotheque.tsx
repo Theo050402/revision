@@ -1,11 +1,12 @@
 // Bibliothèque d'items (spec §8) : progression, bac « À placer », recherche, filtres, suggestions et liste.
 // Dans le panneau de gauche (iPad) ou la feuille du bas (iPhone). Les cartes sont sélectionnables ;
-// le glisser-déposer (tâche 18) lira la sélection par `onSelectionChange` et l'attribut `data-item-id`.
+// le glisser-déposer (délégué à la racine, voir `trouverCarte`) emporte la sélection si la carte saisie est cochée.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { libelleHeure } from '../../domain/actions-creneaux'
 import { dernierTourParItem, etatToursParItem, progression, type EtatTour } from '../../domain/tours'
 import type { Item } from '../../domain/types'
 import { useAujourdhui } from '../calendrier/maintenant'
+import { SourceGlisse } from '../dnd/ContexteDnd'
 import { formaterDuree } from '../duree'
 import { ouvrirImport, useDemandeImport } from '../importDemande'
 import { useStore } from '../store'
@@ -131,6 +132,20 @@ export function Bibliotheque({ onSelectionChange }: Props) {
   const suivants = useMemo(() => aPlanifier(etat), [etat])
   const combler = useMemo(() => (trou ? pourCombler(etat, trou.jour, trou.t).slice(0, MAX_COMBLER) : []), [etat, trou])
 
+  // Glisser-déposer (spec §9.3, §9.5), délégué à la racine : la carte saisie est trouvée au `pointerdown`. Une
+  // carte du bac porte son créneau ; une carte cochée emporte toute la sélection, une autre seulement son item.
+  const selectionLue = useRef(selection)
+  selectionLue.current = selection
+  const trouverCarte = useCallback((cible: HTMLElement) => {
+    const carte = cible.closest<HTMLElement>('.carte-item[data-item-id]')
+    if (!carte) return null
+    const creneauId = carte.dataset.creneauId
+    if (creneauId) return { source: { type: 'creneau' as const, id: creneauId }, prise: 0 }
+    const id = carte.dataset.itemId as string
+    const sel = selectionLue.current
+    return { source: { type: 'item' as const, itemIds: sel.has(id) ? [...sel] : [id] }, prise: 0 }
+  }, [])
+
   const ouvrir = useCallback((id: string) => {
     dernierOuvert.current = id
     setFicheId(id)
@@ -191,7 +206,7 @@ export function Bibliotheque({ onSelectionChange }: Props) {
   const pct = Math.round((progres.vus / progres.total) * 100)
 
   return (
-    <div className="bibliotheque">
+    <SourceGlisse className="bibliotheque" trouver={trouverCarte}>
       <button type="button" className="btn-ajout" disabled={importOuvert} onClick={() => ouvrirImport()}>
         + Collège
       </button>
@@ -414,7 +429,7 @@ export function Bibliotheque({ onSelectionChange }: Props) {
           </section>
         </>
       )}
-    </div>
+    </SourceGlisse>
   )
 }
 

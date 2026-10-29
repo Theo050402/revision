@@ -1,5 +1,6 @@
-// Blocs de la grille (spec §9.2, §13). Aucun gestionnaire de pointeur ici : la tâche 18 y branchera le
-// glisser-déposer et la tâche 19 la fiche (tap). Les attributs `data-creneau` / `data-indispo` servent de cibles.
+// Blocs de la grille (spec §9.2, §13). Le glisser-déposer est délégué à la grille (un seul `useDraggable`, voir
+// dnd/ContexteDnd.tsx) : ici, seulement le tap (`onOuvrir`, fiche de la tâche 19), le décalage de l'aperçu
+// (`transform`, jamais `top` pendant le geste) et le fantôme. `data-creneau` / `data-indispo` servent de cibles.
 import { memo, type CSSProperties } from 'react'
 import { versHm } from '../../domain/temps'
 import type { Creneau, Indispo, Item } from '../../domain/types'
@@ -12,6 +13,8 @@ const HAUTEUR_LIGNE_META = 13
 const MARGES_VERTICALES = 6
 const LIGNES_TITRE_MAX = 3
 
+const teinte = (couleur: number): string => `var(--c${((couleur % 6) + 6) % 6})`
+
 type CreneauProps = {
   creneau: Creneau
   item: Item | undefined
@@ -19,9 +22,24 @@ type CreneauProps = {
   couleur: number
   haut: number
   hauteur: number
+  /** Aperçu de cascade : décalage vertical (px) pendant le geste, animé par `transform`. */
+  decalage?: number
+  /** Créneau en cours de déplacement : il reste à sa place, estompé ; le fantôme montre où il ira. */
+  source?: boolean
+  /** Tap sans glisser : ouvre la fiche du créneau (tâche 19). */
+  onOuvrir?: (id: string) => void
 }
 
-export const BlocCreneau = memo(function BlocCreneau({ creneau, item, couleur, haut, hauteur }: CreneauProps) {
+export const BlocCreneau = memo(function BlocCreneau({
+  creneau,
+  item,
+  couleur,
+  haut,
+  hauteur,
+  decalage = 0,
+  source = false,
+  onOuvrir,
+}: CreneauProps) {
   const { numero, titre, meta } = etiquetteCreneau(creneau, item)
   const deuxLignes = hauteur >= HAUTEUR_DEUX_LIGNES
   const nonExporte = creneau.versionExportee !== creneau.version
@@ -31,8 +49,9 @@ export const BlocCreneau = memo(function BlocCreneau({ creneau, item, couleur, h
   const style = {
     top: haut,
     height: hauteur,
-    '--teinte': `var(--c${((couleur % 6) + 6) % 6})`,
+    '--teinte': teinte(couleur),
     '--lignes': lignes,
+    transform: decalage !== 0 ? `translateY(${decalage}px)` : undefined,
   } as CSSProperties
   return (
     <div
@@ -40,11 +59,14 @@ export const BlocCreneau = memo(function BlocCreneau({ creneau, item, couleur, h
       data-creneau={creneau.id}
       data-debut={creneau.debut ?? undefined}
       data-duree={creneau.duree}
+      data-duree-perso={creneau.dureePerso}
       data-fait={creneau.fait}
       data-marques={marques}
+      data-source={source || undefined}
       style={style}
       role="group"
       aria-label={descriptionCreneau(creneau, item)}
+      onClick={onOuvrir && (() => onOuvrir(creneau.id))}
     >
       <span className={lignes === 1 ? 'bloc-titre bloc-titre-une' : 'bloc-titre'}>
         <span className="bloc-numero">{numero}</span>
@@ -65,13 +87,21 @@ export const BlocCreneau = memo(function BlocCreneau({ creneau, item, couleur, h
   )
 })
 
-type IndispoProps = { indispo: Indispo; debut: number; fin: number; haut: number; hauteur: number }
+type IndispoProps = {
+  indispo: Indispo
+  debut: number
+  fin: number
+  haut: number
+  hauteur: number
+  /** Tap : ouvre l'indisponibilité (tâche 19). */
+  onOuvrir?: (id: string) => void
+}
 
 /** 480 → « 8h », 810 → « 13h30 », 1440 → « 24h ». */
-const heureCourte = (min: number): string =>
+export const heureCourte = (min: number): string =>
   min >= 1440 ? '24h' : versHm(min).replace(/^0/, '').replace(':00', 'h').replace(':', 'h')
 
-export const BlocIndispo = memo(function BlocIndispo({ indispo, debut, fin, haut, hauteur }: IndispoProps) {
+export const BlocIndispo = memo(function BlocIndispo({ indispo, debut, fin, haut, hauteur, onOuvrir }: IndispoProps) {
   const deuxLignes = hauteur >= HAUTEUR_DEUX_LIGNES
   return (
     <div
@@ -80,6 +110,7 @@ export const BlocIndispo = memo(function BlocIndispo({ indispo, debut, fin, haut
       style={{ top: haut, height: hauteur }}
       role="group"
       aria-label={`${indispo.titre}, indisponible de ${heureCourte(debut)} à ${heureCourte(fin)}`}
+      onClick={onOuvrir && (() => onOuvrir(indispo.id))}
     >
       <span className="bloc-titre">{indispo.titre}</span>
       {deuxLignes && (
@@ -90,3 +121,34 @@ export const BlocIndispo = memo(function BlocIndispo({ indispo, debut, fin, haut
     </div>
   )
 })
+
+type FantomeProps = {
+  creneau: Creneau
+  item: Item | undefined
+  couleur: number
+  haut: number
+  hauteur: number
+  /** Heure (minutes) où le créneau serait posé. */
+  debut: number
+  /** Dépôt refusé à cet endroit : teinte rouge, sans message (spec §14). */
+  refus: boolean
+}
+
+/**
+ * Fantôme du glisser (spec §9.3, §13.3) : le bloc à l'heure magnétisée, soulevé (−1,5°, ombre, contour
+ * tireté). Sans `data-creneau` : ce n'est pas un créneau et il n'est jamais une cible.
+ */
+export function BlocFantome({ creneau, item, couleur, haut, hauteur, debut, refus }: FantomeProps) {
+  const { titre } = etiquetteCreneau(creneau, item)
+  const style = { top: haut, height: hauteur, '--teinte': teinte(couleur) } as CSSProperties
+  return (
+    <div className="bloc bloc-creneau fantome" data-fantome={creneau.id} data-refus={refus} style={style} aria-hidden="true">
+      <span className="bloc-titre bloc-titre-une">{titre}</span>
+      {hauteur >= HAUTEUR_DEUX_LIGNES && (
+        <span className="bloc-meta">
+          {heureCourte(debut)} → {heureCourte(debut + creneau.duree)}
+        </span>
+      )}
+    </div>
+  )
+}

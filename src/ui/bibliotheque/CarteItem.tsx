@@ -1,6 +1,7 @@
 // Carte d'item de la bibliothèque (spec §8) : pastille du numéro à la couleur du collège, titre sur deux
 // lignes, « 18 p · 2h15 » et points des tours. Un tap ouvre la fiche ; en mode sélection, il coche la carte.
-// La tâche 18 y branchera le glisser-déposer (attribut `data-item-id`, données `{ type: 'item', itemIds }`).
+// Glisser-déposer : délégué à la racine de la bibliothèque (`SourceGlisse`, dnd/ContexteDnd.tsx), qui lit `data-item-id` /
+// `data-creneau-id` au `pointerdown` ; la carte reste mémoïsée et ne se redessine ni au début ni pendant le geste.
 import { memo } from 'react'
 import type { EtatTour } from '../../domain/tours'
 import type { Item } from '../../domain/types'

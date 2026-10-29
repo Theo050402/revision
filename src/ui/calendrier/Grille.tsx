@@ -1,15 +1,22 @@
-// Grille semaine / jour (spec §9.1) : une colonne par jour affiché, axe des heures commun.
-// Seuls les jours de `jours` sont rendus. Pour le glisser-déposer (tâche 18) : `.grille` publie
-// `data-px-heure`, `data-plage-debut` et `data-plage-fin` ; chaque `.colonne[data-jour]` commence à la
-// minute `plage.debut` (voir geometrie.ts).
-import { memo, useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react'
+// Grille semaine / jour (spec §9.1, §9.3) : une colonne par jour affiché, axe des heures commun.
+// Seuls les jours de `jours` sont rendus. `.grille` publie `data-px-heure`, `data-plage-debut` et `data-plage-fin` ;
+// chaque `.colonne[data-jour]` commence à la minute `plage.debut` (voir geometrie.ts).
+// Gestes : appui long sur un créneau puis glisser (dnd-kit, délégué au corps de la grille), poignée du bord bas
+// (durée), tap sur un emplacement libre (« Pour combler ce trou »), appui long sur un emplacement libre puis
+// étirer (indisponibilité). Pendant un glisser, les créneaux poussés s'écartent par `translateY` (aperçu).
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { ajouterIndispo } from '../../domain/actions-etat'
 import type { Intervalle } from '../../domain/cascade'
-import { hm, minutesDe } from '../../domain/temps'
-import type { Etat } from '../../domain/types'
+import { hm, jourDe, local, minutesDe } from '../../domain/temps'
+import type { Creneau, Etat } from '../../domain/types'
+import { SourceGlisse } from '../dnd/ContexteDnd'
+import { useGlisse, useRedim } from '../dnd/glisse'
 import { libelleJourCourt } from '../periode'
 import { useStore } from '../store'
-import { BlocCreneau, BlocIndispo } from './Bloc'
+import { BlocCreneau, BlocFantome, BlocIndispo, heureCourte } from './Bloc'
+import { FeuilleIndispo } from './FeuilleIndispo'
 import { blocsDesJours, minutesVersY, plageDesJours, PX_HEURE_IPAD, type BlocsDuJour } from './geometrie'
+import { useAppuiVide, useRedimension, type Trace } from './gestes'
 import { LigneMaintenant } from './LigneMaintenant'
 import { useAujourdhui } from './maintenant'
 
@@ -18,18 +25,46 @@ type Props = {
   jours: string[]
   /** Pixels par heure (voir geometrie.ts). */
   pxHeure?: number
+  /** Tap sur un emplacement libre : `t` est le début du pas touché (minutes). */
+  onTapTrou?: (jour: string, t: number) => void
+  /** Tap sur un créneau, sans glisser (fiche : tâche 19). */
+  onOuvrirCreneau?: (id: string) => void
+  /** Tap sur une indisponibilité (tâche 19). */
+  onOuvrirIndispo?: (id: string) => void
 }
 
 /** Un bloc ne descend jamais sous cette hauteur (px), même pour une durée très courte. */
 const HAUTEUR_MIN_BLOC = 14
+const rien = () => {}
 
-export function Grille({ jours, pxHeure = PX_HEURE_IPAD }: Props) {
+/** Rappel stable (référence fixe) qui appelle toujours la dernière version : les blocs mémoïsés n'en souffrent pas. */
+function useStable<A extends unknown[]>(f: ((...a: A) => void) | undefined): (...a: A) => void {
+  const r = useRef(f)
+  r.current = f
+  return useCallback((...a: A) => r.current?.(...a), [])
+}
+
+/** Le bloc saisi pendant un appui long : un créneau (pas sa poignée), le doigt gardant sa prise dans le bloc. */
+function trouverBloc(cible: HTMLElement, e: PointerEvent) {
+  if (cible.closest('.poignee-redim')) return null
+  const bloc = cible.closest<HTMLElement>('.bloc-creneau[data-creneau]')
+  if (!bloc) return null
+  return {
+    source: { type: 'creneau' as const, id: bloc.dataset.creneau as string },
+    prise: e.clientY - bloc.getBoundingClientRect().top,
+  }
+}
+
+export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCreneau, onOuvrirIndispo }: Props) {
   const creneaux = useStore((s) => s.etat.creneaux)
   const indispos = useStore((s) => s.etat.indispos)
   const items = useStore((s) => s.etat.items)
   const colleges = useStore((s) => s.etat.colleges)
   const reglages = useStore((s) => s.etat.reglages)
   const aujourdhui = useAujourdhui()
+  const glisse = useGlisse((s) => s.source !== null)
+  const redim = useRedim((s) => s.id !== null)
+  const [trace, setTrace] = useState<Trace | null>(null)
 
   const cle = jours.join(',')
   const blocs = useMemo(() => blocsDesJours({ creneaux, indispos }, cle.split(',')), [creneaux, indispos, cle])
@@ -55,6 +90,17 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD }: Props) {
     defilement.scrollTop = dehors ? Math.max(0, ligne.offsetTop - defilement.clientHeight / 3) : 0
   }, [pxHeure])
 
+  const tapTrou = useStable(onTapTrou)
+  const ouvrirCreneau = useStable(onOuvrirCreneau ?? rien)
+  const ouvrirIndispo = useStable(onOuvrirIndispo ?? rien)
+
+  const creerIndispo = (titre: string) => {
+    if (!trace) return
+    const t = trace
+    useStore.getState().appliquer((e) => ajouterIndispo(e, titre, local(t.jour, t.debut), local(t.jour, t.fin)))
+    setTrace(null)
+  }
+
   const style = { '--px-heure': `${pxHeure}px`, '--nb-jours': jours.length } as CSSProperties
 
   return (
@@ -66,6 +112,8 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD }: Props) {
       data-px-heure={pxHeure}
       data-plage-debut={plage.debut}
       data-plage-fin={plage.fin}
+      data-glisse={glisse}
+      data-redim={redim}
     >
       <div className="grille-tete">
         <div className="grille-coin" />
@@ -80,7 +128,7 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD }: Props) {
         })}
       </div>
 
-      <div className="grille-corps" style={{ height: hauteurTotale }}>
+      <SourceGlisse className="grille-corps" style={{ height: hauteurTotale }} trouver={trouverBloc}>
         <div className="heures" aria-hidden="true">
           {heures.map((m) => (
             <span key={m} className="heure" style={{ top: minutesVersY(m, plage, pxHeure) }}>
@@ -96,12 +144,20 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD }: Props) {
             plage={plage}
             bornes={bornes}
             pxHeure={pxHeure}
+            pas={reglages.pas}
             items={items}
             colleges={colleges}
             aujourdhui={j === aujourdhui}
+            trace={trace?.jour === j ? trace : null}
+            onTrace={setTrace}
+            onTapTrou={tapTrou}
+            onOuvrirCreneau={ouvrirCreneau}
+            onOuvrirIndispo={ouvrirIndispo}
           />
         ))}
-      </div>
+      </SourceGlisse>
+
+      {trace?.fini && <FeuilleIndispo trace={trace} onCreer={creerIndispo} onAnnuler={() => setTrace(null)} />}
     </div>
   )
 }
@@ -112,10 +168,19 @@ type ColonneProps = {
   plage: Intervalle
   bornes: Intervalle
   pxHeure: number
+  pas: number
   items: Etat['items']
   colleges: Etat['colleges']
   aujourdhui: boolean
+  /** Indisponibilité en cours de tracé dans cette colonne. */
+  trace: Trace | null
+  onTrace: (t: Trace | null) => void
+  onTapTrou: (jour: string, t: number) => void
+  onOuvrirCreneau: (id: string) => void
+  onOuvrirIndispo: (id: string) => void
 }
+
+type Fantome = { creneau: Creneau; debut: number; refus: boolean }
 
 const ColonneJour = memo(function ColonneJour({
   jour,
@@ -123,15 +188,55 @@ const ColonneJour = memo(function ColonneJour({
   plage,
   bornes,
   pxHeure,
+  pas,
   items,
   colleges,
   aujourdhui,
+  trace,
+  onTrace,
+  onTapTrou,
+  onOuvrirCreneau,
+  onOuvrirIndispo,
 }: ColonneProps) {
+  // Aperçu du glisser en cours : ne change que si la minute, le jour, la cible ou la moitié changent.
+  const source = useGlisse((s) => s.source)
+  const survol = useGlisse((s) => (s.survol?.type === 'colonne' && s.survol.cible.jour === jour ? s.survol : null))
+  const vu = useGlisse((s) => s.apercu)
+  const fantomeSource = useGlisse((s) => s.fantome)
+  const redim = useRedim()
+
+  const appuiVide = useAppuiVide(jour, { plage, pxHeure, pas }, onTapTrou, onTrace)
+  const redimensionner = useRedimension({ plage, pxHeure, pas })
+
+  const y = (m: number) => minutesVersY(m, plage, pxHeure)
+  const hauteurDe = (debut: number, duree: number) =>
+    Math.max(HAUTEUR_MIN_BLOC, (Math.min(duree, plage.fin - debut) * pxHeure) / 60)
+  const idSource = source?.type === 'creneau' ? source.id : null
+
+  // Fantômes : là où l'aperçu pose le(s) créneau(x) ; sinon (refus) le créneau glissé à l'heure visée.
+  const fantomes: Fantome[] = []
+  if (survol && source) {
+    if (vu?.ok) {
+      if (idSource !== null) {
+        const c = fantomeSource
+        const debut = vu.positions[idSource] ?? c?.debut
+        if (c && debut && jourDe(debut) === jour) fantomes.push({ creneau: c, debut: minutesDe(debut), refus: false })
+      } else {
+        for (const n of vu.nouveaux) {
+          if (jourDe(n.debut as string) === jour) fantomes.push({ creneau: n, debut: minutesDe(n.debut as string), refus: false })
+        }
+      }
+    } else if (fantomeSource) {
+      fantomes.push({ creneau: fantomeSource, debut: survol.cible.t, refus: vu !== null })
+    }
+  }
+  const refus = survol !== null && vu !== null && !vu.ok
+
   // Heures hors des bornes de la journée (réglages) mais dans la plage affichée : grisées.
   const avant = Math.max(0, Math.min(bornes.debut, plage.fin) - plage.debut)
   const apres = Math.max(0, plage.fin - Math.max(bornes.fin, plage.debut))
   return (
-    <div className="colonne" data-jour={jour} data-aujourdhui={aujourdhui}>
+    <div className="colonne" data-jour={jour} data-aujourdhui={aujourdhui} data-refus={refus || undefined} onPointerDown={appuiVide}>
       {avant > 0 && <div className="hors-bornes" style={{ top: 0, height: (avant * pxHeure) / 60 }} />}
       {apres > 0 && <div className="hors-bornes" style={{ bottom: 0, height: (apres * pxHeure) / 60 }} />}
 
@@ -145,8 +250,9 @@ const ColonneJour = memo(function ColonneJour({
             indispo={indispo}
             debut={debut}
             fin={fin}
-            haut={minutesVersY(d, plage, pxHeure)}
+            haut={y(d)}
             hauteur={Math.max(HAUTEUR_MIN_BLOC, ((f - d) * pxHeure) / 60)}
+            onOuvrir={onOuvrirIndispo}
           />
         )
       })}
@@ -155,19 +261,70 @@ const ColonneJour = memo(function ColonneJour({
         const debut = minutesDe(c.debut as string)
         const item = items[c.itemId]
         const college = item ? colleges[item.collegeId] : undefined
+        const nouvelle = vu?.ok && c.id !== idSource ? vu.positions[c.id] : undefined
+        const decalage = nouvelle && jourDe(nouvelle) === jour ? y(minutesDe(nouvelle)) - y(debut) : 0
+        const duree = redim.id === c.id ? redim.duree : c.duree
+        const hauteur = hauteurDe(debut, duree)
         return (
           <BlocCreneau
             key={c.id}
             creneau={c}
             item={item}
             couleur={college?.couleur ?? 0}
-            haut={minutesVersY(debut, plage, pxHeure)}
-            hauteur={Math.max(HAUTEUR_MIN_BLOC, (Math.min(c.duree, plage.fin - debut) * pxHeure) / 60)}
+            haut={y(debut)}
+            hauteur={hauteur}
+            decalage={decalage}
+            source={c.id === idSource}
+            onOuvrir={onOuvrirCreneau}
           />
         )
       })}
+
+      {/* Poignées du bord bas (durée) : zone tactile de 24 px à cheval sur le bord, trait fin visible. */}
+      {blocs.creneaux.map((c) => {
+        const debut = minutesDe(c.debut as string)
+        const duree = redim.id === c.id ? redim.duree : c.duree
+        const bas = y(debut) + hauteurDe(debut, duree)
+        const dedans = Math.min(14, hauteurDe(debut, duree) / 2)
+        return (
+          <div
+            key={`p-${c.id}`}
+            className="poignee-redim"
+            data-poignee={c.id}
+            data-active={redim.id === c.id || undefined}
+            style={{ top: bas - dedans }}
+            aria-hidden="true"
+            onPointerDown={(e) => redimensionner(e, c.id, c.duree)}
+          />
+        )
+      })}
+
+      {fantomes.map((f) => {
+        const item = items[f.creneau.itemId]
+        return (
+          <BlocFantome
+            key={`f-${f.creneau.id}`}
+            creneau={f.creneau}
+            item={item}
+            couleur={(item && colleges[item.collegeId]?.couleur) ?? 0}
+            haut={y(f.debut)}
+            hauteur={hauteurDe(f.debut, f.creneau.duree)}
+            debut={f.debut}
+            refus={f.refus}
+          />
+        )
+      })}
+
+      {trace && (
+        <div className="trace-indispo" style={{ top: y(trace.debut), height: y(trace.fin) - y(trace.debut) }} aria-hidden="true">
+          <span className="bloc-meta">
+            {heureCourte(trace.debut)}–{heureCourte(trace.fin)}
+          </span>
+        </div>
+      )}
 
       {aujourdhui && <LigneMaintenant plage={plage} pxHeure={pxHeure} />}
     </div>
   )
 })
+

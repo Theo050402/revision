@@ -103,15 +103,22 @@ export const DONNEES = {
 }
 
 /**
- * Écrit les tables dans IndexedDB, puis recharge la page. Attend d'abord que l'app ait créé son schéma
+ * Écrit les tables dans IndexedDB, puis recharge la page. `extra.creneaux` s'ajoute aux créneaux de base ;
+ * `sansCreneaux` écarte d'abord ceux de base dont l'item est listé (ex. un item encore jamais planifié). Attend d'abord que l'app ait créé son schéma
  * (Dexie le fait à l'ouverture de la base) : on n'ouvre jamais la base avant, ce qui en créerait une vide.
  */
-export async function semer(page: Page, extra: { creneaux?: Ligne[]; items?: Ligne[]; reglages?: Ligne } = {}): Promise<void> {
+export async function semer(
+  page: Page,
+  extra: { creneaux?: Ligne[]; items?: Ligne[]; reglages?: Ligne; sansCreneaux?: string[] } = {},
+): Promise<void> {
   await page.getByRole('region', { name: 'Calendrier' }).waitFor()
   const donnees = {
     ...DONNEES,
     items: [...DONNEES.items, ...(extra.items ?? [])],
-    creneaux: [...DONNEES.creneaux, ...(extra.creneaux ?? [])],
+    creneaux: [
+      ...DONNEES.creneaux.filter((c) => !(extra.sansCreneaux ?? []).includes(c.itemId as string)),
+      ...(extra.creneaux ?? []),
+    ],
   }
   await page.evaluate(
     async ([d, reglages]) => {

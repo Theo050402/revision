@@ -1,0 +1,263 @@
+/* Glisser-déposer (spec §9.3, §13.3) : fantôme soulevé (−1,5°, ombre, contour tireté), écart des créneaux
+   poussés (translateY, 180 ms), refus (teinte --now à 20 %), corbeille, poignée de durée, tracé d'indisponibilité.
+   Couleurs : jetons de theme/tokens.css. Mouvement réduit : ni transition ni inclinaison. */
+
+/* Un appui long ne sélectionne pas de texte et n'ouvre pas le menu contextuel d'iOS. */
+.grille-corps,
+.carte-item {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.calendrier {
+  position: relative;
+}
+
+/* ---------- Aperçu dans la grille ---------- */
+
+/* Les transitions n'existent que pendant le geste : au lâcher, les blocs prennent leur place sans rebond. */
+.grille[data-glisse='true'] .bloc-creneau:not(.fantome) {
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.grille[data-redim='true'] .bloc-creneau {
+  transition: height 90ms ease-out;
+}
+
+/* Créneau en cours de déplacement : il reste en place, estompé. */
+.bloc-creneau[data-source='true'] {
+  opacity: 0.35;
+}
+
+.fantome {
+  z-index: 5;
+  pointer-events: none;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  transform: rotate(-1.5deg);
+  box-shadow: var(--ombre);
+  opacity: 0.95;
+}
+
+.fantome[data-refus='true'] {
+  outline-color: var(--now);
+  border-left-color: var(--now);
+  background: color-mix(in srgb, var(--now) 20%, var(--bg));
+}
+
+.colonne[data-refus='true'] {
+  background-color: color-mix(in srgb, var(--now) 8%, transparent);
+}
+
+/* ---------- Fantôme flottant (hors de la grille) ---------- */
+
+.glisse-flottant {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  width: 230px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.glisse-flottant[data-cache='false'] {
+  opacity: 0.96;
+}
+
+/* La carte rétrécit autour du doigt (tenu à 28 × 22 px du coin, voir ContexteDnd) au-dessus de la corbeille. */
+.glisse-carte {
+  box-sizing: border-box;
+  padding: 8px 12px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: var(--rayon);
+  border-left: 5px solid var(--teinte);
+  background: var(--card);
+  color: var(--ink);
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  box-shadow: var(--ombre);
+  transform-origin: 28px 22px;
+  transition: scale 120ms ease;
+}
+
+.glisse-flottant[data-sur-corbeille='true'] .glisse-carte {
+  scale: 0.82;
+  outline-color: var(--now);
+}
+
+.glisse-carte b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-size: var(--fs-3);
+}
+
+.glisse-carte small {
+  font-size: var(--fs-2);
+  color: var(--muted);
+}
+
+/* Glisser depuis la feuille de la bibliothèque (iPhone) : elle s'efface et découvre la grille. */
+.racine[data-glisse-feuille='true'] .feuille-fond {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+/* ---------- Corbeille ---------- */
+
+.corbeille {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  z-index: 12;
+  box-sizing: border-box;
+  min-height: 56px;
+  padding: 0 24px 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 2px dashed var(--now);
+  border-radius: 28px;
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: var(--fs-3);
+  box-shadow: var(--ombre);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 140%);
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms ease,
+    background-color 120ms ease;
+}
+
+.corbeille .icone {
+  color: var(--now);
+}
+
+.corbeille[data-visible='true'] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.corbeille[data-survol='true'] {
+  border-style: solid;
+  background: color-mix(in srgb, var(--now) 22%, var(--panel));
+  transform: translate(-50%, 0) scale(1.08);
+}
+
+/* ---------- Poignée de durée ---------- */
+
+/* Zone tactile de 24 px de haut sur toute la largeur du bloc, à cheval sur son bord bas ; trait fin visible. */
+.poignee-redim {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  height: 24px;
+  z-index: 3;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.poignee-redim::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  width: 22px;
+  height: 3px;
+  margin-left: -11px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink) 35%, transparent);
+  transition: background-color 120ms ease, width 120ms ease;
+}
+
+.poignee-redim[data-active='true']::after {
+  width: 34px;
+  margin-left: -17px;
+  background: var(--ink);
+}
+
+.grille[data-glisse='true'] .poignee-redim,
+.grille[data-redim='true'] .poignee-redim:not([data-active]) {
+  display: none;
+}
+
+/* ---------- Tracé d'une indisponibilité ---------- */
+
+.trace-indispo {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  z-index: 4;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  border: 2px dashed var(--accent);
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--lock-bg) 0 6px,
+    color-mix(in srgb, var(--lock-bg) 62%, var(--line)) 6px 12px
+  );
+  color: var(--ink);
+  pointer-events: none;
+  box-shadow: var(--ombre);
+}
+
+.trace-indispo .bloc-meta {
+  font-weight: 700;
+  opacity: 1;
+}
+
+.feuille-indispo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.feuille-indispo p {
+  margin: 0;
+}
+
+.feuille-indispo-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---------- Vue Mois ---------- */
+
+.mois-jour[data-survol='ok'] {
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+
+.mois-jour[data-survol='refus'] {
+  box-shadow: inset 0 0 0 3px var(--now);
+}
+
+/* ---------- Mouvement réduit ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .grille[data-glisse='true'] .bloc-creneau:not(.fantome),
+  .grille[data-redim='true'] .bloc-creneau,
+  .glisse-flottant,
+  .glisse-carte,
+  .corbeille,
+  .racine[data-glisse-feuille='true'] .feuille-fond {
+    transition: none;
+  }
+
+  .fantome {
+    transform: none;
+  }
+}

@@ -10,8 +10,11 @@ import { fermerImport, useDemandeImport } from './importDemande'
 import { Import } from './screens/Import'
 import { Reglages } from './screens/Reglages'
 import { TestExport } from './screens/TestExport'
+import { ContexteDnd } from './dnd/ContexteDnd'
+import { useGlisse } from './dnd/glisse'
 import { useStore } from './store'
 import { Toasts } from './Toast'
+import { choisirTrou } from './trou'
 import { useDisposition } from './useDisposition'
 import './ui.css'
 
@@ -120,109 +123,134 @@ function Coque() {
     if (importOuvert) setFeuilleOuverte(false)
   }, [importOuvert])
 
+  // Glisser une carte depuis la feuille (iPhone) : la feuille s'efface pendant le geste pour découvrir la grille,
+  // qui ne doit plus être inerte (sinon elle échappe aussi au repérage de la cible) ; un dépôt réussi la ferme.
+  const glisseDepuisFeuille = useGlisse((s) => s.depuisFeuille)
+  useEffect(() => {
+    const el = coque.current
+    if (el && feuilleVisible) el.toggleAttribute('inert', !glisseDepuisFeuille)
+  }, [glisseDepuisFeuille, feuilleVisible])
+  const apresDepot = useCallback((depuisFeuille: boolean) => {
+    if (depuisFeuille) setFeuilleOuverte(false)
+  }, [])
+
+  // Tap sur un emplacement libre : « Pour combler ce trou » s'ouvre dans la bibliothèque (panneau ou feuille).
+  const tapTrou = useCallback(
+    (j: string, t: number) => {
+      choisirTrou(j, t)
+      if (disposition === 'iphone') setFeuilleOuverte(true)
+      else setPanneauOuvert(true)
+    },
+    [disposition],
+  )
+
   const fermerFeuille = useCallback(() => setFeuilleOuverte(false), [])
   const { annuler, retablir } = useStore.getState()
 
   return (
-    <div className="racine" data-dispo={disposition}>
-      <div
-        className="coque"
-        ref={coque}
-        data-dispo={disposition}
-        data-replie={disposition === 'ipad' && !panneauOuvert}
-      >
-        {disposition === 'ipad' && (
-          <aside id="panneau-bibliotheque" className="panneau" aria-label="Bibliothèque d'items">
-            <div className="panneau-contenu">
-              <h2 className="panneau-titre">Items</h2>
-              <Bibliotheque />
-            </div>
-          </aside>
-        )}
-
-        <div className="principal">
-          <BarreHaut
-            disposition={disposition}
-            jour={jour}
-            vue={vue}
-            onVue={(v) => {
-              setVue(v)
-              setEcran('calendrier')
-              fermerImport()
-            }}
-            ecran={ecran}
-            onReglages={() => {
-              fermerImport()
-              setEcran(ecran === 'reglages' ? 'calendrier' : 'reglages')
-            }}
-            peutAnnuler={peutAnnuler}
-            peutRetablir={peutRetablir}
-            onAnnuler={annuler}
-            onRetablir={retablir}
-            panneauOuvert={panneauOuvert}
-            onItems={() => setPanneauOuvert((o) => !o)}
-          />
-
-          {erreur !== null && (
-            // Erreur d'écriture (quota…) : reste affichée tant que l'écriture suivante n'a pas réussi.
-            // Le bouton « Sauvegarder » de la §14 viendra avec la tâche 19.
-            <p className="bandeau-erreur" role="alert">
-              {erreur}
-            </p>
+    <ContexteDnd onDepose={apresDepot}>
+      <div className="racine" data-dispo={disposition} data-glisse-feuille={glisseDepuisFeuille}>
+        <div
+          className="coque"
+          ref={coque}
+          data-dispo={disposition}
+          data-replie={disposition === 'ipad' && !panneauOuvert}
+        >
+          {disposition === 'ipad' && (
+            <aside id="panneau-bibliotheque" className="panneau" aria-label="Bibliothèque d'items">
+              <div className="panneau-contenu">
+                <h2 className="panneau-titre">Items</h2>
+                <Bibliotheque />
+              </div>
+            </aside>
           )}
 
-          <main className={ecran === 'calendrier' ? 'zone zone-calendrier' : 'zone'}>
-            {ecran === 'calendrier' && (
-              <Calendrier
-                vue={vue}
-                jour={jour}
-                disposition={disposition}
-                onJour={setJour}
-                onOuvrirJour={(j) => {
-                  setJour(j)
-                  setVue('jour')
-                }}
-              />
-            )}
-            {ecran === 'reglages' && <Reglages onRetour={() => setEcran('calendrier')} />}
-            {ecran === 'import' && (
-              <Import
-                // Cible différente (nouveau collège ou réimport d'un autre) : l'écran repart de zéro.
-                key={cibleImport ?? 'nouveau'}
-                onTermine={(enregistre) => {
-                  fermerImport()
-                  if (enregistre) setEcran('calendrier')
-                }}
-              />
-            )}
-          </main>
+          <div className="principal">
+            <BarreHaut
+              disposition={disposition}
+              jour={jour}
+              vue={vue}
+              onVue={(v) => {
+                setVue(v)
+                setEcran('calendrier')
+                fermerImport()
+              }}
+              ecran={ecran}
+              onReglages={() => {
+                fermerImport()
+                setEcran(ecran === 'reglages' ? 'calendrier' : 'reglages')
+              }}
+              peutAnnuler={peutAnnuler}
+              peutRetablir={peutRetablir}
+              onAnnuler={annuler}
+              onRetablir={retablir}
+              panneauOuvert={panneauOuvert}
+              onItems={() => setPanneauOuvert((o) => !o)}
+            />
 
-          {disposition === 'iphone' && (
-            <nav className="dock" aria-label="Bibliothèque">
-              <button
-                ref={boutonItems}
-                type="button"
-                className="btn-items"
-                aria-haspopup="dialog"
-                aria-expanded={feuilleVisible}
-                onClick={() => setFeuilleOuverte(true)}
-              >
-                <svg className="icone" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
-                  <path d="M4 6h16M4 12h16M4 18h10" />
-                </svg>
-                Items
-              </button>
-            </nav>
-          )}
+            {erreur !== null && (
+              // Erreur d'écriture (quota…) : reste affichée tant que l'écriture suivante n'a pas réussi.
+              // Le bouton « Sauvegarder » de la §14 viendra avec la tâche 19.
+              <p className="bandeau-erreur" role="alert">
+                {erreur}
+              </p>
+            )}
+
+            <main className={ecran === 'calendrier' ? 'zone zone-calendrier' : 'zone'}>
+              {ecran === 'calendrier' && (
+                <Calendrier
+                  vue={vue}
+                  jour={jour}
+                  disposition={disposition}
+                  onJour={setJour}
+                  onOuvrirJour={(j) => {
+                    setJour(j)
+                    setVue('jour')
+                  }}
+                  onTapTrou={tapTrou}
+                  // Fiches d'un créneau ou d'une indisponibilité au tap : tâche 19 (onOuvrirCreneau / onOuvrirIndispo).
+                />
+              )}
+              {ecran === 'reglages' && <Reglages onRetour={() => setEcran('calendrier')} />}
+              {ecran === 'import' && (
+                <Import
+                  // Cible différente (nouveau collège ou réimport d'un autre) : l'écran repart de zéro.
+                  key={cibleImport ?? 'nouveau'}
+                  onTermine={(enregistre) => {
+                    fermerImport()
+                    if (enregistre) setEcran('calendrier')
+                  }}
+                />
+              )}
+            </main>
+
+            {disposition === 'iphone' && (
+              <nav className="dock" aria-label="Bibliothèque">
+                <button
+                  ref={boutonItems}
+                  type="button"
+                  className="btn-items"
+                  aria-haspopup="dialog"
+                  aria-expanded={feuilleVisible}
+                  onClick={() => setFeuilleOuverte(true)}
+                >
+                  <svg className="icone" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                    <path d="M4 6h16M4 12h16M4 18h10" />
+                  </svg>
+                  Items
+                </button>
+              </nav>
+            )}
+          </div>
         </div>
-      </div>
 
-      {feuilleVisible && (
-        <Feuille titre="Items" onFermer={fermerFeuille}>
-          <Bibliotheque />
-        </Feuille>
-      )}
-      <Toasts />
-    </div>
+        {feuilleVisible && (
+          <Feuille titre="Items" onFermer={fermerFeuille}>
+            <Bibliotheque />
+          </Feuille>
+        )}
+        <Toasts />
+      </div>
+    </ContexteDnd>
   )
 }

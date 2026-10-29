@@ -1,8 +1,11 @@
 // Vue Mois (spec §9.1) : un carreau par jour, teinté à l'encre proportionnellement aux heures planifiées.
-// Un tap ouvre le jour. Chaque carreau porte `data-jour` : c'est aussi une cible de dépôt (tâche 18).
+// Un tap ouvre le jour. Chaque carreau porte `data-jour` : c'est aussi une cible de dépôt (spec §9.3) ; un dépôt
+// y prend la première heure libre de la journée (dnd/apercu.ts, `cibleMois`). Pendant le glisser, le carreau
+// survolé s'éclaire (ou rougit si rien n'y tient).
 import { useMemo, type CSSProperties } from 'react'
 import { formaterDuree } from '../duree'
 import { joursDuMois, libelleJourCourt, libellePeriode } from '../periode'
+import { useGlisse } from '../dnd/glisse'
 import { useStore } from '../store'
 import { chargesDesJours } from './geometrie'
 import { useAujourdhui } from './maintenant'
@@ -27,6 +30,8 @@ export function VueMois({ mois, onOuvrirJour }: Props) {
   const aujourdhui = useAujourdhui()
   const jours = useMemo(() => joursDuMois(mois), [mois])
   const charges = useMemo(() => chargesDesJours({ creneaux }, jours), [creneaux, jours])
+  const survole = useGlisse((s) => (s.survol?.type === 'mois' ? s.survol.jour : null))
+  const accepte = useGlisse((s) => s.apercu?.ok === true)
 
   return (
     <div className="mois-vue" data-mois={mois}>
@@ -50,6 +55,7 @@ export function VueMois({ mois, onOuvrirJour }: Props) {
               data-charge={charge}
               data-hors-mois={j.slice(0, 7) !== mois}
               data-aujourdhui={j === aujourdhui}
+              data-survol={j === survole ? (accepte ? 'ok' : 'refus') : undefined}
               style={{ '--charge': ratio } as CSSProperties}
               aria-label={description}
               aria-current={j === aujourdhui ? 'date' : undefined}
