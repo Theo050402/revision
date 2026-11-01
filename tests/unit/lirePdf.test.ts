@@ -57,9 +57,37 @@ describe('lirePdf', () => {
   test('une erreur du worker fait échouer la lecture au lieu de la laisser pendante', async () => {
     vi.stubGlobal('Worker', FauxWorker)
     const lecture = lirePdf(fichier(), () => {})
-    FauxWorker.instances[0].onerror?.(new Error('script introuvable')) // avant tout await de lirePdf
+    FauxWorker.instances[0].onerror?.(new Error('boum')) // avant tout await de lirePdf
     await expect(lecture).rejects.toBeInstanceOf(ErreurPdf)
     expect(FauxWorker.instances[0].terminated).toBe(1)
+  })
+
+  test("exception levée dans le worker (message présent) : code « illisible »", async () => {
+    vi.stubGlobal('Worker', FauxWorker)
+    const lecture = lirePdf(fichier(), () => {})
+    FauxWorker.instances[0].onerror?.({ message: 'Uncaught TypeError: x is not a function' })
+    await expect(lecture).rejects.toMatchObject({ name: 'ErreurPdf', code: 'illisible' })
+  })
+
+  test("script du worker introuvable (évènement d'erreur sans message) : code « mise-a-jour », pas « illisible »", async () => {
+    vi.stubGlobal('Worker', FauxWorker)
+    const lecture = lirePdf(fichier(), () => {})
+    FauxWorker.instances[0].onerror?.(new Event('error')) // chunk `pdf.worker-<ancien hash>` purgé du cache
+    await expect(lecture).rejects.toMatchObject({ name: 'ErreurPdf', code: 'mise-a-jour' })
+    expect(FauxWorker.instances[0].terminated).toBe(1)
+  })
+
+  test("message d'erreur vide : traité comme un chargement raté", async () => {
+    vi.stubGlobal('Worker', FauxWorker)
+    const lecture = lirePdf(fichier(), () => {})
+    FauxWorker.instances[0].onerror?.({ message: '' })
+    await expect(lecture).rejects.toMatchObject({ code: 'mise-a-jour' })
+  })
+
+  test("erreur PDF renvoyée par le worker (password, document invalide) : code « illisible »", async () => {
+    vi.stubGlobal('Worker', FauxWorker)
+    FauxWorker.repondre = (w) => w.envoyer({ type: 'erreur', nom: 'PasswordException', message: 'No password given' })
+    await expect(lirePdf(fichier(), () => {})).rejects.toMatchObject({ code: 'illisible' })
   })
 
   test('un rappel de progression qui lève ne bloque pas la lecture', async () => {

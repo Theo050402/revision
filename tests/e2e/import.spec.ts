@@ -2,6 +2,8 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { pdfCorrompu, pdfSansTexte, pdfSommaire, type FichierTest } from './pdfs'
 
 const MESSAGE_AUCUN_ITEM = 'Aucun item trouvé dans ce PDF. Ajoute-les à la main depuis la liste officielle.'
+const MESSAGE_MISE_A_JOUR =
+  "Une mise à jour de l'app a été installée. Ferme-la complètement puis rouvre-la, et recommence l'import."
 const MESSAGE_ILLISIBLE = "Ce fichier ne s'ouvre pas. Vérifie qu'il s'agit bien d'un PDF non protégé."
 
 /** Ouvre « + Collège » : dans le panneau (iPad) ou dans la feuille « Items » (iPhone). */
@@ -194,6 +196,17 @@ test('PDF sans texte : message de la §14, liste vide, ajout à la main', async 
   await expect(page.locator('.ligne')).toHaveCount(1)
   await expect(page.getByText(MESSAGE_AUCUN_ITEM, { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Valider' })).toBeEnabled()
+})
+
+test("script du worker introuvable (app mise à jour) : message « mise à jour », pas « illisible »", async ({ page }, info) => {
+  // Simule le chunk `pdf.worker-<ancien hash>` purgé du cache après un déploiement.
+  await page.route(/pdf\.worker-[^/]*\.js/, (route) => route.abort())
+  await ouvrirImport(page, info)
+  await choisir(page, await pdfSommaire())
+
+  await expect(page.getByRole('alert')).toHaveText(MESSAGE_MISE_A_JOUR)
+  await expect(page.getByRole('alert')).not.toHaveText(MESSAGE_ILLISIBLE)
+  await expect(page.getByRole('progressbar')).toHaveCount(0)
 })
 
 test('fichier corrompu : message « illisible » de la §14, on peut en choisir un autre', async ({ page }, info) => {

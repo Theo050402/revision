@@ -15,6 +15,10 @@ export { ouvrirImport } from '../importDemande'
 /** Texte de la §14 : PDF illisible ou chiffré. */
 export const MESSAGE_PDF_ILLISIBLE = "Ce fichier ne s'ouvre pas. Vérifie qu'il s'agit bien d'un PDF non protégé."
 
+/** Le script du worker n'a pas pu se charger : l'app a été mise à jour pendant que la page était ouverte. */
+export const MESSAGE_MISE_A_JOUR =
+  "Une mise à jour de l'app a été installée. Ferme-la complètement puis rouvre-la, et recommence l'import."
+
 /** L'écran d'analyse reste au moins ce temps : un PDF léger ne le fait pas clignoter. */
 const DUREE_MIN_ANALYSE_MS = 450
 
@@ -76,7 +80,11 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
     } catch (e) {
       if (jeton.current !== moi || (e instanceof DOMException && e.name === 'AbortError')) return
       const message =
-        e instanceof ErreurPdf ? MESSAGE_PDF_ILLISIBLE : `L'analyse a échoué : ${e instanceof Error ? e.message : String(e)}`
+        e instanceof ErreurPdf
+          ? e.code === 'mise-a-jour'
+            ? MESSAGE_MISE_A_JOUR
+            : MESSAGE_PDF_ILLISIBLE
+          : `L'analyse a échoué : ${e instanceof Error ? e.message : String(e)}`
       setPhase({ type: 'erreur', message })
     }
   }

@@ -2,10 +2,16 @@ import { extraireEntrees } from './sommaire'
 import type { EntreeSommaire } from './catalog'
 import type { MessageDepuisWorker, MessageVersWorker } from './pdf.worker'
 
-/** Fichier qui ne s'ouvre pas : chiffré, corrompu ou pas un PDF. */
+/**
+ * `illisible` : le fichier ne s'ouvre pas (chiffré, corrompu ou pas un PDF).
+ * `mise-a-jour` : le script du worker n'a pas pu se charger (l'app a été mise à jour pendant que la page était
+ * ouverte et son ancien fichier a disparu) : le PDF n'y est pour rien.
+ */
+export type CodeErreurPdf = 'illisible' | 'mise-a-jour'
+
 export class ErreurPdf extends Error {
-  readonly code: 'illisible'
-  constructor(code: 'illisible', options?: ErrorOptions) {
+  readonly code: CodeErreurPdf
+  constructor(code: CodeErreurPdf, options?: ErrorOptions) {
     super(code, options)
     this.name = 'ErreurPdf'
     this.code = code
@@ -38,7 +44,12 @@ export async function lirePdf(
     echouer = rejeter
   })
   echec.catch(() => {}) // jamais « non gérée » si l'échec survient hors d'une attente
-  worker.onerror = (e) => echouer(new ErreurPdf('illisible', { cause: e }))
+  // Un message d'erreur vient d'une exception levée dans le worker ; un évènement sans message, du chargement de son
+  // script (introuvable après une mise à jour).
+  worker.onerror = (e) => {
+    const message = (e as { message?: unknown } | null)?.message
+    echouer(new ErreurPdf(typeof message === 'string' && message !== '' ? 'illisible' : 'mise-a-jour', { cause: e }))
+  }
   worker.onmessageerror = () => echouer(new ErreurPdf('illisible'))
   // Annulation : le worker est arrêté tout de suite et la lecture échoue avec une AbortError.
   const annuler = () => {

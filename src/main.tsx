@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './ui/theme/fonts'
 import './ui/theme/tokens.css'
+import { enregistrerServiceWorker } from './pwa/enregistrer'
 import { App } from './ui/App'
 
 createRoot(document.getElementById('root')!).render(
@@ -9,3 +10,5 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+enregistrerServiceWorker()
