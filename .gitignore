@@ -12,3 +12,6 @@ playwright-report/
 test-results/
 *.log
 .DS_Store
+
+# Notes locales de travail
+items_edn.md
