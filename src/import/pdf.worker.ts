@@ -1,7 +1,7 @@
 // Seul fichier (avec textePdf pour les types) à importer pdf.js : il vit dans un chunk de worker à part,
 // donc le JavaScript initial de l'app n'en contient rien.
-import * as pdfjs from 'pdfjs-dist'
-import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import * as pdfjs from './pdfjs'
+import workerSrc from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { pagesTexte } from './textePdf'
 import type { PageTexte } from './sommaire'
 
