@@ -46,7 +46,14 @@ function filtrer<T>(table: Record<string, T>, garder: (v: T) => boolean): Record
 
 // ───────────────────────────── Collèges ─────────────────────────────
 
-/** Crée un collège et ses items ; la couleur suit le nombre de collèges existants (modulo 6). */
+/** Première couleur 0..5 qu'aucun collège n'utilise ; si toutes le sont, on tourne (nombre de collèges modulo 6). */
+export function couleurLibre(colleges: Record<string, College>): number {
+  const prises = new Set(Object.values(colleges).map((c) => c.couleur))
+  for (let k = 0; k < 6; k++) if (!prises.has(k)) return k
+  return Object.keys(colleges).length % 6
+}
+
+/** Crée un collège et ses items ; la couleur est la première libre (0..5), sinon on tourne. */
 export function ajouterCollege(
   e: Etat,
   nom: string,
@@ -58,7 +65,7 @@ export function ajouterCollege(
   const college: College = {
     id: collegeId,
     nom,
-    couleur: Object.keys(e.colleges).length % 6,
+    couleur: couleurLibre(e.colleges),
     coefficient: 1,
     importeLe: utcVersLocal(maintenant),
   }

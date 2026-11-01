@@ -61,7 +61,7 @@ function avec(e: Etat, ...cs: Creneau[]): Etat {
 }
 
 describe('collèges', () => {
-  it('ajouterCollege crée le collège et ses items (couleur = nombre de collèges % 6)', () => {
+  it('ajouterCollege crée le collège et ses items (couleur 0 pour le premier)', () => {
     const e = base()
     expect(e.colleges.c1).toEqual({
       id: 'c1',
@@ -81,8 +81,31 @@ describe('collèges', () => {
     })
     let s = e
     for (let k = 2; k <= 7; k++) s = ajouterCollege(s, `C${k}`, [], () => `c${k}`)
-    expect(s.colleges.c7.couleur).toBe(0) // 6 collèges existants → 6 % 6
+    expect(s.colleges.c7.couleur).toBe(0) // 6 collèges existants, toutes les couleurs prises → 6 % 6
     expect(s.colleges.c3.couleur).toBe(2)
+  })
+
+  it('ajouterCollege prend la première couleur libre (un collège supprimé libère la sienne)', () => {
+    let s = base()
+    for (let k = 2; k <= 4; k++) s = ajouterCollege(s, `C${k}`, [], () => `c${k}`) // couleurs 0, 1, 2, 3
+    s = supprimerCollege(s, 'c2') // libère la couleur 1
+    s = ajouterCollege(s, 'Nouveau', [], () => 'c5')
+    expect(s.colleges.c5.couleur).toBe(1)
+    s = ajouterCollege(s, 'Suivant', [], () => 'c6')
+    expect(s.colleges.c6.couleur).toBe(4)
+    // Réglage manuel : la couleur 0 est reprise par un autre collège, la 4 devient libre après suppression.
+    s = modifierCollege(s, 'c1', { couleur: 5 })
+    s = ajouterCollege(s, 'Dernier', [], () => 'c7')
+    expect(s.colleges.c7.couleur).toBe(0)
+  })
+
+  it('ajouterCollege : les 6 couleurs prises, on tourne (nombre de collèges modulo 6)', () => {
+    let s = base()
+    for (let k = 2; k <= 6; k++) s = ajouterCollege(s, `C${k}`, [], () => `c${k}`)
+    s = ajouterCollege(s, 'C7', [], () => 'c7')
+    expect(s.colleges.c7.couleur).toBe(0) // 6 collèges, tous colorés → 6 % 6
+    s = ajouterCollege(s, 'C8', [], () => 'c8')
+    expect(s.colleges.c8.couleur).toBe(1) // 7 % 6
   })
 
   it('modifierCollege fusionne les champs', () => {
