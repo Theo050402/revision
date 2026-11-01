@@ -15,10 +15,10 @@ const rapport = (a, b) => {
 const melange = (dessus, dessous, alpha) => dessus.map((v, i) => v * alpha + dessous[i] * (1 - alpha))
 
 let echec = false
-const ligne = (nom, r, indicatif = false) => {
+const ligne = (nom, r) => {
   const ok = r >= 4.5
-  if (!ok && !indicatif) echec = true
-  console.log(`${ok ? 'OK    ' : indicatif ? 'AVIS  ' : 'ECHEC '} ${nom.padEnd(52)} ${r.toFixed(2)}:1`)
+  if (!ok) echec = true
+  console.log(`${ok ? 'OK    ' : 'ECHEC '} ${nom.padEnd(52)} ${r.toFixed(2)}:1`)
 }
 
 for (const [nom, hex] of Object.entries(surligneurs)) {
@@ -30,10 +30,13 @@ for (const [nom, hex] of Object.entries(surligneurs)) {
 }
 ligne('sombre : #E6E6FA sur la carte #33264A', rapport(rgb('#E6E6FA'), rgb('#33264A')))
 ligne('sombre : #E6E6FA sur le fond #2B1E3E', rapport(rgb('#E6E6FA'), rgb('#2B1E3E')))
-// Texte secondaire (--muted) : à titre indicatif, sans effet sur le code de sortie.
-ligne('clair : muted #6B7493 sur le fond #FCFCFA', rapport(rgb('#6B7493'), rgb(FOND_CLAIR)), true)
-ligne('clair : muted #6B7493 sur la carte #FFFFFF', rapport(rgb('#6B7493'), rgb('#FFFFFF')), true)
-ligne('clair : muted #6B7493 sur un champ #F1F4F9', rapport(rgb('#6B7493'), rgb('#F1F4F9')), true)
-ligne('sombre : muted #A99BC4 sur la carte #33264A', rapport(rgb('#A99BC4'), rgb('#33264A')), true)
-ligne('sombre : muted #A99BC4 sur le fond #2B1E3E', rapport(rgb('#A99BC4'), rgb('#2B1E3E')), true)
+// Texte secondaire (--muted) sur chaque fond où il est posé : même seuil, un échec fait échouer le script.
+const MUTED_CLAIR = '#646D8C'
+const MUTED_SOMBRE = '#A99BC4'
+for (const [nom, fond] of [['le fond', FOND_CLAIR], ['la carte', '#FFFFFF'], ['un champ', '#F1F4F9'], ['un bloc verrouillé', '#EEF2F8']]) {
+  ligne(`clair : muted ${MUTED_CLAIR} sur ${nom} ${fond}`, rapport(rgb(MUTED_CLAIR), rgb(fond)))
+}
+for (const [nom, fond] of [['la carte', '#33264A'], ['le fond', '#2B1E3E'], ['un champ', '#3A2D53'], ['le panneau', '#241934']]) {
+  ligne(`sombre : muted ${MUTED_SOMBRE} sur ${nom} ${fond}`, rapport(rgb(MUTED_SOMBRE), rgb(fond)))
+}
 process.exit(echec ? 1 : 0)

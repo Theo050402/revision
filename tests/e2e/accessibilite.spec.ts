@@ -19,6 +19,15 @@ async function ouvrir(page: Page) {
 type Mesure = { nom: string; largeur: number; hauteur: number }
 
 /**
+ * Exceptions assumées au minimum de 44 px (liste fermée, à justifier ici ; contrôlées au doigt, voir recette.md) :
+ * - les blocs du calendrier (créneaux et indisponibilités) : leur hauteur est leur durée (§9.2), 24 px pour 30 min ;
+ *   leur largeur est celle de la colonne ;
+ * - la poignée de durée, zone de glissé de 24 px à cheval sur le bord bas d'un bloc (§9.4).
+ * Tout autre contrôle (bouton, champ, ou tout élément focalisable `tabindex` ≥ 0 / glissable) est mesuré.
+ */
+const EXCEPTIONS_44PX = '.bloc-creneau, .bloc-indispo, .poignee-redim'
+
+/**
  * Taille tactile effective de chaque contrôle visible (bouton, lien, champ, case…) : sa boîte, agrandie de sa zone de
  * toucher prolongée par un pseudo-élément `::after` (voir « Non vus » de la bibliothèque), qui est centrée sur lui.
  * `dans` limite la mesure à un conteneur (la feuille ouverte, le panneau).
@@ -33,26 +42,30 @@ async function mesurer(page: Page, dans?: string): Promise<Mesure[]> {
         .map((a) => a.finished.catch(() => undefined)),
     ),
   )
-  return page.evaluate((racine) => {
+  return page.evaluate(([racine, exceptions]) => {
     const portee = racine ? (document.querySelector(racine) ?? document.body) : document.body
-    const selecteur = 'button, a[href], input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="checkbox"], [role="tab"]'
+    const selecteur =
+      'button, a[href], input:not([type="hidden"]), select, textarea, summary, [role="button"], [role="checkbox"], [role="tab"], [tabindex]:not([tabindex="-1"]), [draggable="true"]'
     const sorties: { nom: string; largeur: number; hauteur: number }[] = []
     for (const el of portee.querySelectorAll<HTMLElement>(selecteur)) {
       const style = getComputedStyle(el)
       if (el.closest('[hidden], [inert]') || style.visibility === 'hidden' || style.display === 'none') continue
       if (style.pointerEvents === 'none' || (el as HTMLInputElement).type === 'file') continue
-      // Taille de mise en page (offset) : indépendante d'une éventuelle transformation en cours.
-      const r = { width: el.offsetWidth, height: el.offsetHeight }
+      if (el.matches(exceptions)) continue
+      // Les animations d'apparition sont terminées (voir plus haut) : la boîte rendue est la boîte finale.
+      const r = el.getBoundingClientRect()
       if (r.width === 0 || r.height === 0) continue
       const apres = getComputedStyle(el, '::after')
       const zone = apres.content !== 'none' && apres.position === 'absolute'
-      const largeur = Math.max(r.width, zone ? parseFloat(apres.width) || 0 : 0)
-      const hauteur = Math.max(r.height, zone ? parseFloat(apres.height) || 0 : 0)
+      let largeur = Math.max(r.width, zone ? parseFloat(apres.width) || 0 : 0)
+      let hauteur = Math.max(r.height, zone ? parseFloat(apres.height) || 0 : 0)
+      // Une mesure impossible (NaN) ne doit jamais passer pour une réussite : elle est signalée comme trop petite.
+      if (!Number.isFinite(largeur) || !Number.isFinite(hauteur)) largeur = hauteur = 0
       const nom = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('name') || el.className || el.tagName).trim().slice(0, 40)
       sorties.push({ nom: `${el.tagName.toLowerCase()} « ${nom} »`, largeur, hauteur })
     }
     return sorties
-  }, dans ?? null)
+  }, [dans ?? null, EXCEPTIONS_44PX] as const)
 }
 
 async function verifier(page: Page, ecran: string, dans?: string) {

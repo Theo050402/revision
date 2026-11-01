@@ -437,7 +437,7 @@ L'ordre d'essai est le suivant :
 | Panneau | `#FFFFFF` |
 | Champs | `#F1F4F9` |
 | Encre | `#1E2A5A` |
-| Texte secondaire | `#6B7493` |
+| Texte secondaire | `#646D8C` |
 | Lignes de grille | `#DCE4EF` (heures), `#EEF2F8` (demi-heures) |
 | Marge, « maintenant », alerte | `#D9473F` (marge du panneau : `#F3B9B4`) |
 | Bouton principal | fond encre, texte blanc |

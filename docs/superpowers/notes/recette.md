@@ -29,14 +29,14 @@ Calculé par `node scripts/contraste.mjs` (code de sortie non nul au moindre éc
 | Sombre : `#E6E6FA` sur la carte `#33264A` | 11,25 |
 | Sombre : `#E6E6FA` sur le fond `#2B1E3E` | 12,57 |
 
-Tout passe, **aucune couleur modifiée** : l'opacité minimale du dégradé (`--bloc-a2: 60%`) reste à 0,6, qui éclaircit le fond du bloc et améliore même le rapport.
+Tout passe pour l'encre, **aucun surligneur ni dégradé modifié** : l'opacité minimale du dégradé (`--bloc-a2: 60%`) reste à 0,6, qui éclaircit le fond du bloc et améliore même le rapport.
 
-À titre indicatif (hors seuil demandé), le texte secondaire `--muted` : `#6B7493` sur `#FCFCFA` 4,50 (limite), sur la carte blanche 4,62, **sur un champ `#F1F4F9` 4,19** ; `#A99BC4` en sombre 5,39 sur la carte, 6,02 sur le fond. Seul le texte secondaire posé sur un champ clair est sous 4,5 ; à reprendre si Emma le trouve pâle.
+Texte secondaire `--muted` (spec §13.1) : le clair était `#6B7493`, à 4,50:1 sur le fond `#FCFCFA` (4,498 en réel, sous AA) et 4,19:1 sur un champ `#F1F4F9`. **Changé en `#646D8C`** (`src/ui/theme/tokens.css`, spec mise à jour) : 4,98 sur le fond, 5,11 sur la carte blanche, 4,64 sur un champ, 4,55 sur un bloc verrouillé `#EEF2F8`. Le sombre `#A99BC4` n'est pas touché : 5,39 sur la carte, 6,02 sur le fond, 4,86 sur un champ `#3A2D53`, 6,47 sur le panneau. Le script échoue (code 1) dès qu'un de ces couples passe sous 4,5.
 
 ### Accessibilité (tests e2e, `tests/e2e/accessibilite.spec.ts`, iPad et iPhone)
 
 - **Cibles tactiles ≥ 44 px** : balayage de tous les boutons, champs, cases et liens visibles du calendrier (Semaine, Jour, Mois), de la barre du haut, de la bibliothèque (liste, filtres dépliés, mode sélection, fiche d'un item, « Planifier… » sur iPhone), de la fiche d'un créneau, de la feuille d'export, des réglages et du choix du PDF d'import. La taille prise en compte est celle de la mise en page, agrandie de la zone de toucher prolongée par un `::after`. Aucun écart.
-  - Exception assumée : la **poignée de durée** d'un bloc (`.poignee-redim`) fait 24 px de haut, car un bloc de 30 min n'en fait que 24 ; c'est un geste de glissé, pas un bouton.
+  - **Deux exceptions assumées** (liste fermée dans le test, `EXCEPTIONS_44PX`) : les **blocs du calendrier** (créneaux et indisponibilités), dont la hauteur est la durée (§9.2) : 24 px pour 30 min ; et la **poignée de durée** (`.poignee-redim`), zone de glissé de 24 px à cheval sur le bord bas d'un bloc (§9.4). Le balayage mesure tout le reste, y compris les éléments `tabindex` >= 0 et glissables ; une mesure impossible (NaN) compte comme un échec. À contrôler au doigt (voir la checklist).
 - **Focus visible** : 40 appuis sur Tab depuis le calendrier ; chaque contrôle atteint correspond à `:focus-visible` et a un contour d'au moins 2 px (jeton : 3 px, décalé de 2 px).
 - **`prefers-reduced-motion`** : avec `reducedMotion: 'reduce'`, les blocs, boutons et l'anneau de progression ont des durées de transition et d'animation nulles ; un bloc poussé par la prévisualisation de cascade (`translateY`) n'a aucune transition ni animation en cours, et la feuille « Items » de l'iPhone apparaît sans animation. Le même bloc a bien une transition sans le réglage (la vérification n'est donc pas vide).
 
@@ -54,6 +54,11 @@ Renseigner le résultat de chaque ligne (OK / KO / remarque). Appareil : iPad �
 - [ ] L'icône et le nom « Révisions » s'affichent ; l'app s'ouvre en plein écran, sans barre de Safari. Résultat : ________
 - [ ] Mode avion activé, fermer l'app puis la rouvrir depuis l'écran d'accueil : elle s'ouvre et les données (collèges, créneaux) sont là. Résultat : ________
 - [ ] Toujours en mode avion : ajouter un créneau, fermer, rouvrir : il est conservé. Résultat : ________
+
+### Critères d'acceptation (spec §1)
+
+- [ ] **Planifier une semaine complète sur iPad uniquement au doigt, sans clavier** (import, glisser des items, durées, indisponibilités, export). Résultat : ________
+- [ ] **Importer le collège de cancérologie : items 290 à 305, pages correctes, dernier item « à vérifier »** (comparer avec le sommaire du PDF). Résultat : ________
 
 ### Import d'un vrai collège
 
@@ -73,6 +78,11 @@ Renseigner le résultat de chaque ligne (OK / KO / remarque). Appareil : iPad �
 - [ ] Défiler la grille au doigt, sans appui long : aucun glisser n'est déclenché. Résultat : ________
 - [ ] Appui long sur une zone vide puis étirer : titre demandé, indisponibilité créée. Résultat : ________
 
+### Cibles tactiles hors balayage automatique (au doigt, iPad et iPhone)
+
+- [ ] Un bloc court (30 min, 24 px de haut) s'ouvre d'un tap sans erreur et se saisit à l'appui long sans déclencher le bloc voisin. Résultat : ________
+- [ ] La poignée de durée (24 px) se saisit au doigt du premier coup, sans déplacer le bloc à la place. Résultat : ________
+
 ### Parcours iPhone
 
 - [ ] La vue par défaut est Jour ; la bibliothèque s'ouvre en feuille par « Items ». Résultat : ________
@@ -87,6 +97,14 @@ Renseigner le résultat de chaque ligne (OK / KO / remarque). Appareil : iPad �
 - [ ] Déplacer un créneau déjà exporté : « Créneaux modifiés (1) » apparaît. « Mettre à jour dans Calendrier » : iOS demande de valider chaque mise à jour, une par une ; l'événement est **déplacé**, pas dupliqué. Résultat : ________
 - [ ] Supprimer un créneau exporté : la liste « à supprimer » apparaît ; supprimer l'événement à la main dans Calendrier, puis « C'est fait » vide la liste. Résultat : ________
 - [ ] **Les événements arrivent sur l'iPhone via iCloud** (calendrier « Révisions » synchronisé) avec le bon titre, la bonne heure et la note. Résultat : ________
+
+### Risques propres à l'appareil réel
+
+- [ ] iPhone : zones de sécurité (encoche / Dynamic Island en haut, barre d'accueil en bas) : rien de coupé ni caché, boutons du bas accessibles, y compris dans la feuille « Items ». Résultat : ________
+- [ ] iPad : rotation portrait et paysage, en cours d'usage : la mise en page s'adapte, aucun glisser ni feuille ne reste bloqué. Résultat : ________
+- [ ] Export .ics dans l'app installée (mode autonome, pas dans Safari) : le téléchargement ouvre bien l'import de Calendrier et l'app se retrouve ensuite. Résultat : ________
+- [ ] Mise à jour après un redéploiement : rouvrir l'app (réseau actif), la nouvelle version est servie (éventuellement après une seconde ouverture, service worker), les données sont intactes. Résultat : ________
+- [ ] Réglage « Réduire les animations » activé dans iOS (Accessibilité › Mouvement) : feuilles et blocs apparaissent sans animation, tout reste utilisable. Résultat : ________
 
 ### Thème sombre
 
