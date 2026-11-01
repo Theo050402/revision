@@ -319,7 +319,8 @@ export function marquerExporte(e: Etat, envoyes: Envoye[]): Etat {
 /**
  * Annuler / rétablir : l'instantané rejoué donne les créneaux, mais le suivi de l'export (hors historique) doit
  * survivre. Ce qui est déjà parti dans Calendrier ne repart pas, et ce qui y est resté est signalé :
- * - créneau présent dans les deux états : la `versionExportee` la plus récente l'emporte ;
+ * - créneau présent dans les deux états : la `versionExportee` la plus récente l'emporte, et `version` ne descend jamais
+ *   sous elle (sinon `versionExportee + 1`) ;
  * - créneau ressuscité dont la suppression est encore en attente : la suppression est retirée (l'événement est
  *   toujours dans Calendrier), `versionExportee` est gardée ;
  * - créneau ressuscité sans suppression en attente (« C'est fait » confirmé : l'événement a été effacé de Calendrier) :
@@ -334,7 +335,11 @@ export function reconcilierExport(instantane: Etat, courant: Etat): Etat {
     if (actuel) {
       const v = Math.max(c.versionExportee ?? -1, actuel.versionExportee ?? -1)
       const versionExportee = v < 0 ? null : v
-      creneaux[c.id] = versionExportee === c.versionExportee ? c : { ...c, versionExportee }
+      // Annulé sous la version déjà envoyée : Calendrier garde un `SEQUENCE` plus haut, un réexport en version plus
+      // basse serait ignoré, et revenir ensuite à la version exportée passerait pour « non modifié ». On repart au-dessus.
+      const version = versionExportee !== null && c.version < versionExportee ? versionExportee + 1 : c.version
+      creneaux[c.id] =
+        versionExportee === c.versionExportee && version === c.version ? c : { ...c, versionExportee, version }
     } else if (c.id in suppressions) {
       delete suppressions[c.id]
       creneaux[c.id] = c

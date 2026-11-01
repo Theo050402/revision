@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { modifierNote } from '../../src/domain/actions-creneaux'
 import {
   ajouterCollege,
   ajouterIndispo,
@@ -480,6 +481,26 @@ describe('reconcilierExport (annuler / rétablir)', () => {
     const r = reconcilierExport(instantane, courant)
     expect(Object.keys(r.creneaux)).toEqual(['k1'])
     expect(r.suppressions).toEqual({ k2: sup('k2', '300 · T1 · mardi 3 nov. 15h') })
+  })
+
+  it("annulé sous la version exportée : version = exportée + 1, donc « modifié », SEQUENCE supérieure", () => {
+    // Exporté en version 2 ; l'annulation ramène l'instantané en version 1.
+    const instantane = avec(base(), creneau('k1', 'c1:300', { version: 1, versionExportee: null }))
+    const courant = avec(base(), creneau('k1', 'c1:300', { version: 2, versionExportee: 2 }))
+    const r = reconcilierExport(instantane, courant)
+    expect(r.creneaux.k1).toMatchObject({ version: 3, versionExportee: 2 })
+    expect(changementsEnAttente(r).modifies.map((c) => c.id)).toEqual(['k1'])
+    expect(evenementsExport(r, 'modifies').map((v) => v.sequence)).toEqual([3])
+    // Une modification ultérieure repart de 3 : jamais égale à la version exportée.
+    expect(modifierNote(r, 'k1', 'x').creneaux.k1.version).toBe(4)
+  })
+
+  it("annulé exactement à la version exportée : ni version ni état « modifié » ne changent", () => {
+    const instantane = avec(base(), creneau('k1', 'c1:300', { version: 2, versionExportee: null }))
+    const courant = avec(base(), creneau('k1', 'c1:300', { version: 3, versionExportee: 2 }))
+    const r = reconcilierExport(instantane, courant)
+    expect(r.creneaux.k1).toMatchObject({ version: 2, versionExportee: 2 })
+    expect(changementsEnAttente(r).modifies).toEqual([])
   })
 
   it('les suppressions en attente sans rapport avec l’instantané sont conservées', () => {
