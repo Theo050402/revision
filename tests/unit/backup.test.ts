@@ -111,6 +111,23 @@ describe('lireSauvegarde', () => {
     expect(lireSauvegarde(JSON.stringify(o))).toEqual({ ok: false, raison: 'réglages invalides' })
   })
 
+  it.each<[string, (r: Record<string, unknown>) => void]>([
+    ['rythme.pages à 0 (durées infinies)', (r) => ((r.rythme as Record<string, unknown>).pages = 0)],
+    ['rythme.minutes négatif', (r) => ((r.rythme as Record<string, unknown>).minutes = -5)],
+    ['rythme.pages décimal', (r) => ((r.rythme as Record<string, unknown>).pages = 7.5)],
+    ['dureeMin hors du pas (pas 10)', (r) => (r.dureeMin = 25)],
+    ['dureeMax sous dureeMin', (r) => (r.dureeMax = 20)],
+    ['coefficient de tour nul', (r) => (r.coefsTours = [1, 0])],
+    ['coefficient de tour au-dessus de 100 %', (r) => (r.coefsTours = [1, 1.5])],
+    ['pauseMultiple négatif', (r) => (r.pauseMultiple = -1)],
+    ['journée à l’envers', (r) => (r.journee = { debut: '23:00', fin: '07:00' })],
+    ['heure de journée mal formée', (r) => (r.journee = { debut: '7h', fin: '23:00' })],
+  ])('réglages hors limites refusés : %s', (_nom, abimer) => {
+    const o = brut(etatRempli())
+    abimer(o.reglages as Record<string, unknown>)
+    expect(lireSauvegarde(JSON.stringify(o))).toEqual({ ok: false, raison: 'réglages invalides' })
+  })
+
   it('une table absente ou qui n’est pas un tableau est refusée (jamais traitée comme vide)', () => {
     const o = brut(etatRempli())
     delete o.creneaux

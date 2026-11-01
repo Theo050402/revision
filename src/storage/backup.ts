@@ -2,6 +2,7 @@
 // l'appelant n'écrit rien si le résultat est `ok: false`. Validation manuelle, table par table :
 // champs obligatoires et types primitifs ; les champs inconnus sont ignorés (et non recopiés).
 import { REGLAGES_DEFAUT, etatVide } from '../domain/defaults'
+import { brutDurees, lireDurees, lireJournee } from '../domain/validation'
 import type {
   College,
   Creneau,
@@ -130,7 +131,7 @@ function reglages(x: unknown): Reglages | null {
   if (m.pas !== 5 && m.pas !== 10 && m.pas !== 15) return null
   if (m.rappel !== 0 && m.rappel !== 5 && m.rappel !== 15 && m.rappel !== 30) return null
   if (m.theme !== 'auto' && m.theme !== 'clair' && m.theme !== 'sombre') return null
-  return {
+  const lus: Reglages = {
     rythme: { minutes: rythme.minutes, pages: rythme.pages },
     dureeMin: m.dureeMin,
     dureeMax: m.dureeMax,
@@ -141,6 +142,11 @@ function reglages(x: unknown): Reglages | null {
     rappel: m.rappel,
     theme: m.theme,
   }
+  // Mêmes bornes que l'écran des réglages : un fichier retouché à la main (`rythme.pages: 0`) ne doit pas donner des
+  // durées infinies ou une grille impossible.
+  if (!lireDurees(brutDurees(lus), lus.pas).ok) return null
+  if (!lireJournee(lus.journee.debut, lus.journee.fin).ok) return null
+  return lus
 }
 
 /** Valide une table (tableau obligatoire) et l'indexe ; `null` si la table ou une ligne est invalide. */
