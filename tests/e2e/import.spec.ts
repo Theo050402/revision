@@ -216,14 +216,65 @@ test('annuler depuis le choix du fichier revient au calendrier', async ({ page }
   await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible()
 })
 
+/**
+ * Retient les messages du worker d'analyse tant que le test ne les libère pas : l'analyse reste « en cours » aussi
+ * longtemps que nécessaire, quelle que soit la charge de la machine (un PDF léger se lit en moins de 450 ms, délai
+ * minimum de l'écran d'analyse, et le bouton disparaissait pendant que Playwright attendait qu'il soit stable).
+ * `window.__worker` compte les workers créés, ceux arrêtés (`terminate`) et garde les messages retenus.
+ */
+type EtatWorker = { crees: number; termines: number; retenus: (() => void)[]; liberer: () => void }
+const etatWorker = (page: Page) => page.evaluate(() => (window as unknown as { __worker: EtatWorker }).__worker)
+
+async function retenirLeWorker(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const Natif = window.Worker
+    const etat: EtatWorker = { crees: 0, termines: 0, retenus: [], liberer: () => etat.retenus.splice(0).forEach((f) => f()) }
+    ;(window as unknown as { __worker: EtatWorker }).__worker = etat
+    const reprise = Object.getOwnPropertyDescriptor(Natif.prototype, 'onmessage')!
+    window.Worker = class extends Natif {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options)
+        etat.crees++
+        let gestionnaire: ((e: MessageEvent) => void) | null = null
+        Object.defineProperty(this, 'onmessage', {
+          configurable: true,
+          get: () => gestionnaire,
+          set: (f: ((e: MessageEvent) => void) | null) => {
+            gestionnaire = f
+            reprise.set!.call(this, f && ((e: MessageEvent) => etat.retenus.push(() => f.call(this, e))))
+          },
+        })
+      }
+      terminate() {
+        etat.termines++
+        super.terminate()
+      }
+    }
+  })
+}
+
 test('annuler pendant l\'analyse revient tout de suite au calendrier, sans rien ouvrir ensuite', async ({ page }, info) => {
+  await retenirLeWorker(page)
   await ouvrirImport(page, info)
   await choisir(page, await pdfSommaire())
   await expect(page.getByRole('progressbar', { name: 'Analyse du PDF' })).toBeVisible()
+  // Le worker est lancé et ses messages sont retenus : l'analyse est en cours aussi longtemps qu'il le faut.
+  await expect.poll(async () => (await etatWorker(page)).crees).toBe(1)
+
   await page.locator('.import-actions').getByRole('button', { name: 'Annuler' }).click()
-  await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible({ timeout: 1000 })
-  // L'analyse abandonnée ne fait pas réapparaître d'écran de vérification.
-  await page.waitForTimeout(1200)
+  await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible()
+  // L'annulation arrête le worker.
+  await expect.poll(async () => (await etatWorker(page)).termines).toBeGreaterThan(0)
+
+  // On libère ce que le worker avait déjà posté, puis on laisse passer le délai minimum de l'écran d'analyse
+  // (450 ms, attendues dans la page : seul moment où un écran fantôme pourrait encore apparaître).
+  await page.evaluate(
+    () =>
+      new Promise<void>((fini) => {
+        ;(window as unknown as { __worker: EtatWorker }).__worker.liberer()
+        setTimeout(fini, 700)
+      }),
+  )
   await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Vérifier les items' })).toHaveCount(0)
   expect(await lireTable(page, 'colleges')).toHaveLength(0)
