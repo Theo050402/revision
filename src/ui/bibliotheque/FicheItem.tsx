@@ -1,7 +1,7 @@
 // Fiche d'un item (spec §8) : pages, collège, historique des créneaux avec leurs dates. Sur iPhone, elle propose
 // « Planifier… » : un jour et une heure (au pas de la grille) remplacent le glisser-déposer.
 import { useEffect, useRef, useState } from 'react'
-import { deposerItem, libelleHeure } from '../../domain/actions-creneaux'
+import { deplacerCreneau, deposerItem, libelleHeure } from '../../domain/actions-creneaux'
 import { dureeTour } from '../../domain/duration'
 import { hm } from '../../domain/temps'
 import { dernierTourParItem, etatToursParItem } from '../../domain/tours'
@@ -61,12 +61,22 @@ export function FicheItem({ itemId, etat, disposition, jourParDefaut, onRetour }
   const duree = dureeTour(item.pages, college.coefficient, prochain, etat.reglages)
   const teinte = `var(--c${((college.couleur % 6) + 6) % 6})`
 
+  // Un créneau de cet item attend dans le bac : c'est lui qu'on place (la première partie, dans l'ordre), plutôt que
+  // de créer un nouveau tour.
+  const enAttente = creneaux.find((c) => c.debut === null)
+  const libelleAction = enAttente
+    ? enAttente.partie
+      ? `Placer la partie ${enAttente.partie.i}/${enAttente.partie.n}…`
+      : `Placer le tour ${enAttente.tour}…`
+    : 'Planifier…'
+
   const planifier = (ev: React.FormEvent) => {
     ev.preventDefault()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(jour)) return
     let versBac = 0
     const ok = useStore.getState().appliquer((e) => {
-      const res = deposerItem(e, itemId, { jour, t: heure, cibleId: null, moitie: 'haute' })
+      const cible = { jour, t: heure, cibleId: null, moitie: 'haute' as const }
+      const res = enAttente ? deplacerCreneau(e, enAttente.id, cible) : deposerItem(e, itemId, cible)
       if (!res.ok) return null
       versBac = res.versBac
       return res.etat
@@ -139,7 +149,7 @@ export function FicheItem({ itemId, etat, disposition, jourParDefaut, onRetour }
         <div className="fiche-planifier">
           {!planifie ? (
             <button type="button" className="btn-principal" aria-expanded={false} onClick={() => setPlanifie(true)}>
-              Planifier…
+              {libelleAction}
             </button>
           ) : (
             <form className="fiche-form" onSubmit={planifier}>

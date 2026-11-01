@@ -209,6 +209,34 @@ test('iPhone : « Planifier… » crée un créneau, ou refuse faute de place', 
   await expect(b.locator('.fiche-creneaux li')).toContainText('T1 · mercredi 4 nov. 14h')
 })
 
+test('iPhone : un item avec un créneau dans le bac propose de le placer, sans créer de nouveau tour', async ({ page }, info) => {
+  test.skip(info.project.name !== 'iphone', "Planifier… n'existe que sur iPhone")
+  const b = await ouvrir(page, info)
+
+  // 298 : la partie 2/2 attend dans le bac.
+  await liste(b).locator('[data-item-id="c1:298"] .carte-corps').click()
+  await expect(b.locator('.fiche-creneaux li')).toHaveCount(1)
+  await expect(b.getByRole('button', { name: 'Planifier…' })).toHaveCount(0)
+  await b.getByRole('button', { name: 'Placer la partie 2/2…' }).click()
+  await b.getByLabel('Jour', { exact: true }).fill('2026-11-04')
+  await b.locator('.fiche-form select').selectOption({ label: '14h' })
+  await b.getByRole('button', { name: 'Placer', exact: true }).click()
+  await expect(page.locator('.toast', { hasText: 'Placé à 14h' })).toBeVisible()
+  // Le créneau du bac est placé : toujours un seul créneau (pas un nouveau tour), maintenant daté.
+  await expect(b.locator('.fiche-creneaux li')).toHaveCount(1)
+  await expect(b.locator('.fiche-creneaux li[data-creneau-id="cr-b2"]')).toContainText('mercredi 4 nov. 14h')
+  // Plus rien dans le bac pour cet item : le bouton redevient « Planifier… ».
+  await expect(b.getByRole('button', { name: 'Planifier…' })).toBeVisible()
+  await expect(b.getByRole('button', { name: /^Placer la partie/ })).toHaveCount(0)
+})
+
+test('iPhone : créneau du bac sans partie : « Placer le tour 1… »', async ({ page }, info) => {
+  test.skip(info.project.name !== 'iphone', "Planifier… n'existe que sur iPhone")
+  const b = await ouvrir(page, info)
+  await liste(b).locator('[data-item-id="c1:297"] .carte-corps').click()
+  await expect(b.getByRole('button', { name: 'Placer le tour 1…' })).toBeVisible()
+})
+
 test('iPad : pas de « Planifier… » (le glisser-déposer le remplacera)', async ({ page }, info) => {
   test.skip(info.project.name !== 'ipad', 'iPad seulement')
   const b = await ouvrir(page, info)
