@@ -96,6 +96,36 @@ describe('analyserSommaire', () => {
     expect(analyserSommaire([page(1, fr)])).toEqual([])
   })
 
+  test('sommaire sur deux pages (4 + 1 items) : les 5 entrées sont gardées', () => {
+    const p1 = page(
+      1,
+      [...bloc(100, 'T1', 10, 'Item 1'), ...bloc(160, 'T2', 20, 'Item 2'), ...bloc(220, 'T3', 30, 'Item 3'), ...bloc(280, 'T4', 40, 'Item 4')],
+    )
+    const p2 = page(2, bloc(100, 'T5', 50, 'Item 5'))
+    expect(analyserSommaire([p1, p2])).toEqual([
+      { numeros: [1], pageDebut: 10 },
+      { numeros: [2], pageDebut: 20 },
+      { numeros: [3], pageDebut: 30 },
+      { numeros: [4], pageDebut: 40 },
+      { numeros: [5], pageDebut: 50 },
+    ])
+  })
+
+  test('1 + 1 + 1 items répartis sur trois pages : total 3, tout est gardé', () => {
+    const pages = [1, 2, 3].map((n) => page(n, bloc(100, `T${n}`, n * 10, `Item ${n}`)))
+    expect(analyserSommaire(pages)).toHaveLength(3)
+  })
+
+  test("« Item 12 - 2019 » : l'année n'est pas lue comme un second numéro", () => {
+    const fr = [
+      f('Titre', 125, 100), f('15', 515, 100), f('Item 12 - 2019', 125, 112),
+      ...bloc(160, 'T2', 20, 'Item 13'),
+      ...bloc(220, 'T3', 30, 'Item 14'),
+    ]
+    expect(analyserSommaire([page(1, fr)])[0]).toEqual({ numeros: [12], pageDebut: 15 })
+    expect(analyserTitres([page(4, [f('Item 12 - 2019', 50, 80)])])).toEqual([{ numeros: [12], pageDebut: 4 }])
+  })
+
   test('les pages au-delà de la 20e sont ignorées', () => {
     const fr = [...bloc(100, 'T1', 10, 'Item 1'), ...bloc(160, 'T2', 20, 'Item 2'), ...bloc(220, 'T3', 30, 'Item 3')]
     expect(analyserSommaire([page(21, fr)])).toEqual([])
@@ -126,6 +156,13 @@ describe('analyserTitres', () => {
     const sommaire = page(2, [f('Item 1', 50, 50), f('Item 2', 50, 100), f('Item 3', 50, 150)])
     const reelle = page(9, [f('Item 2 – Titre', 50, 80)])
     expect(analyserTitres([sommaire, reelle])).toEqual([{ numeros: [2], pageDebut: 9 }])
+  })
+
+  test("ignore la page de fin d'un sommaire (1 ou 2 « Item N » à la suite d'une page de sommaire)", () => {
+    const sommaire = page(2, [f('Item 1', 50, 50), f('Item 2', 50, 100), f('Item 3', 50, 150)])
+    const suite = page(3, [f('Item 4', 50, 80)])
+    const reelle = page(9, [f('Item 2 – Titre', 50, 80)])
+    expect(analyserTitres([sommaire, suite, reelle])).toEqual([{ numeros: [2], pageDebut: 9 }])
   })
 
   test('garde la première page pour un numéro répété', () => {

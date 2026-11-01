@@ -14,8 +14,9 @@ const FENETRE_LIGNES = 4
 const MARGE_COLONNE = 20
 
 // « Item » peut être coupé par l'OCR (« It » + « em ») : une espace est tolérée à l'intérieur.
-const RE_ITEM = /It\s?em\s?s?\s+(\d{1,3})((?:\s*(?:,|et|-)\s*\d{1,3})*)/i
-const RE_ITEM_COMPTE = /It\s?em\s?s?\s+\d{1,3}/gi
+// `(?!\d)` : « Item 12 - 2019 » ne doit pas lire « 201 » comme un second numéro.
+const RE_ITEM = /It\s?em\s?s?\s+(\d{1,3})(?!\d)((?:\s*(?:,|et|-)\s*\d{1,3}(?!\d))*)/i
+const RE_ITEM_COMPTE = /It\s?em\s?s?\s+\d{1,3}(?!\d)/gi
 const RE_ITEM_DEBUT = new RegExp('^\\s*' + RE_ITEM.source, 'i')
 const RE_PAGE = /[.\s…-]*(\d{1,4})\s*$/
 
@@ -65,7 +66,6 @@ function compterItems(lignes: LigneFragments[]): number {
 
 function analyserPageSommaire(p: PageTexte): EntreeSommaire[] {
   const lignes = grouperFragments(p.fragments)
-  if (compterItems(lignes) < MIN_ENTREES) return []
   const entrees: EntreeSommaire[] = []
   for (const ligne of lignes) {
     const texte = texteDe(ligne.fragments)
@@ -94,22 +94,43 @@ function analyserPageSommaire(p: PageTexte): EntreeSommaire[] {
 
 const parPage = (a: EntreeSommaire, b: EntreeSommaire) => a.pageDebut - b.pageDebut
 
-/** Stratégie A : numéros d'items et pages de début lus dans le sommaire (20 premières pages). */
+/**
+ * Stratégie A : numéros d'items et pages de début lus dans le sommaire (20 premières pages). Le seuil
+ * `MIN_ENTREES` porte sur l'ensemble de ces pages, pas sur chacune : la dernière page d'un sommaire n'a
+ * souvent qu'un ou deux items et ne doit pas être perdue.
+ */
 export function analyserSommaire(pages: PageTexte[]): EntreeSommaire[] {
-  return pages
+  const entrees = pages
     .filter((p) => p.page <= PAGES_SOMMAIRE)
     .flatMap(analyserPageSommaire)
-    .sort(parPage)
+  return entrees.length >= MIN_ENTREES ? entrees.sort(parPage) : []
+}
+
+/**
+ * Pages de sommaire, pour la stratégie B : au moins `MIN_ENTREES` lignes « Item N », ou 1 à 2 lignes sur une
+ * page de la zone du sommaire qui suit une page de sommaire (fin d'un sommaire sur plusieurs pages).
+ */
+function pagesDeSommaire(pages: PageTexte[]): Set<number> {
+  const comptes = new Map<number, number>()
+  for (const p of pages) comptes.set(p.page, compterItems(grouperFragments(p.fragments)))
+  const sommaire = new Set<number>()
+  for (const p of [...pages].sort((a, b) => a.page - b.page)) {
+    const n = comptes.get(p.page) ?? 0
+    if (n >= MIN_ENTREES) sommaire.add(p.page)
+    else if (n > 0 && p.page <= PAGES_SOMMAIRE && sommaire.has(p.page - 1)) sommaire.add(p.page)
+  }
+  return sommaire
 }
 
 /** Stratégie B : première page où une ligne commence par « Item N » dans le tiers supérieur (pages de sommaire ignorées). */
 export function analyserTitres(pages: PageTexte[]): EntreeSommaire[] {
   const vus = new Set<number>()
   const entrees: EntreeSommaire[] = []
+  const sommaire = pagesDeSommaire(pages)
   for (const p of pages) {
-    const lignes = grouperFragments(p.fragments)
     // Une page de sommaire n'est jamais le début d'un item.
-    if (compterItems(lignes) >= MIN_ENTREES) continue
+    if (sommaire.has(p.page)) continue
+    const lignes = grouperFragments(p.fragments)
     for (const ligne of lignes) {
       if (ligne.y >= p.hauteur / 3) continue
       const m = RE_ITEM_DEBUT.exec(texteDe(ligne.fragments))
