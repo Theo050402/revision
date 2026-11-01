@@ -4,6 +4,7 @@ import {
   ajouterIndispo,
   changementsEnAttente,
   conflits,
+  creneauxExportes,
   enregistrerRecurrence,
   evenementsExport,
   importerIndisposIcs,
@@ -11,6 +12,7 @@ import {
   modifierCollege,
   modifierIndispo,
   modifierReglages,
+  reconcilierExport,
   reimporterCollege,
   supprimerCollege,
   supprimerIndispo,
@@ -359,7 +361,10 @@ describe('export', () => {
     )
     e = { ...e, suppressions: { x: { creneauId: 'x', libelle: 'x' } } }
     expect(e.premierExportFait).toBe(false)
-    e = marquerExporte(e, ['n1', 'm1'])
+    e = marquerExporte(e, [
+      { id: 'n1', version: 1 },
+      { id: 'm1', version: 2 },
+    ])
     expect(e.premierExportFait).toBe(true)
     expect(e.creneaux.n1.versionExportee).toBe(1)
     expect(e.creneaux.m1.versionExportee).toBe(2)
@@ -370,8 +375,116 @@ describe('export', () => {
     expect(changementsEnAttente(viderSuppressions(e)).suppressions).toEqual([])
   })
 
+  it("marquerExporte : seules les versions réellement écrites sont marquées", () => {
+    let e = avec(
+      base(),
+      creneau('a', 'c1:300', { debut: '2026-11-03T09:00', version: 1 }),
+      creneau('b', 'c1:300', { debut: '2026-11-03T11:00', version: 2 }),
+    )
+    // Entre la construction du fichier et le marquage, `b` est passé en version 3 et `a` a disparu.
+    e = { ...e, creneaux: { b: { ...e.creneaux.b, version: 3 } } }
+    e = marquerExporte(e, [
+      { id: 'a', version: 1 },
+      { id: 'b', version: 2 },
+    ])
+    expect(e.creneaux.b.versionExportee).toBeNull()
+    expect(changementsEnAttente(e).nouveaux.map((c) => c.id)).toEqual(['b'])
+    expect(e.creneaux.a).toBeUndefined()
+    expect(e.premierExportFait).toBe(true)
+  })
+
+  it('creneauxExportes : mêmes ids que les UID de evenementsExport, même ordre ; item ou collège inconnu exclu', () => {
+    let e = avec(
+      base(),
+      creneau('n2', 'c1:300', { debut: '2026-11-04T09:00' }),
+      creneau('n1', 'c1:300', { debut: '2026-11-03T09:00' }),
+      creneau('m1', 'c1:300', { debut: '2026-11-03T11:00', version: 2, versionExportee: 1 }),
+      creneau('ok', 'c1:300', { debut: '2026-11-03T12:00', version: 2, versionExportee: 2 }),
+      creneau('bac', 'c1:300', { debut: null }),
+      creneau('sans-item', 'c1:999', { debut: '2026-11-03T10:00' }),
+      creneau('sans-college', 'c9:300', { debut: '2026-11-03T10:30' }),
+    )
+    e = { ...e, items: { ...e.items, 'c9:300': { ...e.items['c1:300'], id: 'c9:300', collegeId: 'c9' } } }
+    const suffixe = '@revisions-emma'
+    for (const p of ['nouveaux', 'modifies', 'tout'] as const) {
+      const uids = evenementsExport(e, p).map((v) => v.uid.slice(0, -suffixe.length))
+      expect(creneauxExportes(e, p)).toEqual(uids)
+      expect(uids).not.toContain('sans-item')
+      expect(uids).not.toContain('sans-college')
+      expect(uids).not.toContain('bac')
+    }
+    expect(creneauxExportes(e, 'nouveaux')).toEqual(['n1', 'n2'])
+    expect(creneauxExportes(e, 'modifies')).toEqual(['m1'])
+    expect(creneauxExportes(e, 'tout')).toEqual(['n1', 'm1', 'ok', 'n2'])
+  })
+
   it('modifierReglages fusionne superficiellement', () => {
     const e = modifierReglages(etatVide(), { rappel: 30, theme: 'sombre' })
     expect(e.reglages).toMatchObject({ rappel: 30, theme: 'sombre', pas: 15 })
+  })
+})
+
+describe('reconcilierExport (annuler / rétablir)', () => {
+  const sup = (id: string, libelle = id) => ({ creneauId: id, libelle })
+
+  it("annuler un déplacement après l'export : le créneau n'est ni nouveau ni modifié", () => {
+    // Instantané d'avant l'export, état courant : exporté en version 1 puis déplacé (version 2).
+    const instantane = avec(base(), creneau('k1', 'c1:300', { version: 1, versionExportee: null }))
+    const courant = avec(base(), creneau('k1', 'c1:300', { version: 2, versionExportee: 1 }))
+    const r = reconcilierExport(instantane, courant)
+    expect(r.creneaux.k1).toMatchObject({ version: 1, versionExportee: 1 })
+    const ch = changementsEnAttente(r)
+    expect(ch.nouveaux).toEqual([])
+    expect(ch.modifies).toEqual([])
+  })
+
+  it("garde la version exportée la plus récente, qu'elle vienne de l'instantané ou de l'état courant", () => {
+    const instantane = avec(base(), creneau('k1', 'c1:300', { version: 3, versionExportee: 3 }))
+    const courant = avec(base(), creneau('k1', 'c1:300', { version: 3, versionExportee: 2 }))
+    expect(reconcilierExport(instantane, courant).creneaux.k1.versionExportee).toBe(3)
+    const r = reconcilierExport(courant, instantane)
+    expect(r.creneaux.k1.versionExportee).toBe(3)
+  })
+
+  it("jamais exporté des deux côtés : reste null", () => {
+    const e = avec(base(), creneau('k1', 'c1:300'))
+    expect(reconcilierExport(e, e).creneaux.k1.versionExportee).toBeNull()
+  })
+
+  it("supprimé après export puis annulé avant « C'est fait » : la suppression disparaît, rien à réexporter", () => {
+    const instantane = avec(base(), creneau('k1', 'c1:300', { versionExportee: 1 }))
+    const courant: Etat = { ...base(), suppressions: { k1: sup('k1'), autre: sup('autre') } }
+    const r = reconcilierExport(instantane, courant)
+    expect(r.suppressions).toEqual({ autre: sup('autre') })
+    expect(r.creneaux.k1.versionExportee).toBe(1)
+    const ch = changementsEnAttente(r)
+    expect(ch.nouveaux).toEqual([])
+    expect(ch.modifies).toEqual([])
+  })
+
+  it("supprimé, « C'est fait » confirmé, puis annulé : le créneau repart comme nouveau", () => {
+    const instantane = avec(base(), creneau('k1', 'c1:300', { versionExportee: 1 }))
+    const r = reconcilierExport(instantane, base())
+    expect(r.creneaux.k1.versionExportee).toBeNull()
+    expect(r.suppressions).toEqual({})
+    expect(changementsEnAttente(r).nouveaux.map((c) => c.id)).toEqual(['k1'])
+  })
+
+  it("une annulation qui retire un créneau exporté ajoute une suppression ; un créneau jamais exporté, non", () => {
+    const instantane = avec(base(), creneau('k1', 'c1:300', { versionExportee: 1 }))
+    const courant = avec(
+      instantane,
+      creneau('k2', 'c1:300', { debut: '2026-11-03T15:00', versionExportee: 1 }),
+      creneau('k3', 'c1:300', { debut: '2026-11-03T16:00' }),
+    )
+    const r = reconcilierExport(instantane, courant)
+    expect(Object.keys(r.creneaux)).toEqual(['k1'])
+    expect(r.suppressions).toEqual({ k2: sup('k2', '300 · T1 · mardi 3 nov. 15h') })
+  })
+
+  it('les suppressions en attente sans rapport avec l’instantané sont conservées', () => {
+    const instantane = avec(base(), creneau('k1', 'c1:300'))
+    const courant: Etat = { ...avec(base(), creneau('k1', 'c1:300')), suppressions: { z: sup('z') } }
+    expect(reconcilierExport(instantane, courant).suppressions).toEqual({ z: sup('z') })
   })
 })

@@ -1,6 +1,7 @@
 // Store zustand : l'état de l'application (`Etat` immuable), l'historique d'annulation (en mémoire
 // uniquement, 50 niveaux, spec §4 et §9.6) et la persistance IndexedDB.
 import { create } from 'zustand'
+import { reconcilierExport } from '../domain/actions-etat'
 import { etatVide } from '../domain/defaults'
 import type { Etat } from '../domain/types'
 import { chargerTout, demanderPersistance, enregistrer, remplacerTout } from '../storage/db'
@@ -91,11 +92,12 @@ export function attendreEcritures(): Promise<void> {
 
 /**
  * Un état d'historique rejoué garde les champs non annulables de l'état courant : annuler une
- * opération sur les créneaux ne doit pas ramener d'anciens réglages, ni renommer un collège (spec §9.6).
+ * opération sur les créneaux ne doit pas ramener d'anciens réglages, ni renommer un collège (spec §9.6). Le suivi de
+ * l'export (`versionExportee`, suppressions en attente) suit la même règle : voir `reconcilierExport`.
  */
 function rejouer(snapshot: Etat, courant: Etat): Etat {
   return {
-    ...snapshot,
+    ...reconcilierExport(snapshot, courant),
     reglages: courant.reglages,
     premierExportFait: courant.premierExportFait,
     colleges: courant.colleges,

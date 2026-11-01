@@ -2,7 +2,8 @@ import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { etatVide } from '../../src/domain/defaults'
 import type { Creneau, Etat } from '../../src/domain/types'
-import { modifierNote } from '../../src/domain/actions-creneaux'
+import { modifierNote, supprimerCreneau } from '../../src/domain/actions-creneaux'
+import { ajouterCollege, changementsEnAttente, marquerExporte, viderSuppressions } from '../../src/domain/actions-etat'
 import { lireSauvegarde } from '../../src/storage/backup'
 import { chargerTout, db } from '../../src/storage/db'
 import { attendreEcritures, useStore } from '../../src/ui/store'
@@ -161,6 +162,77 @@ describe('store : appliquerSansHistorique (réglages hors historique)', () => {
     expect(s().etat.premierExportFait).toBe(true)
     await attendreEcritures()
     expect((await chargerTout()).reglages.theme).toBe('sombre')
+  })
+})
+
+describe('store : annuler / rétablir et suivi de l’export', () => {
+  // Un collège et un item connus : sans eux, un créneau n'est jamais exportable.
+  beforeEach(() => {
+    s().appliquerSansHistorique((e) =>
+      ajouterCollege(e, 'Cancérologie', [{ numero: 300, titre: 'Item', pageDebut: 1, pages: 5, aVerifier: false, raison: null }], () => 'c1'),
+    )
+  })
+
+  const exporter = (...ids: string[]) =>
+    s().appliquerSansHistorique((e) =>
+      marquerExporte(
+        e,
+        ids.map((id) => ({ id, version: e.creneaux[id].version })),
+      ),
+    )
+
+  it('annuler un déplacement après l’export ne remet pas le créneau à exporter', () => {
+    s().appliquer(ajoute(creneau('a'))) // instantané : a non exporté
+    exporter('a')
+    s().appliquer((e) => modifierNote(e, 'a', 'x')) // version 2, exportée en 1
+    expect(changementsEnAttente(s().etat).modifies).toHaveLength(1)
+
+    s().annuler() // l'instantané du déplacement est celui d'après l'export
+    s().annuler() // celui d'avant l'export : a y est absent
+    expect(s().etat.creneaux).toEqual({})
+    expect(s().etat.suppressions.a).toBeDefined() // exporté puis retiré : à supprimer à la main
+
+    s().retablir() // a revient, sa suppression disparaît, il reste exporté
+    expect(s().etat.suppressions).toEqual({})
+    expect(s().etat.creneaux.a.versionExportee).toBe(1)
+    const ch = changementsEnAttente(s().etat)
+    expect(ch.nouveaux).toEqual([])
+    expect(ch.modifies).toEqual([])
+  })
+
+  it('annuler un placement exporté ajoute une suppression, annuler la suppression l’efface', () => {
+    s().appliquer(ajoute(creneau('a')))
+    s().appliquer(ajoute(creneau('b')))
+    exporter('a', 'b')
+    s().annuler()
+    expect(Object.keys(s().etat.creneaux)).toEqual(['a'])
+    expect(Object.keys(s().etat.suppressions)).toEqual(['b'])
+    expect(s().etat.creneaux.a.versionExportee).toBe(1)
+    s().retablir()
+    expect(s().etat.suppressions).toEqual({})
+    expect(s().etat.creneaux.b.versionExportee).toBe(1)
+  })
+
+  it('supprimer un exporté, « C’est fait », puis annuler : il repart comme nouveau', () => {
+    s().appliquer(ajoute(creneau('a')))
+    exporter('a')
+    s().appliquer((e) => supprimerCreneau(e, 'a'))
+    expect(Object.keys(s().etat.suppressions)).toEqual(['a'])
+    s().appliquerSansHistorique(viderSuppressions)
+    s().annuler()
+    expect(s().etat.creneaux.a.versionExportee).toBeNull()
+    expect(changementsEnAttente(s().etat).nouveaux.map((c) => c.id)).toEqual(['a'])
+  })
+
+  it('supprimer un exporté puis annuler avant « C’est fait » : plus de suppression, rien à réexporter', () => {
+    s().appliquer(ajoute(creneau('a')))
+    exporter('a')
+    s().appliquer((e) => supprimerCreneau(e, 'a'))
+    s().annuler()
+    expect(s().etat.suppressions).toEqual({})
+    const ch = changementsEnAttente(s().etat)
+    expect(ch.nouveaux).toEqual([])
+    expect(ch.modifies).toEqual([])
   })
 })
 

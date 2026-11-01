@@ -295,19 +295,59 @@ export function evenementsExport(e: Etat, portee: Portee): EvenementIcs[] {
   return retenus(e, portee).map((c) => enEvenement(e, c))
 }
 
-/** Identifiants des créneaux de `evenementsExport(e, portee)`, dans le même ordre : à passer à `marquerExporte`. */
+/** Identifiants des créneaux de `evenementsExport(e, portee)`, dans le même ordre. */
 export function creneauxExportes(e: Etat, portee: Portee): string[] {
   return retenus(e, portee).map((c) => c.id)
 }
 
-/** Après la livraison : `versionExportee = version` ; le premier export est fait. */
-export function marquerExporte(e: Etat, creneauIds: string[]): Etat {
+/** Un créneau écrit dans le fichier, avec la version qui y figure (`SEQUENCE`). */
+export type Envoye = { id: string; version: number }
+
+/**
+ * Après la livraison : `versionExportee = version` pour les créneaux envoyés, et seulement si leur version courante
+ * est encore celle du fichier (un créneau modifié entre-temps reste « modifié »). Le premier export est fait.
+ */
+export function marquerExporte(e: Etat, envoyes: Envoye[]): Etat {
   const maj: Record<string, Creneau> = {}
-  for (const id of creneauIds) {
+  for (const { id, version } of envoyes) {
     const c = e.creneaux[id]
-    if (c && c.debut !== null) maj[id] = { ...c, versionExportee: c.version }
+    if (c && c.debut !== null && c.version === version) maj[id] = { ...c, versionExportee: version }
   }
   return { ...e, creneaux: { ...e.creneaux, ...maj }, premierExportFait: true }
+}
+
+/**
+ * Annuler / rétablir : l'instantané rejoué donne les créneaux, mais le suivi de l'export (hors historique) doit
+ * survivre. Ce qui est déjà parti dans Calendrier ne repart pas, et ce qui y est resté est signalé :
+ * - créneau présent dans les deux états : la `versionExportee` la plus récente l'emporte ;
+ * - créneau ressuscité dont la suppression est encore en attente : la suppression est retirée (l'événement est
+ *   toujours dans Calendrier), `versionExportee` est gardée ;
+ * - créneau ressuscité sans suppression en attente (« C'est fait » confirmé : l'événement a été effacé de Calendrier) :
+ *   `versionExportee = null`, il repartira comme nouveau ;
+ * - créneau exporté que l'annulation retire : une suppression est ajoutée (comme `supprimerCreneau`).
+ */
+export function reconcilierExport(instantane: Etat, courant: Etat): Etat {
+  const creneaux: Record<string, Creneau> = {}
+  const suppressions = { ...courant.suppressions }
+  for (const c of Object.values(instantane.creneaux)) {
+    const actuel = courant.creneaux[c.id]
+    if (actuel) {
+      const v = Math.max(c.versionExportee ?? -1, actuel.versionExportee ?? -1)
+      const versionExportee = v < 0 ? null : v
+      creneaux[c.id] = versionExportee === c.versionExportee ? c : { ...c, versionExportee }
+    } else if (c.id in suppressions) {
+      delete suppressions[c.id]
+      creneaux[c.id] = c
+    } else {
+      creneaux[c.id] = c.versionExportee === null ? c : { ...c, versionExportee: null }
+    }
+  }
+  for (const actuel of Object.values(courant.creneaux)) {
+    if (!(actuel.id in instantane.creneaux) && actuel.versionExportee !== null) {
+      suppressions[actuel.id] = { creneauId: actuel.id, libelle: libelleSuppression(courant, actuel) }
+    }
+  }
+  return { ...instantane, creneaux, suppressions }
 }
 
 /** « C'est fait » : la liste des suppressions à faire à la main est vidée. */

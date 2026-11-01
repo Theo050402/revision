@@ -171,16 +171,24 @@ test('plus de 10 créneaux modifiés : procédure « Tout réexporter »', async
       versionExportee: 1,
     }),
   )
-  await ouvrir(page, modifies)
+  await ouvrir(page, [...modifies, creneau('e-x', 'c1:292', `${JOUR}T14:00`, 60, { versionExportee: 1 })])
   await expect(badge(page)).toHaveText('11')
+  // Un créneau exporté supprimé : une suppression à faire à la main s'ajoute au badge.
+  await bloc(page, 'e-x').click()
+  await page.getByRole('button', { name: 'Supprimer' }).click()
+  await expect(badge(page)).toHaveText('12')
 
   await ouvrirFeuille(page)
   await expect(feuille(page).getByRole('heading', { name: 'Créneaux modifiés (11)' })).toBeVisible()
   await expect(feuille(page).getByText('supprime le calendrier « Révisions »')).toBeVisible()
+  await expect(feuille(page).getByText('La liste des suppressions à faire à la main est alors effacée')).toBeVisible()
+  await expect(feuille(page).getByRole('heading', { name: 'À supprimer à la main dans Calendrier :' })).toBeVisible()
   const { fichier, ics } = await telecharger(page, 'Tout réexporter')
   expect(fichier).toBe('revisions-tout.ics')
   expect(evenements(ics)).toBe(11)
   expect(ics).toContain('SEQUENCE:2')
+  // Le calendrier repart de zéro : la liste des suppressions est vidée avec le reste.
+  await expect(feuille(page).getByRole('heading', { name: 'À supprimer à la main dans Calendrier :' })).toHaveCount(0)
   await feuille(page).getByRole('button', { name: 'Fermer' }).click()
   await expect(badge(page)).toHaveCount(0)
 })

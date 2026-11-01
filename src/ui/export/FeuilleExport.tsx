@@ -39,20 +39,24 @@ export function FeuilleExport({ onFermer }: { onFermer: () => void }) {
   const { nouveaux, modifies, suppressions } = changementsEnAttente(etat)
   const total = evenementsExport(etat, 'tout').length
 
-  async function livrer(portee: Portee): Promise<void> {
+  /** `depart` : l'utilisateur repart d'un calendrier recréé, les suppressions à la main n'ont plus d'objet. */
+  async function livrer(portee: Portee, depart = false): Promise<void> {
     if (occupe) return
     const courant = useStore.getState().etat
     const evenements = evenementsExport(courant, portee)
     if (evenements.length === 0) return
-    const ids = creneauxExportes(courant, portee)
+    // Les versions écrites dans le fichier : seuls ces créneaux, à ces versions, sont marqués envoyés.
+    const envoyes = creneauxExportes(courant, portee).map((id) => ({ id, version: courant.creneaux[id].version }))
     setOccupe(true)
     try {
       const methode = await livrerIcs(genererIcs(evenements, new Date()), NOM_FICHIER[portee])
       // Fermer la feuille de partage sans envoyer ne marque rien ; un téléchargement est considéré comme livré.
       if (methode === 'annule') return
       // Le suivi de l'export n'est pas annulable : « Annuler » ne doit pas re-proposer ce qui est parti.
-      useStore.getState().appliquerSansHistorique((e) => marquerExporte(e, ids))
-      toast(messageEnvoi(ids.length))
+      useStore
+        .getState()
+        .appliquerSansHistorique((e) => (depart ? viderSuppressions(marquerExporte(e, envoyes)) : marquerExporte(e, envoyes)))
+      toast(messageEnvoi(envoyes.length))
     } finally {
       setOccupe(false)
     }
@@ -91,13 +95,16 @@ export function FeuilleExport({ onFermer }: { onFermer: () => void }) {
             {modifies.length > SEUIL_TOUT_REEXPORTER && (
               <div className="export-alternative">
                 <h4>Trop de mises à jour à valider ?</h4>
-                <p className="aide">Repars d'un calendrier vide : tout s'ajoute alors en une fois.</p>
+                <p className="aide">
+                  Repars d'un calendrier vide : tout s'ajoute alors en une fois. La liste des suppressions à faire à la main
+                  est alors effacée, puisque l'ancien calendrier disparaît.
+                </p>
                 <ol>
                   <li>Dans l'app Calendrier, supprime le calendrier « Révisions ».</li>
                   <li>Recrée-le avec le même nom.</li>
                   <li>Touche « Tout réexporter » ci-dessous, puis « Tout ajouter » dans Calendrier.</li>
                 </ol>
-                <button type="button" className="btn-secondaire" disabled={occupe} onClick={() => void livrer('tout')}>
+                <button type="button" className="btn-secondaire" disabled={occupe} onClick={() => void livrer('tout', true)}>
                   Tout réexporter
                 </button>
               </div>

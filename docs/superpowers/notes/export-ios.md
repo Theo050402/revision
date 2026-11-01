@@ -1,6 +1,6 @@
 # Test de l'export .ics sur iPad
 
-Valeur retenue : `MODE_EXPORT` dans `src/ics/mode.ts` (à fixer après le test).
+Décision : voir ci-dessous (livraison par téléchargement, deux fichiers).
 
 ## Procédure
 
