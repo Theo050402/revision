@@ -3,6 +3,7 @@ import { modifierNote } from '../../src/domain/actions-creneaux'
 import {
   ajouterCollege,
   ajouterIndispo,
+  annulerMarquage,
   changementsEnAttente,
   conflits,
   creneauxExportes,
@@ -415,6 +416,51 @@ describe('export', () => {
     expect(changementsEnAttente(e).nouveaux.map((c) => c.id)).toEqual(['b'])
     expect(e.creneaux.a).toBeUndefined()
     expect(e.premierExportFait).toBe(true)
+  })
+
+  it("annulerMarquage : rend aux créneaux envoyés leur versionExportee d'avant, sauf si leur version a bougé", () => {
+    let e = avec(
+      base(),
+      creneau('n1', 'c1:300', { debut: '2026-11-03T09:00' }),
+      creneau('m1', 'c1:300', { debut: '2026-11-03T11:00', version: 2, versionExportee: 1 }),
+      creneau('b', 'c1:300', { debut: '2026-11-03T13:00', version: 1 }),
+      creneau('autre', 'c1:300', { debut: '2026-11-03T15:00', version: 1, versionExportee: 1 }),
+    )
+    const envoyes = [
+      { id: 'n1', version: 1, avant: null },
+      { id: 'm1', version: 2, avant: 1 },
+      { id: 'b', version: 1, avant: null },
+    ]
+    e = marquerExporte(e, envoyes)
+    expect(changementsEnAttente(e).nouveaux).toEqual([])
+    // `b` est modifié après l'envoi : sa version n'est plus celle du fichier.
+    e = { ...e, creneaux: { ...e.creneaux, b: { ...e.creneaux.b, version: 2 } } }
+    const r = annulerMarquage(e, envoyes)
+    expect(r.creneaux.n1.versionExportee).toBeNull()
+    expect(r.creneaux.m1.versionExportee).toBe(1)
+    expect(r.creneaux.b.versionExportee).toBe(1) // inchangé : version ≠ version du fichier
+    expect(r.creneaux.autre).toBe(e.creneaux.autre) // pas dans l'envoi : même référence
+    expect(changementsEnAttente(r).nouveaux.map((c) => c.id)).toEqual(['n1'])
+    expect(changementsEnAttente(r).modifies.map((c) => c.id)).toEqual(['m1', 'b'])
+  })
+
+  it('annulerMarquage : créneau disparu ignoré ; premierExportFait et suppressions rétablis si demandé', () => {
+    let e = avec(base(), creneau('n1', 'c1:300', { debut: '2026-11-03T09:00' }))
+    const supp = { x: { creneauId: 'x', libelle: 'x' } }
+    const envoyes = [
+      { id: 'n1', version: 1, avant: null },
+      { id: 'fantome', version: 1, avant: null },
+    ]
+    e = viderSuppressions(marquerExporte({ ...e, suppressions: supp }, envoyes))
+    const r = annulerMarquage(e, envoyes, { premierExportFait: false, suppressions: supp })
+    expect(r.creneaux.fantome).toBeUndefined()
+    expect(r.creneaux.n1.versionExportee).toBeNull()
+    expect(r.premierExportFait).toBe(false)
+    expect(r.suppressions).toEqual(supp)
+    // Sans options, ces deux champs ne bougent pas.
+    const s = annulerMarquage(e, envoyes)
+    expect(s.premierExportFait).toBe(true)
+    expect(s.suppressions).toEqual({})
   })
 
   it('creneauxExportes : mêmes ids que les UID de evenementsExport, même ordre ; item ou collège inconnu exclu', () => {

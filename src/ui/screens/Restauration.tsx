@@ -7,6 +7,9 @@ import { FeuilleConfirmation } from '../feuilles/FeuilleConfirmation'
 import { useStore } from '../store'
 import { toast } from '../Toast'
 
+/** Après une restauration, Calendrier peut contenir autre chose que l'état restauré. */
+export const INDICE_CALENDRIER = "Si ton Calendrier ne correspond plus, utilise « Repartir d'un calendrier vide » dans Exporter."
+
 export function Restauration() {
   const champ = useRef<HTMLInputElement>(null)
   const [refus, setRefus] = useState<string | null>(null)
@@ -35,6 +38,7 @@ export function Restauration() {
     useStore.getState().restaurer(propose)
     setPropose(null)
     toast('Données restaurées.')
+    toast(INDICE_CALENDRIER)
   }
 
   return (

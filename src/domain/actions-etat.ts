@@ -323,6 +323,32 @@ export function marquerExporte(e: Etat, envoyes: Envoye[]): Etat {
   return { ...e, creneaux: { ...e.creneaux, ...maj }, premierExportFait: true }
 }
 
+/** Un créneau envoyé, avec sa `versionExportee` d'avant l'envoi (pour `annulerMarquage`). */
+export type EnvoyeAvant = Envoye & { avant: number | null }
+
+/**
+ * « Remettre à envoyer » : la livraison n'est pas une preuve d'import (téléchargement refusé, écran d'import fermé,
+ * mauvais calendrier). Rend à chaque créneau envoyé sa `versionExportee` d'avant, mais seulement s'il est encore à la
+ * version du fichier ; `premierExportFait` et les suppressions en attente ne sont rétablis que si on les fournit.
+ */
+export function annulerMarquage(
+  e: Etat,
+  envoyes: EnvoyeAvant[],
+  avant: { premierExportFait?: boolean; suppressions?: Record<string, SuppressionEnAttente> } = {},
+): Etat {
+  const maj: Record<string, Creneau> = {}
+  for (const { id, version, avant: precedente } of envoyes) {
+    const c = e.creneaux[id]
+    if (c && c.version === version && c.versionExportee !== precedente) maj[id] = { ...c, versionExportee: precedente }
+  }
+  return {
+    ...e,
+    creneaux: { ...e.creneaux, ...maj },
+    premierExportFait: avant.premierExportFait ?? e.premierExportFait,
+    suppressions: avant.suppressions ? { ...avant.suppressions, ...e.suppressions } : e.suppressions,
+  }
+}
+
 /**
  * Annuler / rétablir : l'instantané rejoué donne les créneaux, mais le suivi de l'export (hors historique) doit
  * survivre. Ce qui est déjà parti dans Calendrier ne repart pas, et ce qui y est resté est signalé :

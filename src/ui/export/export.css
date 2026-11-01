@@ -133,10 +133,41 @@
   border-radius: 10px;
 }
 
-.export-alternative h4 {
-  margin: 0;
+/* Procédure « Repartir d'un calendrier vide » : un <details> (bloc, pas flex : WebKit) toujours présent, ouvert et
+   mis en avant quand il y a trop de mises à jour. */
+details.export-alternative {
+  display: block;
+  margin-top: 0;
+}
+
+details.export-alternative[data-conseille] {
+  border: 1.5px solid var(--accent);
+}
+
+details.export-alternative > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
   font-size: var(--fs-3);
   font-weight: 700;
+  cursor: pointer;
+}
+
+details.export-alternative > :not(summary) {
+  margin-top: 8px;
+}
+
+/* « Pas importé dans Calendrier ? » sous le bouton de l'action utilisée. */
+.export-remise {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.export-remise .aide {
+  margin: 0;
 }
 
 .export-suppressions ul {
@@ -145,9 +176,12 @@
 
 /* iPhone : les boutons occupent la largeur de la feuille. */
 @media (max-width: 899px) {
-  .export-section > button,
-  .export-alternative > button {
+  .export-section > button {
     align-self: stretch;
+  }
+
+  details.export-alternative > button {
+    width: 100%;
   }
 }
 
