@@ -111,9 +111,26 @@ describe('analyserSommaire', () => {
     ])
   })
 
-  test('1 + 1 + 1 items répartis sur trois pages : total 3, tout est gardé', () => {
+  test('1 + 1 + 1 items éparpillés sur trois pages : ce ne sont pas des pages de sommaire, liste vide', () => {
     const pages = [1, 2, 3].map((n) => page(n, bloc(100, `T${n}`, n * 10, `Item ${n}`)))
-    expect(analyserSommaire(pages)).toHaveLength(3)
+    expect(analyserSommaire(pages)).toEqual([])
+  })
+
+  test('un vrai sommaire en page 2 et un « cf. Item 12 » isolé en page 7 : seules les entrées du sommaire', () => {
+    const toc = page(2, [...bloc(100, 'T1', 10, 'Item 1'), ...bloc(160, 'T2', 20, 'Item 2'), ...bloc(220, 'T3', 30, 'Item 3')])
+    const parasite = page(7, [f('Résultats publiés en 2019', 125, 100), f('cf. Item 12', 125, 112)])
+    expect(analyserSommaire([toc, parasite])).toEqual([
+      { numeros: [1], pageDebut: 10 },
+      { numeros: [2], pageDebut: 20 },
+      { numeros: [3], pageDebut: 30 },
+    ])
+  })
+
+  test("une page à 1 item n'est une fin de sommaire que juste après une page « pleine » (pas de chaînage)", () => {
+    const toc = page(2, [...bloc(100, 'T1', 10, 'Item 1'), ...bloc(160, 'T2', 20, 'Item 2'), ...bloc(220, 'T3', 30, 'Item 3')])
+    const suite = page(3, bloc(100, 'T4', 40, 'Item 4'))
+    const nonSuite = page(4, bloc(100, 'T5', 50, 'Item 5'))
+    expect(analyserSommaire([toc, suite, nonSuite]).map((e) => e.numeros[0])).toEqual([1, 2, 3, 4])
   })
 
   test("« Item 12 - 2019 » : l'année n'est pas lue comme un second numéro", () => {
@@ -165,6 +182,13 @@ describe('analyserTitres', () => {
     expect(analyserTitres([sommaire, suite, reelle])).toEqual([{ numeros: [2], pageDebut: 9 }])
   })
 
+  test("pas de chaînage : la page 4 (1 item) qui suit la page de fin 3 n'est pas ignorée", () => {
+    const sommaire = page(2, [f('Item 1', 50, 50), f('Item 2', 50, 100), f('Item 3', 50, 150)])
+    const suite = page(3, [f('Item 4', 50, 80)])
+    const reelle = page(4, [f('Item 5 – Titre', 50, 80)])
+    expect(analyserTitres([sommaire, suite, reelle])).toEqual([{ numeros: [5], pageDebut: 4 }])
+  })
+
   test('garde la première page pour un numéro répété', () => {
     const pages = [page(4, [f('Item 7', 50, 80)]), page(9, [f('Item 7', 50, 80)])]
     expect(analyserTitres(pages)).toEqual([{ numeros: [7], pageDebut: 4 }])
@@ -201,6 +225,22 @@ describe('extraireEntrees', () => {
   test("A trouve moins de 3 entrées : bascule vers « titres »", async () => {
     const r = await extraireEntrees([page(1, [])], async () => [page(6, [f('Item 3 – Titre', 50, 80)])])
     expect(r).toEqual({ entrees: [{ numeros: [3], pageDebut: 6 }], strategie: 'titres' })
+  })
+
+  test('chapitres isolés (Item N sous une ligne finissant par un nombre), sans sommaire : A vide, B les trouve', async () => {
+    const ouverture = (n: number, item: number) =>
+      page(n, [f('Évolution depuis 2019', 125, 100), f(`Item ${item} – Titre`, 125, 112)])
+    const pages = [ouverture(5, 3), ouverture(9, 7), ouverture(14, 11)]
+    expect(analyserSommaire(pages)).toEqual([])
+    const r = await extraireEntrees(pages, async () => pages)
+    expect(r).toEqual({
+      entrees: [
+        { numeros: [3], pageDebut: 5 },
+        { numeros: [7], pageDebut: 9 },
+        { numeros: [11], pageDebut: 14 },
+      ],
+      strategie: 'titres',
+    })
   })
 
   test("B ne trouve rien : « aucune »", async () => {

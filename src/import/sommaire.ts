@@ -95,31 +95,30 @@ function analyserPageSommaire(p: PageTexte): EntreeSommaire[] {
 const parPage = (a: EntreeSommaire, b: EntreeSommaire) => a.pageDebut - b.pageDebut
 
 /**
- * Stratégie A : numéros d'items et pages de début lus dans le sommaire (20 premières pages). Le seuil
- * `MIN_ENTREES` porte sur l'ensemble de ces pages, pas sur chacune : la dernière page d'un sommaire n'a
- * souvent qu'un ou deux items et ne doit pas être perdue.
- */
-export function analyserSommaire(pages: PageTexte[]): EntreeSommaire[] {
-  const entrees = pages
-    .filter((p) => p.page <= PAGES_SOMMAIRE)
-    .flatMap(analyserPageSommaire)
-  return entrees.length >= MIN_ENTREES ? entrees.sort(parPage) : []
-}
-
-/**
- * Pages de sommaire, pour la stratégie B : au moins `MIN_ENTREES` lignes « Item N », ou 1 à 2 lignes sur une
- * page de la zone du sommaire qui suit une page de sommaire (fin d'un sommaire sur plusieurs pages).
+ * Pages de sommaire, communes aux stratégies A et B : une page (des 20 premières) est « pleine » si elle compte
+ * au moins `MIN_ENTREES` lignes « Item N » ; une page à 1 ou 2 items est la fin d'un sommaire seulement si la
+ * page précédente est elle-même pleine. Pas de chaînage : une fin de sommaire n'en prolonge pas une autre.
  */
 function pagesDeSommaire(pages: PageTexte[]): Set<number> {
   const comptes = new Map<number, number>()
   for (const p of pages) comptes.set(p.page, compterItems(grouperFragments(p.fragments)))
+  const n = (page: number) => comptes.get(page) ?? 0
   const sommaire = new Set<number>()
-  for (const p of [...pages].sort((a, b) => a.page - b.page)) {
-    const n = comptes.get(p.page) ?? 0
-    if (n >= MIN_ENTREES) sommaire.add(p.page)
-    else if (n > 0 && p.page <= PAGES_SOMMAIRE && sommaire.has(p.page - 1)) sommaire.add(p.page)
+  for (const p of pages) {
+    if (p.page > PAGES_SOMMAIRE) continue
+    if (n(p.page) >= MIN_ENTREES || (n(p.page) >= 1 && n(p.page - 1) >= MIN_ENTREES)) sommaire.add(p.page)
   }
   return sommaire
+}
+
+/**
+ * Stratégie A : numéros d'items et pages de début lus dans les pages de sommaire. Seul le total des entrées
+ * doit atteindre `MIN_ENTREES` : la dernière page d'un sommaire n'a souvent qu'un ou deux items.
+ */
+export function analyserSommaire(pages: PageTexte[]): EntreeSommaire[] {
+  const sommaire = pagesDeSommaire(pages)
+  const entrees = pages.filter((p) => sommaire.has(p.page)).flatMap(analyserPageSommaire)
+  return entrees.length >= MIN_ENTREES ? entrees.sort(parPage) : []
 }
 
 /** Stratégie B : première page où une ligne commence par « Item N » dans le tiers supérieur (pages de sommaire ignorées). */
