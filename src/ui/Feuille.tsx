@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 /**
@@ -26,15 +26,20 @@ export function Feuille({
   children: ReactNode
 }) {
   const fermer = useRef<HTMLButtonElement>(null)
+  const idTitre = useId()
+  // Les appelants passent souvent une fermeture neuve à chaque rendu : on la garde en référence pour que l'effet
+  // (focus d'ouverture, écoute d'Échap) ne tourne qu'à l'ouverture, pas à chaque changement du store.
+  const surFermer = useRef(onFermer)
+  surFermer.current = onFermer
 
   useEffect(() => {
     fermer.current?.focus()
     const touche = (ev: KeyboardEvent) => {
-      if (ev.key === 'Escape') onFermer()
+      if (ev.key === 'Escape') surFermer.current()
     }
     document.addEventListener('keydown', touche)
     return () => document.removeEventListener('keydown', touche)
-  }, [onFermer])
+  }, [])
 
   return createPortal(
     <div className="feuille-fond" data-efface={efface || undefined} onClick={onFermer}>
@@ -42,12 +47,12 @@ export function Feuille({
         className={className ? `feuille ${className}` : 'feuille'}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="titre-feuille"
+        aria-labelledby={idTitre}
         onClick={(ev) => ev.stopPropagation()}
       >
         <div className="feuille-poignee" aria-hidden="true" />
         <div className="feuille-entete">
-          <h2 id="titre-feuille">{titre}</h2>
+          <h2 id={idTitre}>{titre}</h2>
           <button ref={fermer} type="button" className="btn-texte" onClick={onFermer}>
             Fermer
           </button>
