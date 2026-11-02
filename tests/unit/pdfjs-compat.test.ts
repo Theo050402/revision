@@ -16,6 +16,10 @@ const RECENTES: [object, string][] = [
   [Uint8Array.prototype, 'toBase64'],
   [Uint8Array.prototype, 'toHex'],
   [globalThis, 'Float16Array'],
+  // Itération asynchrone d'un ReadableStream (`for await … of stream`) : absente de Safari sous iPadOS 26.5,
+  // utilisée par page.getTextContent() de pdf.js → « undefined is not a function (near '…e of t…') ».
+  [ReadableStream.prototype, Symbol.asyncIterator as unknown as string],
+  [ReadableStream.prototype, 'values'],
 ]
 
 const sauvegardes: [object, string, PropertyDescriptor][] = []
@@ -32,6 +36,29 @@ function retirerApisRecentes() {
     delete (cible as Record<string, unknown>)[nom]
   }
 }
+
+test("l'itération ajoutée d'un ReadableStream lit tout, et annule le flux sur une sortie anticipée", async () => {
+  retirerApisRecentes()
+  vi.resetModules()
+  await import('../../src/import/pdfjs')
+
+  const flux = (annule: () => void) =>
+    new ReadableStream<number>({
+      start(c) {
+        ;[1, 2, 3].forEach((n) => c.enqueue(n))
+        c.close()
+      },
+      cancel: annule,
+    })
+
+  const lus: number[] = []
+  for await (const n of flux(() => {}) as unknown as AsyncIterable<number>) lus.push(n)
+  expect(lus).toEqual([1, 2, 3])
+
+  let annulations = 0
+  for await (const n of flux(() => annulations++) as unknown as AsyncIterable<number>) if (n === 1) break
+  expect(annulations).toBe(1)
+})
 
 test("pdf.js de l'app lit un PDF dans un navigateur sans les API JavaScript récentes", async () => {
   const pdf = await PDFDocument.create()
