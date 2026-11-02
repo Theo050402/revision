@@ -144,12 +144,15 @@ export function Atterrissage({ cle, jour, debut, haut, hauteur, couleur, refus, 
 }
 
 /**
- * Teinte d'accent à 8 % sur toute la hauteur de la colonne visée, en fondu par ressort (instantané en mouvement
- * réduit) ; rouge quand la colonne refuse le dépôt.
+ * Éclairage de la colonne visée, sur toute sa hauteur, en fondu par ressort (instantané en mouvement réduit) :
+ * surligneur du collège glissé (`teinte`) en clair, accent en sombre, rouge quand la colonne refuse le dépôt.
+ * La teinte est posée sur ce seul calque (sans enfant) et gardée pendant le fondu de sortie.
  */
-export function Eclairage({ visee }: { visee: boolean }) {
+export function Eclairage({ visee, teinte: couleur }: { visee: boolean; teinte?: string }) {
   const ref = useRef<HTMLDivElement>(null)
   const anim = useRef<Anim | null>(null)
+  const derniere = useRef(couleur)
+  if (couleur) derniere.current = couleur
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
@@ -162,5 +165,6 @@ export function Eclairage({ visee }: { visee: boolean }) {
     anim.current.vers(visee ? 1 : 0)
   }, [visee])
   useLayoutEffect(() => () => anim.current?.arreter(), [])
-  return <div ref={ref} className="colonne-eclairage" aria-hidden="true" />
+  const style = derniere.current ? ({ '--teinte-visee': derniere.current } as CSSProperties) : undefined
+  return <div ref={ref} className="colonne-eclairage" style={style} aria-hidden="true" />
 }

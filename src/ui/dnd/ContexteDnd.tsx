@@ -29,12 +29,14 @@ import { cibleAtterrissage, oublierAtterrissages } from './Atterrissage'
 import { cleSurvol, lire } from './cibles'
 import {
   arreterCopie,
-  contenuCopie,
+  clonerCarte,
   CopieFlottante,
   poserCopie,
   souleverCopie,
   suivreCopie,
   survolCorbeille,
+  survolGrille,
+  type Taille,
 } from './CopieFlottante'
 import {
   bloquerDefilement,
@@ -102,6 +104,9 @@ export function ContexteDnd({ children, onDepose }: Props) {
     /** Forme de la copie : un bloc de la grille garde sa taille, une carte peut être plus étroite. */
     forme: 'bloc' | 'carte'
     surCorbeille: boolean
+    surGrille: boolean
+    /** Taille de l'objet saisi : la copie y revient. */
+    taille: Taille | null
     echantillons: Echantillon[]
     image: number
     arreter: () => void
@@ -152,6 +157,12 @@ export function ContexteDnd({ children, onDepose }: Props) {
       g.surCorbeille = surCorbeille
       survolCorbeille(surCorbeille)
     }
+    // Une carte au-dessus d'une colonne prend la forme du créneau qu'elle deviendra.
+    const surGrille = survol?.type === 'colonne'
+    if (surGrille !== g.surGrille) {
+      g.surGrille = surGrille
+      survolGrille(surGrille)
+    }
     const cle = cleSurvol(survol)
     if (cle === g.cle) return
     g.cle = cle
@@ -172,8 +183,9 @@ export function ContexteDnd({ children, onDepose }: Props) {
   }, [])
 
   /**
-   * Retour à l'origine par ressort (refus, lâcher hors cible ou sur place, Échap) : la copie rejoint l'objet saisi,
-   * masqué jusqu'à son arrivée s'il s'agit d'un créneau de la grille. Objet disparu : la copie s'efface sur place.
+   * Retour à l'origine par ressort (refus, lâcher hors cible ou sur place, Échap) : la copie rejoint l'objet saisi
+   * en reprenant sa forme ; un créneau de la grille reste estompé jusqu'à son arrivée, puis la copie s'efface
+   * par-dessus. Objet disparu : la copie s'efface sur place.
    */
   const revenir = useCallback((g: NonNullable<typeof geste.current>, v: { vx: number; vy: number }) => {
     const id = g.source.type === 'creneau' ? g.source.id : null
@@ -190,7 +202,7 @@ export function ContexteDnd({ children, onDepose }: Props) {
     }
     const masque = id !== null && el.matches('.bloc-creneau[data-creneau]') ? [id] : []
     if (masque.length > 0) useVol.setState({ caches: masque })
-    poserCopie({ x: r.left, y: r.top }, v, () => useVol.setState({ caches: [] }))
+    poserCopie({ x: r.left, y: r.top, forme: g.forme }, v, () => useVol.setState({ caches: [] }))
   }, [])
 
   const debut = useCallback(
@@ -228,6 +240,8 @@ export function ContexteDnd({ children, onDepose }: Props) {
         origine: o?.el ?? null,
         forme,
         surCorbeille: false,
+        surGrille: false,
+        taille: o ? { largeur: o.r.width, hauteur: o.r.height } : null,
         echantillons: [],
         image: 0,
         arreter: () => {
@@ -238,9 +252,25 @@ export function ContexteDnd({ children, onDepose }: Props) {
       marquerGeste(true)
       useVol.setState({ caches: [] })
       oublierAtterrissages()
-      // La copie apparaît exactement sur l'objet saisi, puis se soulève : le doigt garde sa prise.
-      const r = o?.r ?? { left: pe.clientX - 28, top: pe.clientY - 22, width: 230, height: 0 }
-      souleverCopie(contenuCopie(etat, d.source, fantome, forme, r, o?.x ?? pe.clientX, o?.y ?? pe.clientY), o?.x ?? pe.clientX, o?.y ?? pe.clientY)
+      // La copie apparaît exactement sur l'objet saisi (même place, même taille, même contenu), puis se soulève :
+      // le doigt garde sa prise. Une carte connaît aussi la taille du créneau qu'elle deviendra dans la grille.
+      const px = o?.x ?? pe.clientX
+      const py = o?.y ?? pe.clientY
+      const item = fantome ? etat.items[fantome.itemId] : undefined
+      souleverCopie(
+        {
+          creneau: fantome,
+          item,
+          couleur: item ? (etat.colleges[item.collegeId]?.couleur ?? 0) : 0,
+          carte: o && forme === 'carte' ? { el: clonerCarte(o.el), taille: { largeur: o.r.width, hauteur: o.r.height } } : null,
+          nombre: d.source.type === 'item' ? d.source.itemIds.length : 1,
+          dx: o ? px - o.r.left : 0,
+          dy: o ? py - o.r.top : 0,
+        },
+        px,
+        py,
+        forme === 'bloc' && o ? { largeur: o.r.width, hauteur: o.r.height } : tailleDansLaGrille(fantome?.duree ?? null),
+      )
       useGlisse.setState({
         ...GLISSE_VIDE,
         source: d.source,
@@ -307,9 +337,11 @@ export function ContexteDnd({ children, onDepose }: Props) {
       if (reussi) {
         haptique('succes')
         if (atterrir) {
+          // Les créneaux posés restent estompés jusqu'à l'arrivée de la copie, qui a pris la forme exacte de
+          // l'emplacement ; elle s'efface alors par-dessus le vrai créneau (relais).
           useVol.setState({ caches: poses })
-          // Une carte (plus large que le créneau) s'efface en rejoignant l'emplacement ; un bloc s'y pose exactement.
-          poserCopie({ x: atterrir.x, y: atterrir.y, fondre: g.forme === 'carte' }, v, () => useVol.setState({ caches: [] }))
+          const taille = { largeur: atterrir.largeur, hauteur: atterrir.hauteur }
+          poserCopie({ x: atterrir.x, y: atterrir.y, forme: 'bloc', taille }, v, () => useVol.setState({ caches: [] }))
         } else {
           poserCopie(null, v) // corbeille, vue Mois : la copie s'efface sur place
         }
@@ -360,6 +392,16 @@ export function ContexteDnd({ children, onDepose }: Props) {
 }
 
 const REFUS_MOIS: Apercu = { ok: false, positions: {}, nouveaux: [], versBac: 0 }
+
+/** Taille qu'aurait un créneau de `duree` minutes dans la grille affichée (emplacement), `null` sans grille. */
+function tailleDansLaGrille(duree: number | null): Taille | null {
+  const grille = document.querySelector<HTMLElement>('.grille[data-px-heure]')
+  const col = grille?.querySelector<HTMLElement>('.colonne[data-jour]')
+  if (!grille || !col || duree === null) return null
+  const pxHeure = Number(grille.dataset.pxHeure)
+  // Comme l'emplacement : 3 px de marge de chaque côté, 14 px au moins.
+  return { largeur: col.clientWidth - 6, hauteur: Math.max(14, (duree * pxHeure) / 60) }
+}
 
 /**
  * Source de glisser déléguée : un seul `useDraggable` pour tout un conteneur. `trouver` reçoit le

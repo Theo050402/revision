@@ -27,9 +27,10 @@
   opacity: 0.35;
 }
 
-/* Créneau posé (ou revenu) que la copie n'a pas encore rejoint : il apparaît à son arrivée. */
+/* Créneau posé (ou revenu) que la copie n'a pas encore rejoint : estompé, on voit où elle va ; à son arrivée, il
+   reprend son opacité sous la copie, identique, qui s'efface par-dessus (relais). */
 .bloc-creneau[data-vol='true'] {
-  opacity: 0;
+  opacity: 0.35;
 }
 
 /* Emplacement d'atterrissage : contour translucide à la couleur du collège, magnétisé au jour et au pas. Sa boîte
@@ -41,7 +42,6 @@
   right: 3px;
   z-index: 5;
   pointer-events: none;
-  will-change: transform, opacity;
   contain: size layout style;
 }
 
@@ -59,35 +59,71 @@
   background: color-mix(in srgb, var(--now) 18%, transparent);
 }
 
-/* Colonne du jour visé : teinte d'accent à 8 % sur toute la hauteur (opacité animée par ressort), rouge en cas de
-   refus ; elle passe au-dessus de ses voisines, pour que l'emplacement qui arrive d'un autre jour reste visible. */
+/* Colonne du jour visé : en clair, le surligneur du collège glissé (`--teinte-visee`, posé sur le calque et sur
+   l'en-tête visé seulement) à 18 % sur toute la hauteur ; en sombre, l'accent à 14 % (opacité animée par ressort).
+   Rouge en cas de refus. Elle passe au-dessus de ses voisines, pour que l'emplacement qui arrive d'un autre jour reste
+   visible. L'en-tête du jour est souligné au surligneur, comme le mois. */
 .colonne-eclairage {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: color-mix(in srgb, var(--teinte-visee, var(--accent)) 18%, transparent);
   opacity: 0;
   pointer-events: none;
 }
 
-.colonne[data-refus='true'] .colonne-eclairage {
-  background: color-mix(in srgb, var(--now) 8%, transparent);
+.jour-tete[data-visee='true'] b {
+  align-self: flex-start;
+  padding: 0 4px;
+  margin: 0 -4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    transparent 58%,
+    color-mix(in srgb, var(--teinte-visee, var(--accent)) 85%, transparent) 58% 94%,
+    transparent 94%
+  );
+}
+
+:root[data-theme='sombre'] .colonne-eclairage {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+:root[data-theme='sombre'] .jour-tete[data-visee='true'] b {
+  background: linear-gradient(transparent 58%, color-mix(in srgb, var(--accent) 60%, transparent) 58% 94%, transparent 94%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='auto'] .colonne-eclairage {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+
+  :root[data-theme='auto'] .jour-tete[data-visee='true'] b {
+    background: linear-gradient(transparent 58%, color-mix(in srgb, var(--accent) 60%, transparent) 58% 94%, transparent 94%);
+  }
+}
+
+/* Refus : rouge, quel que soit le thème (règles placées après celles des thèmes, même spécificité). */
+:root .colonne[data-refus='true'] .colonne-eclairage {
+  background: color-mix(in srgb, var(--now) 12%, transparent);
+}
+
+:root .jour-tete[data-visee='true'][data-refus='true'] b {
+  background: linear-gradient(transparent 58%, color-mix(in srgb, var(--now) 70%, transparent) 58% 94%, transparent 94%);
 }
 
 .colonne[data-visee='true'] {
   z-index: 1;
 }
 
-.jour-tete[data-visee='true'] {
-  color: var(--ink);
-  font-weight: 700;
-}
-
-/* ---------- Copie flottante (portail, au-dessus de tout) ---------- */
+/* ---------- Copie flottante (portail, au-dessus de tout) ----------
+   Boîte sans taille posée sur le doigt ; le porteur se soulève autour du doigt (origine 0 0) ; les couches carte et
+   bloc sont placées et mises à l'échelle par `transform` (CopieFlottante.tsx). Aucune transition. */
 
 .copie {
   position: fixed;
   left: 0;
   top: 0;
+  width: 0;
+  height: 0;
   z-index: 40;
   pointer-events: none;
   will-change: transform, opacity;
@@ -97,84 +133,80 @@
   visibility: hidden;
 }
 
-/* Le corps se soulève autour du point de saisie (`transform-origin` posé à la saisie). */
-.copie-corps {
+.copie-porteur {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.copie-carte,
+.copie .copie-bloc {
+  position: absolute;
+  left: 0;
+  right: auto;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+/* Ombre plus profonde : l'objet est soulevé. Le bloc garde sa lueur intérieure (thème sombre). */
+.copie-carte > * {
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
-  color: var(--ink);
-  will-change: transform;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   box-shadow:
     0 18px 36px -10px rgb(0 0 0 / 0.38),
     0 4px 12px -2px rgb(0 0 0 / 0.2);
 }
 
-.copie-corps[data-forme='bloc'] {
-  padding: 3px 5px;
-  border-radius: 4px;
-  line-height: 1.2;
-  background: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--teinte) var(--bloc-a1), var(--bloc-fond)),
-    color-mix(in srgb, var(--teinte) var(--bloc-a2), var(--bloc-fond))
-  ),
-  var(--bg);
-  border-left: var(--bloc-trait) solid color-mix(in srgb, var(--teinte) var(--bloc-trait-teinte), var(--ink));
+.copie .copie-bloc {
+  background-color: var(--bg);
+  box-shadow:
+    inset 0 0 22px -10px color-mix(in srgb, var(--teinte) var(--bloc-lueur), transparent),
+    0 18px 36px -10px rgb(0 0 0 / 0.38),
+    0 4px 12px -2px rgb(0 0 0 / 0.2);
 }
 
-.copie-corps[data-forme='carte'] {
-  padding: 8px 12px 8px 10px;
-  border-radius: var(--rayon);
-  border-left: 5px solid var(--teinte);
-  background: var(--card);
-}
-
-.copie[data-sur-corbeille='true'] .copie-corps {
+.copie[data-sur-corbeille='true'] .copie-carte > *,
+.copie[data-sur-corbeille='true'] .copie-bloc,
+.copie[data-refus='true'] .copie-carte > *,
+.copie[data-refus='true'] .copie-bloc {
   outline: 2px solid var(--now);
   outline-offset: -2px;
 }
 
-.copie-corps b {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+/* Le texte garde l'encre sur fond (contraste AA) ; seul un anneau rouge signale le refus. */
+.copie[data-refus='true'] .copie-heure {
+  box-shadow:
+    0 0 0 2px var(--now),
+    var(--ombre);
 }
 
-.copie-corps small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-}
-
-.copie-corps[data-forme='bloc'] b {
+/* Plusieurs items glissés ensemble : leur nombre, en pastille au coin. */
+.copie-nombre {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: var(--now);
+  color: #fff;
+  font-weight: 700;
   font-size: var(--fs-2);
-  line-height: 15px;
+  line-height: 24px;
+  text-align: center;
 }
 
-.copie-corps[data-forme='bloc'] small {
-  font-size: var(--fs-1);
-  line-height: 13px;
-  color: inherit;
-  opacity: 0.82;
-}
-
-.copie-corps[data-forme='carte'] b {
-  font-size: var(--fs-3);
-}
-
-.copie-corps[data-forme='carte'] small {
-  font-size: var(--fs-2);
-}
-
-/* Étiquette d'heure accrochée à la copie : « mer. 4 · 14h30 → 15h30 ». */
+/* Étiquette d'heure accrochée à la copie : « mer. 4 · 14h30 → 15h30 ». Son bas est sur le doigt ; `transform`
+   la pose au-dessus de la copie. */
 .copie-heure {
   position: absolute;
   left: 0;
-  bottom: calc(100% + 10px);
+  bottom: 0;
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--ink);

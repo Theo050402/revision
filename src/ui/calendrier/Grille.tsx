@@ -67,6 +67,11 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
   const glisse = useGlisse((s) => s.source !== null)
   // Jour visé par le glisser : son en-tête passe en gras (la colonne, elle, lit son propre aperçu).
   const jourVise = useGlisse((s) => (s.survol?.type === 'colonne' ? s.survol.cible.jour : null))
+  const viseRefuse = useGlisse((s) => s.survol?.type === 'colonne' && s.apercu !== null && !s.apercu.ok)
+  // Surligneur du collège de l'item glissé : il teinte la colonne visée et souligne son en-tête. Posé sur ces seuls
+  // éléments (et non sur la grille, dont tout le sous-arbre recalculerait son style à la saisie).
+  const itemGlisse = useGlisse((s) => s.fantome?.itemId ?? null)
+  const teinteVisee = teinteDuCollege(itemGlisse, items, colleges)
   const redim = useRedim((s) => s.id !== null)
   const [trace, setTrace] = useState<Trace | null>(null)
 
@@ -124,7 +129,14 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
         {jours.map((j) => {
           const { nom, numero } = libelleJourCourt(j)
           return (
-            <div key={j} className="jour-tete" data-aujourdhui={j === aujourdhui} data-visee={j === jourVise || undefined}>
+            <div
+              key={j}
+              className="jour-tete"
+              data-aujourdhui={j === aujourdhui}
+              data-visee={j === jourVise || undefined}
+              data-refus={(j === jourVise && viseRefuse) || undefined}
+              style={j === jourVise && teinteVisee ? ({ '--teinte-visee': teinteVisee } as CSSProperties) : undefined}
+            >
               <span>{nom}</span>
               <b>{numero}</b>
             </div>
@@ -189,6 +201,13 @@ type ColonneProps = {
 
 const AUCUN_REDIM = { id: null, duree: 0 }
 
+/** Surligneur (`var(--cN)`) du collège d'un item, `undefined` s'il est inconnu. */
+function teinteDuCollege(itemId: string | null | undefined, items: Etat['items'], colleges: Etat['colleges']): string | undefined {
+  const collegeId = itemId ? items[itemId]?.collegeId : undefined
+  const couleur = collegeId ? colleges[collegeId]?.couleur : undefined
+  return couleur === undefined ? undefined : `var(--c${((couleur % 6) + 6) % 6})`
+}
+
 const ColonneJour = memo(function ColonneJour({
   indice,
   jour,
@@ -209,6 +228,7 @@ const ColonneJour = memo(function ColonneJour({
   // Aperçu du glisser en cours, réduit à ce jour : la colonne ne se redessine que si ce qui la concerne change.
   const cle = useGlisse((s) => cleColonne(s, jour))
   const { idSource, debuts, fantomes, refus, visee } = useMemo(() => apercuColonne(useGlisse.getState(), jour), [cle, jour])
+  const teinteVisee = visee ? teinteDuCollege(useGlisse.getState().fantome?.itemId, items, colleges) : undefined
   const redim = useRedim((s) => (s.id !== null && blocs.creneaux.some((c) => c.id === s.id) ? s : AUCUN_REDIM))
 
   const appuiVide = useAppuiVide(jour, { plage, pxHeure, pas }, onTapTrou, onTrace)
@@ -231,7 +251,7 @@ const ColonneJour = memo(function ColonneJour({
       data-visee={visee || undefined}
       onPointerDown={appuiVide}
     >
-      <Eclairage visee={visee} />
+      <Eclairage visee={visee} teinte={teinteVisee} />
       {avant > 0 && <div className="hors-bornes" style={{ top: 0, height: (avant * pxHeure) / 60 }} />}
       {apres > 0 && <div className="hors-bornes" style={{ bottom: 0, height: (apres * pxHeure) / 60 }} />}
 

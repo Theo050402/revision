@@ -51,15 +51,10 @@ export const BlocCreneau = memo(function BlocCreneau({
   source = false,
   onOuvrir,
 }: CreneauProps) {
-  const { numero, titre, meta } = etiquetteCreneau(creneau, item)
   const ref = useRef<HTMLDivElement>(null)
   useDecalage(ref, haut, decalage)
   const enVol = useVol((s) => s.caches.includes(creneau.id))
-  const deuxLignes = hauteur >= HAUTEUR_DEUX_LIGNES
-  const nonExporte = creneau.versionExportee !== creneau.version
-  const marques = (nonExporte ? 1 : 0) + (creneau.fait ? 1 : 0)
-  const place = hauteur - MARGES_VERTICALES - (deuxLignes ? HAUTEUR_LIGNE_META : 0)
-  const lignes = Math.max(1, Math.min(LIGNES_TITRE_MAX, Math.floor(place / HAUTEUR_LIGNE_TITRE)))
+  const { marques, lignes } = miseEnPageBloc(creneau, hauteur)
   const style = {
     top: haut,
     height: hauteur,
@@ -85,6 +80,31 @@ export const BlocCreneau = memo(function BlocCreneau({
       onKeyDown={onOuvrir && ((ev) => ouvrirAuClavier(ev, () => onOuvrir(creneau.id)))}
       onClick={onOuvrir && (() => onOuvrir(creneau.id))}
     >
+      <ContenuBloc creneau={creneau} item={item} hauteur={hauteur} />
+    </div>
+  )
+})
+
+/** Mise en page d'un bloc de créneau de `hauteur` px : deux lignes ou une, lignes de titre, marques. */
+export function miseEnPageBloc(creneau: Creneau, hauteur: number) {
+  const deuxLignes = hauteur >= HAUTEUR_DEUX_LIGNES
+  const nonExporte = creneau.versionExportee !== creneau.version
+  const marques = (nonExporte ? 1 : 0) + (creneau.fait ? 1 : 0)
+  const place = hauteur - MARGES_VERTICALES - (deuxLignes ? HAUTEUR_LIGNE_META : 0)
+  const lignes = Math.max(1, Math.min(LIGNES_TITRE_MAX, Math.floor(place / HAUTEUR_LIGNE_TITRE)))
+  return { deuxLignes, nonExporte, marques, lignes }
+}
+
+/**
+ * Contenu d'un bloc (titre, méta, marques), partagé avec la copie flottante du glisser : la copie a exactement la
+ * mise en page du bloc, rien ne se réarrange à la saisie ni à l'atterrissage. Le conteneur porte `--lignes` et
+ * `data-marques` (voir `miseEnPageBloc`).
+ */
+export function ContenuBloc({ creneau, item, hauteur }: { creneau: Creneau; item: Item | undefined; hauteur: number }) {
+  const { numero, titre, meta } = etiquetteCreneau(creneau, item)
+  const { deuxLignes, nonExporte, marques, lignes } = miseEnPageBloc(creneau, hauteur)
+  return (
+    <>
       <span className={lignes === 1 ? 'bloc-titre bloc-titre-une' : 'bloc-titre'}>
         <span className="bloc-numero">{numero}</span>
         <span className="bloc-nom">{titre.slice(numero.length)}</span>
@@ -100,9 +120,9 @@ export const BlocCreneau = memo(function BlocCreneau({
           )}
         </span>
       )}
-    </div>
+    </>
   )
-})
+}
 
 /**
  * Décalage de l'aperçu de cascade (spec §C.2) : les créneaux poussés glissent par ressort, interruptibles (une

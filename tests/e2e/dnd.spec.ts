@@ -362,13 +362,103 @@ test.describe('iPad : glisser fluide', () => {
       return { x: r.left, y: r.top, w: r.width, h: r.height }
     })
 
+  type Rect = { x: number; y: number; w: number; h: number }
+  const proche = (a: Rect, b: { x: number; y: number; width: number; height: number }, tol = 1) =>
+    Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol && Math.abs(a.w - b.width) <= tol && Math.abs(a.h - b.height) <= tol
+
+  /**
+   * Appui (pointerdown) au point `de`, puis rectangle de la couche `couche` de la copie à la première image où elle
+   * est visible (saisie de l'appui long) : elle doit recouvrir exactement l'objet saisi.
+   */
+  const premiereImage = (page: Page, de: Point, couche: string) =>
+    page.evaluate(
+      ({ x, y, couche }) =>
+        new Promise<Rect | null>((fini) => {
+          const sous = document.elementFromPoint(x, y) ?? document.body
+          sous.dispatchEvent(
+            new PointerEvent('pointerdown', {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              pointerId: 7,
+              pointerType: 'touch',
+              isPrimary: true,
+              button: 0,
+              buttons: 1,
+            }),
+          )
+          const debut = performance.now()
+          const image = () => {
+            const boite = document.querySelector<HTMLElement>('[data-copie]')
+            const el = boite?.querySelector<HTMLElement>(couche)
+            if (boite?.dataset.visible === 'true' && el) {
+              const r = el.getBoundingClientRect()
+              return fini({ x: r.left, y: r.top, w: r.width, h: r.height })
+            }
+            if (performance.now() - debut > 2000) return fini(null)
+            requestAnimationFrame(image)
+          }
+          requestAnimationFrame(image)
+        }),
+      { x: de.x, y: de.y, couche },
+    )
+
+  /** Lâche en `p` et relève, image par image, la copie, sa couche `couche` et l'élément `cible`, jusqu'à disparition. */
+  type Image = { phase: string; visible: boolean; copie: number; couche: Rect; cible: number | null; rectCible: Rect | null }
+  const lacherEtSuivre = (page: Page, p: Point, couche: string, cible: string) =>
+    page.evaluate(
+      ({ x, y, couche, cible }) =>
+        new Promise<Image[]>((fini) => {
+          const sous = document.elementFromPoint(x, y) ?? document.body
+          sous.dispatchEvent(
+            new PointerEvent('pointerup', {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              pointerId: 7,
+              pointerType: 'touch',
+              isPrimary: true,
+              button: 0,
+              buttons: 0,
+            }),
+          )
+          const vu: Image[] = []
+          const debut = performance.now()
+          const image = () => {
+            const boite = document.querySelector<HTMLElement>('[data-copie]')!
+            const el = boite.querySelector<HTMLElement>(couche)
+            const c = document.querySelector<HTMLElement>(cible)
+            const r = el?.getBoundingClientRect()
+            const rc = c?.getBoundingClientRect()
+            const visible = boite.dataset.visible === 'true'
+            vu.push({
+              phase: boite.dataset.phase ?? '',
+              visible,
+              copie: visible && el ? Number(getComputedStyle(boite).opacity) * Number(getComputedStyle(el).opacity) : 0,
+              couche: r ? { x: r.left, y: r.top, w: r.width, h: r.height } : { x: 0, y: 0, w: 0, h: 0 },
+              cible: c ? Number(getComputedStyle(c).opacity) : null,
+              rectCible: rc ? { x: rc.left, y: rc.top, w: rc.width, h: rc.height } : null,
+            })
+            if (!visible || performance.now() - debut > 3000) return fini(vu)
+            requestAnimationFrame(image)
+          }
+          image()
+        }),
+      { x: p.x, y: p.y, couche, cible },
+    )
+
   test('copie continue : elle glisse librement d’un jour à l’autre, collée au doigt', async ({ page }) => {
     await ouvrir(page, { creneaux: [LUNDI_15H] })
     const b = (await bloc(page, 'cr-l').boundingBox())!
     const de = { x: b.x + b.width / 2, y: b.y + 10 }
     const vers = await pointGrille(page, MERCREDI, 15, 0, 10)
-    await saisir(page, de, de, 1)
-    await expect(copie(page)).toHaveAttribute('data-visible', 'true')
+    // Saisie : la copie recouvre exactement le bloc (même place, même taille), sans saut.
+    const leve = await premiereImage(page, de, '.copie-bloc')
+    expect(leve).not.toBeNull()
+    expect(proche(leve!, b)).toBe(true)
+    await page.waitForTimeout(400) // soulèvement et frémissement terminés
     const gauches = await page.locator('.colonne').evaluateAll((cs) => cs.map((c) => c.getBoundingClientRect().left))
 
     const ecarts: number[] = []
@@ -377,7 +467,7 @@ test.describe('iPad : glisser fluide', () => {
       const p = { x: de.x + ((vers.x - de.x) * i) / 12, y: de.y }
       await pointeur(page, 'pointermove', p)
       await images(page)
-      const c = await rect(page, '[data-copie]')
+      const c = await rect(page, '[data-copie] .copie-bloc')
       expect(Number(await copie(page).evaluate((el) => getComputedStyle(el).opacity))).toBeGreaterThan(0.5)
       ecarts.push(c.x - p.x)
       // Position entre deux colonnes : loin du bord gauche de toute colonne (un bloc magnétisé y serait calé).
@@ -386,8 +476,6 @@ test.describe('iPad : glisser fluide', () => {
     expect(libres.length).toBeGreaterThan(0)
     // 1:1 : l'écart entre le doigt et la copie ne change jamais (aucun saut, aucun recentrage).
     for (const e of ecarts) expect(Math.abs(e - ecarts[0])).toBeLessThan(0.5)
-    // Le point de saisie est respecté : la copie part du bord du bloc saisi.
-    expect(Math.abs(ecarts[0] - (b.x - de.x))).toBeLessThan(1)
     await lacher(page, vers)
     await expect(bloc(page, 'cr-l')).toHaveAttribute('data-debut', `${MERCREDI}T15:00`)
   })
@@ -458,44 +546,79 @@ test.describe('iPad : glisser fluide', () => {
     await saisir(page, origine, vers)
     await expect(page.locator('[data-atterrissage][data-refus="true"]')).toHaveCount(1)
 
-    // Lâcher puis suivre la copie image par image jusqu'à ce qu'elle disparaisse.
-    const trace = await page.evaluate(
-      ({ x, y }) =>
-        new Promise<{ x: number; y: number }[]>((fini) => {
-          const sous = document.elementFromPoint(x, y) ?? document.body
-          sous.dispatchEvent(
-            new PointerEvent('pointerup', {
-              bubbles: true,
-              cancelable: true,
-              clientX: x,
-              clientY: y,
-              pointerId: 7,
-              pointerType: 'touch',
-              isPrimary: true,
-              button: 0,
-              buttons: 0,
-            }),
-          )
-          const vu: { x: number; y: number }[] = []
-          const debut = performance.now()
-          const image = () => {
-            const el = document.querySelector<HTMLElement>('[data-copie]')
-            if (!el || el.dataset.visible !== 'true' || performance.now() - debut > 3000) return fini(vu)
-            const r = el.getBoundingClientRect()
-            vu.push({ x: r.left, y: r.top })
-            requestAnimationFrame(image)
-          }
-          image()
-        }),
-      vers,
-    )
+    // Lâcher puis suivre la copie (sa forme de carte) image par image jusqu'à ce qu'elle disparaisse.
+    const trace = (await lacherEtSuivre(page, vers, '.copie-carte', '#__aucun')).filter((i) => i.visible)
     expect(trace.length).toBeGreaterThan(3) // animée, et non effacée sur place
-    const loin = (p: Point) => Math.hypot(p.x - boite.x, p.y - boite.y)
-    expect(loin(trace[0])).toBeGreaterThan(100)
-    expect(loin(trace[trace.length - 1])).toBeLessThan(2)
+    const loin = (p: Rect) => Math.hypot(p.x - boite.x, p.y - boite.y)
+    expect(loin(trace[0].couche)).toBeGreaterThan(100)
+    // Elle reprend la forme et la place exactes de la carte, puis s'efface par-dessus.
+    const arrivee = trace.find((i) => i.phase === 'relais')
+    expect(arrivee).toBeDefined()
+    expect(proche(arrivee!.couche, boite)).toBe(true)
+    expect(loin(trace[trace.length - 1].couche)).toBeLessThan(2)
     await expect(copie(page)).toHaveAttribute('data-visible', 'false')
     await expect(page.locator('.bloc-creneau[data-creneau]')).toHaveCount(avant)
     await expect(page.getByRole('button', { name: 'Annuler' })).toBeDisabled()
+  })
+
+  test('saisie d’une carte sur sa moitié droite : la copie apparaît sur la carte, sans saut, et suit le doigt 1:1', async ({ page }) => {
+    await ouvrir(page)
+    const c = carte(page, 'c1:296')
+    await c.scrollIntoViewIfNeeded()
+    await images(page)
+    const boite = (await c.boundingBox())!
+    const de = { x: boite.x + boite.width * 0.8, y: boite.y + boite.height / 2 }
+    const leve = await premiereImage(page, de, '.copie-carte')
+    expect(leve).not.toBeNull()
+    expect(proche(leve!, boite)).toBe(true)
+    await page.waitForTimeout(400) // soulèvement et frémissement terminés
+    // Le doigt reste au-dessus de la bibliothèque : la copie garde sa forme de carte et l'écart au doigt.
+    const ecarts: { x: number; y: number }[] = []
+    for (let i = 1; i <= 6; i++) {
+      const p = { x: de.x - 10 * i, y: de.y + 12 * i }
+      await pointeur(page, 'pointermove', p)
+      await images(page)
+      const r = await rect(page, '[data-copie] .copie-carte')
+      ecarts.push({ x: r.x - p.x, y: r.y - p.y })
+    }
+    for (const e of ecarts) {
+      expect(Math.abs(e.x - ecarts[0].x)).toBeLessThan(0.5)
+      expect(Math.abs(e.y - ecarts[0].y)).toBeLessThan(0.5)
+    }
+    await page.keyboard.press('Escape')
+    await lacher(page, de)
+  })
+
+  test('atterrissage d’une carte : la copie prend la forme exacte de l’emplacement, puis cède la place au créneau', async ({ page }) => {
+    await ouvrir(page)
+    const vers = await pointGrille(page, SAMEDI, 15)
+    await saisir(page, await centre(carte(page, 'c1:296')), vers)
+    // L'emplacement posé par son ressort : son rectangle est la cible.
+    let emplacement: Rect = { x: 0, y: 0, w: 0, h: 0 }
+    await expect
+      .poll(async () => {
+        const a = await rect(page, '[data-atterrissage]')
+        const stable = proche(a, { x: emplacement.x, y: emplacement.y, width: emplacement.w, height: emplacement.h }, 0.01)
+        emplacement = a
+        return stable
+      })
+      .toBe(true)
+    const posee = `.colonne[data-jour="${SAMEDI}"] .bloc-creneau[data-creneau]`
+    const trace = await lacherEtSuivre(page, vers, '.copie-bloc', posee)
+    // À l'arrivée (début du relais), la copie a exactement le rectangle de l'emplacement.
+    const arrivee = trace.find((i) => i.phase === 'relais')
+    expect(arrivee).toBeDefined()
+    const cible = { x: emplacement.x, y: emplacement.y, width: emplacement.w, height: emplacement.h }
+    expect(proche(arrivee!.couche, cible)).toBe(true)
+    // Le créneau posé est exactement là.
+    expect(proche(arrivee!.rectCible!, cible)).toBe(true)
+    // Aucune image où ni la copie ni le créneau ne se voient ; le créneau est plein avant que la copie ne s'efface.
+    for (const i of trace) expect(Math.max(i.copie, i.cible ?? 0)).toBeGreaterThanOrEqual(0.3)
+    const relais = trace.filter((i) => i.phase === 'relais')
+    expect(relais.length).toBeGreaterThan(1) // fondu enchaîné, pas une disparition sèche
+    for (const i of relais) expect(i.cible).toBe(1)
+    await expect(copie(page)).toHaveAttribute('data-visible', 'false')
+    await expect(page.locator(posee)).toHaveCSS('opacity', '1')
   })
 
   test('origine atténuée : le bloc saisi reste en place à 35 %', async ({ page }) => {
