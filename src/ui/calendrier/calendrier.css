@@ -43,7 +43,7 @@
   font-size: var(--fs-3);
   font-weight: 700;
   cursor: pointer;
-  transition: background-color 120ms ease;
+  transition: background-color 120ms ease, transform 100ms ease-out;
 }
 
 .btn-aujourdhui[data-actif='true'] {
@@ -68,14 +68,77 @@
   color: var(--ink);
 }
 
+/* Zone sous la barre : la vue qui défile, et par-dessus la bande lumineuse des bords (glisser contre un bord). */
+.calendrier-vue {
+  --largeur-heures: 44px;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .calendrier-defilement {
   flex: 1;
   min-height: 0;
+  /* La piste glisse de côté pendant un balayage : ce qui déborde ne crée pas de défilement horizontal. */
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Défilement vertical par le navigateur ; le balayage horizontal change de période (Calendrier.tsx). */
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Contenu de la vue : c'est lui qui suit le doigt pendant un balayage de semaine (Calendrier.tsx). Au repos, aucun
+   `transform` n'est posé. */
+.calendrier-piste {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendrier-piste > .grille {
+  flex: none;
+}
+
+.calendrier-piste > .mois-vue {
+  flex: 1;
+}
+
+/* Bande lumineuse du bord tenu pendant un glisser : elle se remplit en 600 ms, le temps d'attendre avant de changer
+   de période (opacité et échelle seulement). Mouvement réduit : bande fixe, déjà pleine. */
+.bord-halo {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 8;
+  width: 32px;
+  pointer-events: none;
+  animation: bord-remplit 600ms linear both;
+}
+
+.bord-halo[data-bord-halo='gauche'] {
+  left: var(--largeur-heures);
+  transform-origin: left center;
+  background: linear-gradient(to right, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+}
+
+.bord-halo[data-bord-halo='droite'] {
+  right: 0;
+  transform-origin: right center;
+  background: linear-gradient(to left, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+}
+
+@keyframes bord-remplit {
+  from {
+    transform: scaleX(0);
+    opacity: 0.3;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
 }
 
 /* ---------- Grille semaine / jour ---------- */

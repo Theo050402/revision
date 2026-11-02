@@ -709,6 +709,30 @@ test.describe('iPad : bords de la grille', () => {
     await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', '2026-10-26T14:00')
   })
 
+  test('une bande lumineuse se remplit pendant les 600 ms contre le bord, et disparaît en le quittant', async ({ page }) => {
+    await ouvrir(page)
+    const b = (await bloc(page, 'cr-a').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    const d = await defil(page)
+    const y = (await pointGrille(page, MARDI, 14, 0, 10)).y
+    const halo = page.locator('[data-bord-halo]')
+    await expect(halo).toHaveCount(0)
+    await saisir(page, de, { x: d.droite - 8, y })
+    await expect(halo).toHaveCount(1)
+    await expect(halo).toHaveAttribute('data-bord-halo', 'droite')
+    // Remplissage : l'échelle croît de 0 vers 1 (transform et opacité seulement), sans toucher à la mise en page.
+    const echelles: number[] = []
+    for (let i = 0; i < 4; i++) {
+      echelles.push(await halo.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a))
+      await page.waitForTimeout(90)
+    }
+    expect(echelles[0]).toBeLessThan(0.9)
+    expect(echelles[echelles.length - 1]).toBeGreaterThan(echelles[0])
+    await deplacer(page, { x: d.droite - 8, y }, de)
+    await expect(halo).toHaveCount(0)
+    await lacher(page, de)
+  })
+
   test('moins de 600 ms contre le bord : la semaine ne change pas', async ({ page }) => {
     await ouvrir(page)
     const avant = await periode(page).textContent()

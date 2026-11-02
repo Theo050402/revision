@@ -4,6 +4,7 @@ import './ui/theme/fonts'
 import './ui/theme/tokens.css'
 import { enregistrerServiceWorker } from './pwa/enregistrer'
 import { App } from './ui/App'
+import { installerAppui } from './ui/mouvement/appui'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -11,4 +12,5 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
+installerAppui()
 enregistrerServiceWorker()

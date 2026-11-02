@@ -13,7 +13,11 @@
     margin: 0;
     border-radius: 18px;
     padding-bottom: 0;
-    animation: apparaitre 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* Popover : rien ne dépasse sous l'écran, pas de prolongement. */
+  .feuille.feuille-etroite::after {
+    display: none;
   }
 
   .feuille.feuille-etroite .feuille-poignee {
@@ -22,13 +26,6 @@
 
   .feuille.feuille-etroite .feuille-entete {
     padding-top: 8px;
-  }
-}
-
-@keyframes apparaitre {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
   }
 }
 
@@ -116,7 +113,7 @@
   font-weight: 700;
   font-size: var(--fs-4);
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color 150ms ease, color 150ms ease, transform 100ms ease-out;
 }
 
 .btn-fait[aria-pressed='true'] {

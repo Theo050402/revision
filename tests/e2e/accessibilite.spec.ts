@@ -1,6 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { MAINTENANT, semer } from './graine-calendrier'
-import { centre, deplacer, pointGrille, saisir } from './gestes'
+import { centre, deplacer, images, pointGrille, pointeur, saisir } from './gestes'
 
 // Contrôles d'accessibilité (tâche 21, spec §13.5, contraintes globales) : cibles tactiles ≥ 44 px, focus visible,
 // `prefers-reduced-motion`. Données : celles du calendrier (semaine du 2 au 8 nov. 2026).
@@ -34,6 +34,8 @@ const EXCEPTIONS_44PX = '.bloc-creneau, .bloc-indispo, .poignee-redim'
  */
 async function mesurer(page: Page, dans?: string): Promise<Mesure[]> {
   // Les apparitions (feuille qui monte, fondu) sont terminées : une feuille à demi réduite paraîtrait trop petite.
+  // Celles des feuilles passent par un ressort en JavaScript : `data-anime` les signale jusqu'à leur repos.
+  await page.waitForFunction(() => document.querySelector('[data-anime]') === null)
   await page.evaluate(() =>
     Promise.all(
       document
@@ -223,6 +225,68 @@ test.describe('mouvement réduit', () => {
 
     // iPad : le bloc 300, poussé par 291, change d'écart d'un coup, sans transition ni ressort : une seule valeur.
     expect(await decalagesVers1415(page)).toEqual(['translateY(36px)'])
+  })
+
+  test('appui, feuille et balayage : ni échelle, ni ressort, ni glissement ; des fondus de 150 ms', async ({ page }, info) => {
+    await ouvrir(page)
+    // Appui : le fond se fonce, sans changer d'échelle.
+    const bouton = page.getByRole('button', { name: "Aujourd'hui" })
+    const avant = await bouton.evaluate((el) => getComputedStyle(el).boxShadow)
+    await pointeur(page, 'pointerdown', await centre(bouton))
+    await expect.poll(() => bouton.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe(avant)
+    expect(await bouton.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', bubbles: true })))
+
+    // Feuille : jamais de transformation, seulement l'opacité, de 0 à 1 en ~150 ms.
+    await page.evaluate(() => {
+      const w = window as unknown as { __ech: { t: string; o: number }[]; __stop: boolean }
+      w.__ech = []
+      w.__stop = false
+      const tour = () => {
+        const el = document.querySelector('.feuille')
+        if (el) {
+          const s = getComputedStyle(el)
+          w.__ech.push({ t: s.transform, o: Number(s.opacity) })
+        }
+        if (!w.__stop) requestAnimationFrame(tour)
+      }
+      tour()
+    })
+    if (iphone(info)) await page.getByRole('button', { name: 'Items', exact: true }).click()
+    else await page.locator('[data-creneau="cr-c"]').click()
+    const feuille = page.getByRole('dialog')
+    await expect(feuille).toBeVisible()
+    await expect(page.locator('[data-anime]')).toHaveCount(0)
+    await expect(feuille).toHaveCSS('opacity', '1')
+    const vus = await page.evaluate(() => {
+      const w = window as unknown as { __ech: { t: string; o: number }[]; __stop: boolean }
+      w.__stop = true
+      return w.__ech
+    })
+    expect(vus.length).toBeGreaterThan(2)
+    for (const v of vus) expect(v.t).toBe('none')
+    expect(vus.some((v) => v.o > 0 && v.o < 1)).toBe(true)
+    expect(vus[vus.length - 1].o).toBe(1)
+    expect(await feuille.evaluate((el) => el.getAnimations().length)).toBe(0)
+    // Fermée : un fondu, puis plus rien.
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    // Balayage : la grille ne suit pas le doigt (pas de glissement) ; la période change, en fondu.
+    const zone = (await page.locator('.calendrier-defilement').boundingBox())!
+    const periode = page.locator('.calendrier-periode')
+    const avantPeriode = await periode.textContent()
+    const y = zone.y + 280
+    const x0 = zone.x + zone.width * 0.8
+    await pointeur(page, 'pointerdown', { x: x0, y })
+    await pointeur(page, 'pointermove', { x: x0 - 30, y })
+    await pointeur(page, 'pointermove', { x: x0 - zone.width * 0.4, y })
+    await images(page)
+    expect(await page.locator('.calendrier-piste').evaluate((el) => getComputedStyle(el).transform)).toBe('none')
+    await page.waitForTimeout(200)
+    await pointeur(page, 'pointerup', { x: x0 - zone.width * 0.4, y })
+    await expect(periode).not.toHaveText(avantPeriode ?? '')
+    expect(await page.locator('.calendrier-piste').evaluate((el) => getComputedStyle(el).transform)).toBe('none')
   })
 
   test('sans le réglage, ce même bloc glisse par ressort (la vérification n\'est pas vide)', async ({ page }, info) => {

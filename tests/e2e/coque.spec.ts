@@ -1,4 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
+import { MAINTENANT, semer } from './graine-calendrier'
+import { centre, images, pointeur } from './gestes'
 
 const estIpad = (nom: string) => nom === 'ipad'
 const racine = (page: Page) => page.locator('html')
@@ -145,4 +147,239 @@ test('une erreur d\'écriture reste affichée dans un bandeau', async ({ page })
   // Persistant : toujours là bien après la durée d'un toast.
   await page.waitForTimeout(5500)
   await expect(bandeau).toBeVisible()
+})
+
+// ---------- Détails natifs (tâche 9, spec §C.6) : appui, feuilles, balayage de semaine ----------
+
+async function ouvrirSemee(page: Page) {
+  await page.clock.setFixedTime(MAINTENANT)
+  await page.goto('./')
+  await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible()
+  await semer(page)
+  await expect(page.locator('.bloc-creneau').first()).toBeAttached()
+}
+
+/** Échelle horizontale (a) et décalages (e, f) du `transform` calculé d'un élément. */
+const matrice = (l: Locator) =>
+  l.evaluate((el) => {
+    const m = new DOMMatrix(getComputedStyle(el).transform)
+    return { a: m.a, e: m.e, f: m.f }
+  })
+
+type Echantillon = { transform: string; opacite: number }
+/** Relève, à chaque image, le `transform` et l'opacité du premier élément qui correspond (jusqu'à `echantillons`). */
+async function echantillonner(page: Page, selecteur: string): Promise<void> {
+  await page.evaluate((sel) => {
+    const w = window as unknown as { __ech: Echantillon[]; __stop: boolean }
+    w.__ech = []
+    w.__stop = false
+    const tour = () => {
+      const el = document.querySelector(sel)
+      if (el) {
+        const s = getComputedStyle(el)
+        w.__ech.push({ transform: s.transform, opacite: Number(s.opacity) })
+      }
+      if (!w.__stop) requestAnimationFrame(tour)
+    }
+    tour()
+  }, selecteur)
+}
+async function echantillons(page: Page): Promise<Echantillon[]> {
+  return page.evaluate(() => {
+    const w = window as unknown as { __ech: Echantillon[]; __stop: boolean }
+    w.__stop = true
+    return w.__ech
+  })
+}
+/** Lit un `transform` calculé (`none`, `matrix(...)` ou `matrix3d(...)`). */
+function lire(t: string): { a: number; e: number; f: number } {
+  if (t === 'none') return { a: 1, e: 0, f: 0 }
+  const n = t.slice(t.indexOf('(') + 1, -1).split(',').map(Number)
+  return t.startsWith('matrix3d') ? { a: n[0], e: n[12], f: n[13] } : { a: n[0], e: n[4], f: n[5] }
+}
+const echelle = (t: string) => lire(t).a
+const decalage = (t: string, axe: 'e' | 'f') => lire(t)[axe]
+
+test("appui : un bouton pressé est réduit avant le relâchement, un bloc ou une carte s'assombrit sans changer d'échelle", async ({ page }, info) => {
+  await ouvrirSemee(page)
+  const bouton = page.getByRole('button', { name: "Aujourd'hui" })
+  expect((await matrice(bouton)).a).toBe(1)
+  // Souris : l'appui du pointeur.
+  const c = await centre(bouton)
+  await page.mouse.move(c.x, c.y)
+  await page.mouse.down()
+  await expect.poll(async () => (await matrice(bouton)).a, { timeout: 1000 }).toBeLessThan(1)
+  expect((await matrice(bouton)).a).toBeGreaterThan(0.9)
+  await page.mouse.up()
+  await expect.poll(async () => (await matrice(bouton)).a, { timeout: 1000 }).toBe(1)
+
+  // Doigt : un `pointerdown` tactile maintenu suffit (pas de `:active`), et l'annulation du navigateur relâche.
+  const segment = page.getByRole('button', { name: 'Mois', exact: true })
+  const s = await centre(segment)
+  await pointeur(page, 'pointerdown', s)
+  await expect.poll(async () => (await matrice(segment)).a, { timeout: 1000 }).toBeLessThan(1)
+  await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', bubbles: true })))
+  await expect.poll(async () => (await matrice(segment)).a, { timeout: 1000 }).toBe(1)
+
+  // Un bloc de la grille se fonce au lieu de rétrécir (il se glisse).
+  const bloc = page.locator('[data-creneau="cr-c"]')
+  const avant = await bloc.evaluate((el) => getComputedStyle(el).boxShadow)
+  const b = await centre(bloc)
+  await pointeur(page, 'pointerdown', b)
+  await expect.poll(() => bloc.evaluate((el) => getComputedStyle(el).boxShadow), { timeout: 1000 }).not.toBe(avant)
+  expect((await matrice(bloc)).a).toBe(1)
+  await pointeur(page, 'pointerup', b)
+  await expect.poll(() => bloc.evaluate((el) => getComputedStyle(el).boxShadow), { timeout: 1000 }).toBe(avant)
+
+  if (info.project.name === 'ipad') {
+    // Une carte de la bibliothèque, glissable elle aussi, se fonce sans rétrécir.
+    const carte = page.locator('#panneau-bibliotheque section[aria-label="Tous les items"] .carte-corps').first()
+    const k = await centre(carte)
+    await pointeur(page, 'pointerdown', k)
+    await expect.poll(() => carte.evaluate((el) => getComputedStyle(el).boxShadow), { timeout: 1000 }).not.toBe('none')
+    expect((await matrice(carte)).a).toBe(1)
+    await pointeur(page, 'pointerup', k)
+  }
+})
+
+test('feuille : entrée par ressort, tirée vers le bas pour fermer (iPhone) ou popover qui grandit depuis son bouton (iPad)', async ({ page }, info) => {
+  await ouvrirSemee(page)
+  await echantillonner(page, '.feuille')
+
+  if (estIpad(info.project.name)) {
+    const declencheur = page.locator('[data-creneau="cr-c"]')
+    const o = await centre(declencheur)
+    await declencheur.click()
+    const feuille = page.getByRole('dialog')
+    await expect(feuille).toBeVisible()
+    await expect(page.locator('[data-anime]')).toHaveCount(0)
+    // Elle est née plus petite et transparente, puis a atteint sa taille.
+    const vus = await echantillons(page)
+    expect(Math.min(...vus.map((v) => echelle(v.transform)))).toBeLessThan(0.95)
+    expect(Math.min(...vus.map((v) => v.opacite))).toBeLessThan(0.9)
+    expect(echelle(await feuille.evaluate((el) => getComputedStyle(el).transform))).toBeCloseTo(1, 3)
+    // Elle grandit depuis le bloc qui l'a ouverte : `transform-origin` en est le centre (coordonnées de la feuille).
+    const boite = (await feuille.boundingBox())!
+    const origine = await feuille.evaluate((el) => getComputedStyle(el).transformOrigin.split(' ').map(parseFloat))
+    expect(origine[0]).toBeCloseTo(o.x - boite.x, 0)
+    expect(origine[1]).toBeCloseTo(o.y - boite.y, 0)
+    // Elle y retourne : en se fermant elle passe par des tailles intermédiaires.
+    await echantillonner(page, '.feuille')
+    await page.keyboard.press('Escape')
+    await expect(feuille).toHaveCount(0)
+    const retour = await echantillons(page)
+    expect(Math.min(...retour.map((v) => echelle(v.transform)))).toBeLessThan(0.97)
+    return
+  }
+
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  const feuille = page.getByRole('dialog', { name: 'Items' })
+  await expect(feuille).toBeVisible()
+  await expect(page.locator('[data-anime]')).toHaveCount(0)
+  const hauteur = (await feuille.boundingBox())!.height
+  // Entrée par le bas : d'abord décalée de presque toute sa hauteur, puis posée.
+  const vus = await echantillons(page)
+  expect(Math.max(...vus.map((v) => decalage(v.transform, 'f')))).toBeGreaterThan(hauteur * 0.5)
+  expect((await matrice(feuille)).f).toBeCloseTo(0, 1)
+
+  const prise = await centre(feuille.locator('.feuille-entete h2'), false)
+  const fermee = () => expect(page.getByRole('dialog')).toHaveCount(0)
+
+  // Tirée de 20 % seulement, lentement : elle suit le doigt 1:1 puis revient par ressort.
+  await pointeur(page, 'pointerdown', prise)
+  await page.waitForTimeout(150)
+  await pointeur(page, 'pointermove', { x: prise.x, y: prise.y + 40 })
+  await page.waitForTimeout(150)
+  await pointeur(page, 'pointermove', { x: prise.x, y: prise.y + hauteur * 0.2 })
+  await images(page)
+  expect((await matrice(feuille)).f).toBeCloseTo(hauteur * 0.2, 0)
+  // Au-dessus du point de départ, la feuille résiste (élastique) : elle bouge, mais moins que le doigt.
+  await pointeur(page, 'pointermove', { x: prise.x, y: prise.y - 80 })
+  await images(page)
+  const haut = (await matrice(feuille)).f
+  expect(haut).toBeLessThan(0)
+  expect(haut).toBeGreaterThan(-80)
+  await page.waitForTimeout(150)
+  await pointeur(page, 'pointermove', { x: prise.x, y: prise.y + hauteur * 0.2 })
+  await page.waitForTimeout(200)
+  await pointeur(page, 'pointerup', { x: prise.x, y: prise.y + hauteur * 0.2 })
+  await expect.poll(async () => (await matrice(feuille)).f, { timeout: 2000 }).toBeCloseTo(0, 1)
+  await expect(feuille).toBeVisible()
+
+  // Tirée de plus de 30 % de sa hauteur : elle se ferme.
+  await pointeur(page, 'pointerdown', prise)
+  await page.waitForTimeout(120)
+  await pointeur(page, 'pointermove', { x: prise.x, y: prise.y + hauteur * 0.2 })
+  await page.waitForTimeout(120)
+  await pointeur(page, 'pointermove', { x: prise.x, y: prise.y + hauteur * 0.35 })
+  await page.waitForTimeout(200)
+  await pointeur(page, 'pointerup', { x: prise.x, y: prise.y + hauteur * 0.35 })
+  await fermee()
+  await expect(page.getByRole('button', { name: 'Items', exact: true })).toBeFocused()
+
+  // Un coup rapide, même court, la ferme aussi (projection de la vitesse).
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  await expect(feuille).toBeVisible()
+  await expect(page.locator('[data-anime]')).toHaveCount(0)
+  // Cadencé dans la page (16 ms entre deux points) : 120 px en ~50 ms, soit ~2 400 px/s, bien en deçà de 30 % de la feuille.
+  await page.evaluate(async ({ x, y }) => {
+    const cible = document.elementFromPoint(x, y)!
+    const evt = (type: string, dy: number) =>
+      cible.dispatchEvent(
+        new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y + dy, pointerId: 7, pointerType: 'touch', isPrimary: true, buttons: type === 'pointerup' ? 0 : 1 }),
+      )
+    const pause = () => new Promise((r) => setTimeout(r, 16))
+    evt('pointerdown', 0)
+    for (const dy of [40, 80, 120]) {
+      await pause()
+      evt('pointermove', dy)
+    }
+    evt('pointerup', 120)
+  }, prise)
+  expect(120).toBeLessThan(hauteur * 0.3)
+  await fermee()
+
+  // Un simple appui sur « Fermer » (dans la zone de prise) reste un appui : il ferme.
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  await expect(feuille).toBeVisible()
+  await page.getByRole('button', { name: 'Fermer' }).click()
+  await fermee()
+})
+
+test('balayage de semaine : la grille suit le doigt puis se pose par ressort', async ({ page }) => {
+  await ouvrirSemee(page)
+  const zone = (await page.locator('.calendrier-defilement').boundingBox())!
+  const periode = page.locator('.calendrier-periode')
+  const avant = await periode.textContent()
+  const piste = page.locator('.calendrier-piste')
+  const y = zone.y + 280
+  const x0 = zone.x + zone.width * 0.8
+
+  // Trop court et lent : la grille suit le doigt (positions intermédiaires), puis revient.
+  await pointeur(page, 'pointerdown', { x: x0, y })
+  await pointeur(page, 'pointermove', { x: x0 - 20, y })
+  await pointeur(page, 'pointermove', { x: x0 - zone.width * 0.1, y })
+  await images(page)
+  expect((await matrice(piste)).e).toBeCloseTo(-zone.width * 0.1, 0)
+  await page.waitForTimeout(200)
+  await pointeur(page, 'pointerup', { x: x0 - zone.width * 0.1, y })
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 2000 }).toBeCloseTo(0, 0)
+  await expect(periode).toHaveText(avant ?? '')
+
+  // Plus de 25 % de la largeur : la semaine sort, la suivante entre par la droite et se pose.
+  await pointeur(page, 'pointerdown', { x: x0, y })
+  await pointeur(page, 'pointermove', { x: x0 - 30, y })
+  await pointeur(page, 'pointermove', { x: x0 - zone.width * 0.4, y })
+  await images(page)
+  expect((await matrice(piste)).e).toBeCloseTo(-zone.width * 0.4, 0)
+  await page.waitForTimeout(200)
+  await echantillonner(page, '.calendrier-piste')
+  await pointeur(page, 'pointerup', { x: x0 - zone.width * 0.4, y })
+  await expect(periode).not.toHaveText(avant ?? '')
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 2000 }).toBeCloseTo(0, 0)
+  const vus = (await echantillons(page)).map((v) => decalage(v.transform, 'e'))
+  // Elle est sortie à gauche (au-delà du doigt), puis la nouvelle est entrée par la droite.
+  expect(Math.min(...vus)).toBeLessThan(-zone.width * 0.6)
+  expect(Math.max(...vus)).toBeGreaterThan(zone.width * 0.3)
+  expect(vus.filter((e) => e > 1 && e < zone.width * 0.9).length).toBeGreaterThan(2)
 })

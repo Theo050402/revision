@@ -107,7 +107,7 @@
   color: var(--ink);
   font-size: var(--fs-2);
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease, transform 100ms ease-out;
 }
 
 /* Zone d'appui de 46 px de haut autour d'une pastille de 32 px. */

@@ -101,3 +101,31 @@ describe('creerMaintienBord', () => {
     expect(f).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('creerMaintienBord : signal pour la bande lumineuse', () => {
+  it('signale le départ du décompte contre un bord, son redémarrage après le changement, et son arrêt', () => {
+    const cotes: number[] = []
+    const m = creerMaintienBord(() => {}, 600, (c) => cotes.push(c))
+    m.maj(0, 0)
+    expect(cotes).toEqual([])
+    m.maj(1, 100)
+    expect(cotes).toEqual([1])
+    m.maj(1, 400)
+    expect(cotes).toEqual([1]) // en cours : rien de nouveau
+    m.maj(1, 700) // 600 ms tenues : changement, le décompte suivant repart
+    expect(cotes).toEqual([1, 1])
+    m.maj(0, 800) // le doigt quitte la bande
+    expect(cotes).toEqual([1, 1, 0])
+  })
+
+  it('passer d\'un bord à l\'autre relance le décompte, arreter l\'éteint (une fois)', () => {
+    const cotes: number[] = []
+    const m = creerMaintienBord(() => {}, 600, (c) => cotes.push(c))
+    m.maj(-1, 0)
+    m.maj(1, 100)
+    expect(cotes).toEqual([-1, 1])
+    m.arreter()
+    m.arreter()
+    expect(cotes).toEqual([-1, 1, 0])
+  })
+})

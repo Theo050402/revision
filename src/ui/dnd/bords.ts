@@ -40,8 +40,15 @@ export type MaintienBord = {
 /**
  * Le doigt reste contre un bord : après `delai` ms, `onChange(sens)` ; il faut ensuite `delai` ms de plus pour le
  * changement suivant. Quitter la bande ou passer à l'autre bord repart de zéro.
+ *
+ * `surCote(cote)`, facultatif, signale que le décompte (re)part contre ce bord (`cote` ±1) ou s'arrête (0) : il
+ * pilote la bande lumineuse qui se remplit pendant les `delai` ms.
  */
-export function creerMaintienBord(onChange: (sens: -1 | 1) => void, delai = DELAI): MaintienBord {
+export function creerMaintienBord(
+  onChange: (sens: -1 | 1) => void,
+  delai = DELAI,
+  surCote?: (cote: -1 | 0 | 1) => void,
+): MaintienBord {
   let cote: -1 | 0 | 1 = 0
   let depuis = 0
   return {
@@ -49,24 +56,47 @@ export function creerMaintienBord(onChange: (sens: -1 | 1) => void, delai = DELA
       if (c !== cote) {
         cote = c
         depuis = t
+        surCote?.(c)
         return
       }
       if (c !== 0 && t - depuis >= delai) {
         depuis = t
         onChange(c)
+        surCote?.(c) // le décompte du changement suivant repart
       }
     },
     arreter() {
+      if (cote !== 0) surCote?.(0)
       cote = 0
     },
   }
+}
+
+// Bande lumineuse du bord tenu : un identifiant neuf à chaque départ de décompte (la bande se remonte et repart de zéro).
+export type Halo = { cote: -1 | 1; id: number } | null
+let halo: Halo = null
+let compteurHalo = 0
+const ecouteursHalo = new Set<() => void>()
+
+/** Le bord dont le décompte court, ou `null`. */
+export const lireHalo = (): Halo => halo
+
+/** Abonnement au changement du halo (pour `useSyncExternalStore`). */
+export function abonnerHalo(rappel: () => void): () => void {
+  ecouteursHalo.add(rappel)
+  return () => ecouteursHalo.delete(rappel)
+}
+
+function publierHalo(cote: -1 | 0 | 1): void {
+  halo = cote === 0 ? null : { cote, id: ++compteurHalo }
+  for (const f of ecouteursHalo) f()
 }
 
 /** `creerMaintienBord` à durée de vie du composant ; `onChange` est toujours la dernière version passée. */
 export function useMaintienBord(onChange: (sens: -1 | 1) => void, delai = DELAI): MaintienBord {
   const rappel = useRef(onChange)
   rappel.current = onChange
-  return useMemo(() => creerMaintienBord((s) => rappel.current(s), delai), [delai])
+  return useMemo(() => creerMaintienBord((s) => rappel.current(s), delai, publierHalo), [delai])
 }
 
 // Changement de période : la zone du calendrier enregistre ce qu'« une période de plus ou de moins » veut dire dans la

@@ -15,11 +15,7 @@
   font-weight: 700;
   font-size: var(--fs-3);
   cursor: pointer;
-  transition: transform 120ms ease;
-}
-
-.btn-export:active:not(:disabled) {
-  transform: scale(0.97);
+  transition: transform 100ms ease-out;
 }
 
 /* Rien n'a jamais pu être exporté : un contour pâle plutôt qu'un aplat délavé (le texte reste lisible). */
