@@ -60,10 +60,14 @@ export function recalculerCreneaux(
       const duree = durees.get(c.id) ?? c.duree
       const avant = minutesDe(c.debut)
       let debut = Math.max(avant, curseur)
-      for (;;) {
-        const v = verrous.find((x) => x.debut < debut + duree && x.fin > debut)
-        if (!v) break
-        debut = v.fin
+      // Un créneau ni recalculé ni poussé reste en place, même sur une indisponibilité
+      // (le conflit est signalé par `conflits`, pas résolu en silence).
+      if (debut !== avant || duree !== c.duree) {
+        for (;;) {
+          const v = verrous.find((x) => x.debut < debut + duree && x.fin > debut)
+          if (!v) break
+          debut = v.fin
+        }
       }
       const change = debut !== avant || duree !== c.duree
       if (change && debut + duree > bornes.fin) {

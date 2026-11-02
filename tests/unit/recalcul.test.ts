@@ -102,6 +102,20 @@ describe('recalculerCreneaux', () => {
     expect(etat.creneaux.b.debut).toBe(`${J}T18:00`)
   })
 
+  it('créneau inchangé déjà dans une indisponibilité : il ne bouge pas', () => {
+    const e = base(
+      [
+        creneau('a', { debut: `${J}T09:00` }),
+        creneau('c', { debut: `${J}T14:00`, duree: 60, dureePerso: true }),
+      ],
+      [indispo('i', `${J}T14:30`, `${J}T15:00`)],
+    )
+    const { etat, bilan } = recalculerCreneaux(e, AUJ)
+    expect(etat.creneaux.a.duree).toBe(150)
+    expect(etat.creneaux.c).toBe(e.creneaux.c)
+    expect(bilan).toEqual({ recalcules: 1, deplaces: 0, versBac: 0 })
+  })
+
   it('débordement vers À placer : un créneau poussé au-delà de 23:00', () => {
     const e = base([
       creneau('a', { debut: `${J}T20:00` }),
