@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { etatVide } from '../../src/domain/defaults'
 import type { Creneau, Etat } from '../../src/domain/types'
-import { modifierNote, supprimerCreneau } from '../../src/domain/actions-creneaux'
+import { modifierNote, supprimerCreneau, viderPlanning } from '../../src/domain/actions-creneaux'
 import { ajouterCollege, changementsEnAttente, marquerExporte, viderSuppressions } from '../../src/domain/actions-etat'
 import { lireSauvegarde } from '../../src/storage/backup'
 import { chargerTout, db } from '../../src/storage/db'
@@ -180,6 +180,24 @@ describe('store : annuler / rétablir et suivi de l’export', () => {
         ids.map((id) => ({ id, version: e.creneaux[id].version })),
       ),
     )
+
+  it('vider le planning puis annuler : la suppression en attente disparaît, versionExportee est gardée', async () => {
+    s().appliquer(ajoute(creneau('a')))
+    s().appliquer(ajoute(creneau('b', { debut: null })))
+    exporter('a')
+    expect(s().appliquer(viderPlanning)).toBe(true)
+    expect(s().etat.creneaux).toEqual({})
+    expect(s().etat.suppressions.a).toBeDefined()
+    expect(s().etat.suppressions.b).toBeUndefined()
+
+    s().annuler()
+    expect(Object.keys(s().etat.creneaux).sort()).toEqual(['a', 'b'])
+    expect(s().etat.suppressions).toEqual({})
+    expect(s().etat.creneaux.a.versionExportee).toBe(1)
+    expect(s().etat.creneaux.b.versionExportee).toBeNull()
+    expect(changementsEnAttente(s().etat).modifies).toEqual([])
+    await attendreEcritures() // sinon les écritures en cours retombent dans la base du test suivant
+  })
 
   it('annuler un déplacement après l’export ne remet pas le créneau à exporter', () => {
     s().appliquer(ajoute(creneau('a'))) // instantané : a non exporté

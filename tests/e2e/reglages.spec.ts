@@ -931,3 +931,36 @@ test('Réglages › Données : vider un planning déjà exporté prévient pour 
     'Ils sont aussi dans ton Calendrier : le plus simple est ensuite de supprimer le calendrier « Révisions » et de le recréer.',
   )
 })
+
+/** Fond et texte calculés d'un bouton (rgb() ou color(srgb …), selon le navigateur) : rouge dominant, contraste ≥ 4,5:1. */
+async function verifierRouge(bouton: ReturnType<Page['locator']>) {
+  const { fond, texte } = await bouton.evaluate((el) => {
+    const cs = getComputedStyle(el)
+    return { fond: cs.backgroundColor, texte: cs.color }
+  })
+  const canaux = (c: string): number[] => {
+    const n = (c.match(/-?\d*\.?\d+/g) ?? []).map(Number)
+    return c.startsWith('color(') ? n.slice(0, 3).map((v) => v * 255) : n.slice(0, 3)
+  }
+  const lum = (c: number[]) => {
+    const [r, g, b] = c.map((v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  const [r, g, b] = canaux(fond)
+  expect(r, `fond ${fond} : rouge dominant`).toBeGreaterThan(g + 60)
+  expect(r, `fond ${fond} : rouge dominant`).toBeGreaterThan(b + 60)
+  const [l1, l2] = [lum(canaux(fond)), lum(canaux(texte))].sort((x, y) => y - x)
+  expect((l1 + 0.05) / (l2 + 0.05), `texte ${texte} sur ${fond}`).toBeGreaterThanOrEqual(4.5)
+}
+
+for (const theme of ['Clair', 'Sombre'] as const) {
+  test(`Réglages › Données : les boutons destructifs sont rouges et lisibles (thème ${theme.toLowerCase()})`, async ({ page }) => {
+    await ouvrir(page, troisCreneaux(false))
+    await versReglages(page)
+    await page.getByRole('button', { name: theme, exact: true }).click()
+    const vider = page.getByRole('button', { name: 'Vider le planning' })
+    await verifierRouge(vider)
+    await vider.click()
+    await verifierRouge(page.getByRole('dialog').getByRole('button', { name: 'Supprimer', exact: true }))
+  })
+}
