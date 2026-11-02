@@ -37,6 +37,11 @@ async function telecharger(page: Page, nom: string): Promise<{ fichier: string; 
   return { fichier: download.suggestedFilename(), ics: (await readFile(await download.path())).toString('utf8') }
 }
 
+/** La question qui suit un téléchargement : rien n'est marqué envoyé avant la réponse d'Emma. */
+const question = (page: Page, texte: string) => feuille(page).getByText(texte, { exact: true })
+const oui = (page: Page) => feuille(page).getByRole('button', { name: "Oui, c'est fait" })
+const non = (page: Page) => feuille(page).getByRole('button', { name: 'Non', exact: true })
+
 const evenements = (ics: string) => ics.match(/BEGIN:VEVENT/g)?.length ?? 0
 /** Le texte du badge (la pastille est cachée aux lecteurs d'écran, mais présente dans le DOM). */
 const badge = (page: Page) => page.locator('.btn-export .export-badge')
@@ -73,6 +78,11 @@ test('le premier export : encart, fichier à 2 événements, badge à 0', async 
   expect(ics).toContain('SEQUENCE:1')
   expect(ics).toContain('DESCRIPTION:Cancérologie · p. 290–304 (14 p)')
 
+  // Télécharger ne marque rien : la question est posée, le badge reste.
+  await expect(question(page, 'Calendrier a bien enregistré ces 2 créneaux ?')).toBeVisible()
+  await expect(badge(page)).toHaveText('2')
+  await oui(page).click()
+
   // Les deux créneaux sont marqués envoyés : plus de badge, plus d'encart, un message.
   await expect(page.locator('.toast')).toContainText('2 créneaux envoyés au Calendrier')
   await expect(feuille(page).getByRole('heading', { name: 'Nouveaux créneaux (0)' })).toBeVisible()
@@ -89,6 +99,8 @@ test('un seul créneau envoyé : message au singulier', async ({ page }) => {
   await ouvrir(page, [creneau('n-a', 'c1:290', `${JOUR}T09:00`, 60)])
   await ouvrirFeuille(page)
   await telecharger(page, 'Ajouter au Calendrier')
+  await expect(question(page, 'Calendrier a bien enregistré ce créneau ?')).toBeVisible()
+  await oui(page).click()
   await expect(page.locator('.toast')).toContainText('1 créneau envoyé au Calendrier')
 })
 
@@ -101,6 +113,10 @@ test('« Tout le planning » exporte aussi les créneaux déjà envoyés', async
   const { fichier, ics } = await telecharger(page, 'Exporter tout le planning')
   expect(fichier).toBe('revisions-tout.ics')
   expect(evenements(ics)).toBe(2)
+  await expect(question(page, 'Calendrier a bien enregistré ces 2 créneaux ?')).toBeVisible()
+  await expect(badge(page)).toHaveText('1')
+  await oui(page).click()
+  await feuille(page).getByRole('button', { name: 'Fermer' }).click()
   await expect(badge(page)).toHaveCount(0)
 })
 
@@ -133,6 +149,11 @@ test('modifier un créneau exporté : « Créneaux modifiés (1) », SEQUENCE:2,
   expect(evenements(ics)).toBe(1)
   expect(ics).toMatch(/UID:e-a@revisions-emma\r\nSEQUENCE:2\r\n/)
   expect(ics).toContain('Revoir le schéma')
+  // Rien n'est marqué tant qu'Emma n'a pas répondu : la section reste là, le bouton est remplacé par la question.
+  await expect(feuille(page).getByRole('heading', { name: 'Créneaux modifiés (1)' })).toBeVisible()
+  await expect(question(page, 'Calendrier a bien enregistré ce créneau ?')).toBeVisible()
+  await expect(feuille(page).getByRole('button', { name: 'Mettre à jour dans Calendrier' })).toHaveCount(0)
+  await oui(page).click()
   await expect(feuille(page).getByRole('heading', { name: /Créneaux modifiés/ })).toHaveCount(0)
   await feuille(page).getByRole('button', { name: 'Fermer' }).click()
   await expect(badge(page)).toHaveCount(0)
@@ -192,58 +213,128 @@ test('plus de 10 créneaux modifiés : procédure « Tout réexporter »', async
   expect(fichier).toBe('revisions-tout.ics')
   expect(evenements(ics)).toBe(11)
   expect(ics).toContain('SEQUENCE:2')
+  // Pas de marquage au téléchargement : la liste des suppressions est toujours là.
+  await expect(question(page, 'Calendrier contient bien tout le planning ?')).toBeVisible()
+  await expect(feuille(page).getByRole('heading', { name: 'À supprimer à la main dans Calendrier :' })).toBeVisible()
+  await oui(page).click()
   // Le calendrier repart de zéro : la liste des suppressions est vidée avec le reste.
   await expect(feuille(page).getByRole('heading', { name: 'À supprimer à la main dans Calendrier :' })).toHaveCount(0)
   await feuille(page).getByRole('button', { name: 'Fermer' }).click()
   await expect(badge(page)).toHaveCount(0)
 })
 
-test("« Remettre à envoyer » : la livraison n'est pas définitive (nouveaux)", async ({ page }) => {
+test('télécharger ne marque rien : la question est posée, le badge reste', async ({ page }) => {
   await ouvrir(page, DEUX_NOUVEAUX())
   await expect(badge(page)).toHaveText('2')
   await ouvrirFeuille(page)
-  await expect(feuille(page).getByText('Pas importé dans Calendrier ?')).toHaveCount(0)
+  await expect(feuille(page).getByText(/Calendrier a bien enregistré/)).toHaveCount(0)
 
   await telecharger(page, 'Ajouter au Calendrier')
-  await expect(page.locator('.toast')).toContainText('2 créneaux envoyés au Calendrier')
-  await expect(feuille(page).getByText('Pas importé dans Calendrier ?')).toBeVisible()
-  const remettre = feuille(page).getByRole('button', { name: 'Remettre à envoyer' })
-  expect((await remettre.boundingBox())!.height).toBeGreaterThanOrEqual(44)
-  // Le badge est caché derrière la feuille, mais bien à 0 (absent).
-  await expect(badge(page)).toHaveCount(0)
-
-  await remettre.click()
+  await expect(question(page, 'Calendrier a bien enregistré ces 2 créneaux ?')).toBeVisible()
+  // À la place du bouton utilisé.
+  await expect(feuille(page).getByRole('button', { name: 'Ajouter au Calendrier' })).toHaveCount(0)
+  await expect(page.locator('.toast')).toHaveCount(0)
+  await expect(badge(page)).toHaveText('2')
   await expect(feuille(page).getByRole('heading', { name: 'Nouveaux créneaux (2)' })).toBeVisible()
-  await expect(feuille(page).getByText('Pas importé dans Calendrier ?')).toHaveCount(0)
-  await expect(feuille(page).getByText("Crée d'abord un calendrier « Révisions »")).toBeVisible() // premier export à refaire
+  for (const b of [oui(page), non(page)]) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+})
+
+test("« Oui, c'est fait » marque les créneaux envoyés", async ({ page }) => {
+  await ouvrir(page, DEUX_NOUVEAUX())
+  await ouvrirFeuille(page)
+  await telecharger(page, 'Ajouter au Calendrier')
+  await oui(page).click()
+  await expect(page.locator('.toast')).toContainText('2 créneaux envoyés au Calendrier')
+  await expect(feuille(page).getByText(/Calendrier a bien enregistré/)).toHaveCount(0)
+  await feuille(page).getByRole('button', { name: 'Fermer' }).click()
+  await expect(badge(page)).toHaveCount(0)
+})
+
+test('« Non » ne marque rien et rend le bouton', async ({ page }) => {
+  await ouvrir(page, DEUX_NOUVEAUX())
+  await ouvrirFeuille(page)
+  await telecharger(page, 'Ajouter au Calendrier')
+  await non(page).click()
+  await expect(feuille(page).getByText(/Calendrier a bien enregistré/)).toHaveCount(0)
+  await expect(feuille(page).getByRole('button', { name: 'Ajouter au Calendrier' })).toBeVisible()
+  await expect(feuille(page).getByRole('heading', { name: 'Nouveaux créneaux (2)' })).toBeVisible()
+  await expect(page.locator('.toast')).toHaveCount(0)
   await feuille(page).getByRole('button', { name: 'Fermer' }).click()
   await expect(badge(page)).toHaveText('2')
 })
 
-test('« Remettre à envoyer » disparaît à la fermeture de la feuille', async ({ page }) => {
+test("fermer sans répondre : rien n'est marqué, la question ne revient pas, même après un rechargement", async ({ page }) => {
   await ouvrir(page, DEUX_NOUVEAUX())
   await ouvrirFeuille(page)
   await telecharger(page, 'Ajouter au Calendrier')
-  await expect(feuille(page).getByRole('button', { name: 'Remettre à envoyer' })).toBeVisible()
+  await expect(question(page, 'Calendrier a bien enregistré ces 2 créneaux ?')).toBeVisible()
   await feuille(page).getByRole('button', { name: 'Fermer' }).click()
-  await expect(badge(page)).toHaveCount(0)
+  await expect(badge(page)).toHaveText('2')
+
   await ouvrirFeuille(page)
-  await expect(feuille(page).getByRole('button', { name: 'Remettre à envoyer' })).toHaveCount(0)
+  await expect(feuille(page).getByText(/Calendrier a bien enregistré/)).toHaveCount(0)
+  await expect(feuille(page).getByRole('button', { name: 'Ajouter au Calendrier' })).toBeVisible()
+  await feuille(page).getByRole('button', { name: 'Fermer' }).click()
+
+  // Fermer l'app : à la réouverture, rien n'est marqué et l'export reste proposé.
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Calendrier' })).toBeVisible()
+  await expect(badge(page)).toHaveText('2')
+  await ouvrirFeuille(page)
+  await expect(feuille(page).getByText(/Calendrier a bien enregistré/)).toHaveCount(0)
+  await expect(feuille(page).getByRole('button', { name: 'Ajouter au Calendrier' })).toBeVisible()
 })
 
-test('« Remettre à envoyer » après une mise à jour : le créneau redevient modifié', async ({ page }) => {
+test("« Repartir d'un calendrier vide » : la question porte sur tout le planning, « Oui » vide les suppressions", async ({ page }) => {
+  await ouvrir(page, [
+    creneau('e-a', 'c1:290', `${JOUR}T09:00`, 60, { versionExportee: 1 }),
+    creneau('e-b', 'c1:291', `${JOUR}T11:00`, 60, { versionExportee: 1 }),
+    creneau('e-x', 'c1:292', `${JOUR}T14:00`, 60, { versionExportee: 1 }),
+  ])
+  await bloc(page, 'e-x').click()
+  await page.getByRole('button', { name: 'Supprimer' }).click()
+  await ouvrirFeuille(page)
+  await feuille(page).locator('details.export-alternative > summary').click()
+
+  const { fichier, ics } = await telecharger(page, 'Tout réexporter')
+  expect(fichier).toBe('revisions-tout.ics')
+  expect(evenements(ics)).toBe(2)
+  await expect(question(page, 'Calendrier contient bien tout le planning ?')).toBeVisible()
+  await expect(feuille(page).getByRole('heading', { name: 'À supprimer à la main dans Calendrier :' })).toBeVisible()
+
+  // « Non » : rien ne change.
+  await non(page).click()
+  await expect(feuille(page).getByRole('button', { name: 'Tout réexporter' })).toBeVisible()
+  await expect(feuille(page).getByRole('heading', { name: 'À supprimer à la main dans Calendrier :' })).toBeVisible()
+
+  await telecharger(page, 'Tout réexporter')
+  await oui(page).click()
+  await expect(page.locator('.toast', { hasText: '2 créneaux envoyés au Calendrier' })).toBeVisible()
+  await expect(feuille(page).getByRole('heading', { name: 'À supprimer à la main dans Calendrier :' })).toHaveCount(0)
+})
+
+test('une mise à jour partielle : « Non » laisse le créneau modifié, un nouvel export le renvoie', async ({ page }) => {
   await ouvrir(page, [
     creneau('e-a', 'c1:290', `${JOUR}T09:00`, 60, { version: 2, versionExportee: 1 }),
     creneau('e-b', 'c1:291', `${JOUR}T11:00`, 60, { versionExportee: 1 }),
   ])
-  await expect(badge(page)).toHaveText('1')
   await ouvrirFeuille(page)
   await telecharger(page, 'Mettre à jour dans Calendrier')
-  await expect(feuille(page).getByText('Pas importé dans Calendrier ?')).toBeVisible()
-  await feuille(page).getByRole('button', { name: 'Remettre à envoyer' }).click()
+  await non(page).click()
   await expect(feuille(page).getByRole('heading', { name: 'Créneaux modifiés (1)' })).toBeVisible()
+  const { ics } = await telecharger(page, 'Mettre à jour dans Calendrier')
+  expect(ics).toMatch(/UID:e-a@revisions-emma\r\nSEQUENCE:2\r\n/)
   await feuille(page).getByRole('button', { name: 'Fermer' }).click()
   await expect(badge(page)).toHaveText('1')
+})
+
+test("le bouton qui ferme la feuille s'appelle « Fermer » (jamais une icône de validation)", async ({ page }) => {
+  await ouvrir(page, DEUX_NOUVEAUX())
+  await ouvrirFeuille(page)
+  const fermer = feuille(page).getByRole('button', { name: 'Fermer', exact: true })
+  await expect(fermer).toHaveCount(1)
+  await expect(fermer).toHaveText('Fermer')
+  await expect(feuille(page).getByRole('button', { name: /^(✓|OK|Terminé)$/ })).toHaveCount(0)
 })
 
 test('exactement 10 créneaux modifiés : pas de procédure', async ({ page }) => {
@@ -275,12 +366,15 @@ test('un changement du store pendant que la feuille est ouverte ne ramène pas l
   await ouvrirFeuille(page)
   const fermer = feuille(page).getByRole('button', { name: 'Fermer' })
   await expect(fermer).toBeFocused()
-  // La livraison modifie le store : le bouton Exporter se redessine et passe une nouvelle fermeture à la feuille.
   const ajouter = feuille(page).getByRole('button', { name: 'Ajouter au Calendrier' })
   await ajouter.focus()
   const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Enter')])
   expect(download.suggestedFilename()).toBe('revisions-nouveaux.ics')
-  await expect(feuille(page).getByRole('button', { name: 'Remettre à envoyer' })).toBeVisible()
+  await expect(question(page, 'Calendrier a bien enregistré ces 2 créneaux ?')).toBeVisible()
+  // « Oui » modifie le store : le bouton Exporter se redessine et passe une nouvelle fermeture à la feuille.
+  await oui(page).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.toast')).toContainText('2 créneaux envoyés au Calendrier')
   await expect(fermer).not.toBeFocused()
   // Le titre de la feuille est bien relié à la boîte de dialogue (identifiant unique).
   await expect(page.getByRole('dialog', { name: 'Exporter vers Calendrier' })).toBeVisible()

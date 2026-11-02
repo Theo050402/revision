@@ -157,17 +157,33 @@ details.export-alternative > :not(summary) {
   margin-top: 8px;
 }
 
-/* « Pas importé dans Calendrier ? » sous le bouton de l'action utilisée. */
-.export-remise {
+/* La question posée après un fichier livré, à la place du bouton de l'action utilisée. */
+.export-question {
   align-self: stretch;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
+  outline: none;
 }
 
-.export-remise .aide {
+.export-question-texte {
   margin: 0;
+  font-size: var(--fs-3);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.export-question-boutons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.export-question-boutons > button {
+  flex: 1 1 auto;
 }
 
 .export-suppressions ul {

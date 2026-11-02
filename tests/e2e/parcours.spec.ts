@@ -117,6 +117,8 @@ test('parcours complet : importer, placer 3 items, marquer fait, exporter, recha
   const ics = (await readFile(await telechargement.path())).toString('utf8')
   expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(3)
   for (const p of poses) expect(ics).toContain(`UID:${p.id}@revisions-emma`)
+  await expect(feuille.getByText('Calendrier a bien enregistré ces 3 créneaux ?', { exact: true })).toBeVisible()
+  await feuille.getByRole('button', { name: "Oui, c'est fait" }).click()
   await expect(page.locator('.toast', { hasText: '3 créneaux envoyés au Calendrier' })).toBeVisible()
   await feuille.getByRole('button', { name: 'Fermer' }).click()
   await expect(badge(page)).toHaveCount(0)

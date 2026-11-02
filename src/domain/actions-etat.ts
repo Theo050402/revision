@@ -311,8 +311,9 @@ export function creneauxExportes(e: Etat, portee: Portee): string[] {
 export type Envoye = { id: string; version: number }
 
 /**
- * Après la livraison : `versionExportee = version` pour les créneaux envoyés, et seulement si leur version courante
- * est encore celle du fichier (un créneau modifié entre-temps reste « modifié »). Le premier export est fait.
+ * Quand Emma confirme que Calendrier a enregistré le fichier (jamais au simple téléchargement) : `versionExportee =
+ * version` pour les créneaux envoyés, et seulement si leur version courante est encore celle du fichier (un créneau
+ * modifié entre-temps reste « modifié »). Le premier export est fait.
  */
 export function marquerExporte(e: Etat, envoyes: Envoye[]): Etat {
   const maj: Record<string, Creneau> = {}
@@ -321,32 +322,6 @@ export function marquerExporte(e: Etat, envoyes: Envoye[]): Etat {
     if (c && c.debut !== null && c.version === version) maj[id] = { ...c, versionExportee: version }
   }
   return { ...e, creneaux: { ...e.creneaux, ...maj }, premierExportFait: true }
-}
-
-/** Un créneau envoyé, avec sa `versionExportee` d'avant l'envoi (pour `annulerMarquage`). */
-export type EnvoyeAvant = Envoye & { avant: number | null }
-
-/**
- * « Remettre à envoyer » : la livraison n'est pas une preuve d'import (téléchargement refusé, écran d'import fermé,
- * mauvais calendrier). Rend à chaque créneau envoyé sa `versionExportee` d'avant, mais seulement s'il est encore à la
- * version du fichier ; `premierExportFait` et les suppressions en attente ne sont rétablis que si on les fournit.
- */
-export function annulerMarquage(
-  e: Etat,
-  envoyes: EnvoyeAvant[],
-  avant: { premierExportFait?: boolean; suppressions?: Record<string, SuppressionEnAttente> } = {},
-): Etat {
-  const maj: Record<string, Creneau> = {}
-  for (const { id, version, avant: precedente } of envoyes) {
-    const c = e.creneaux[id]
-    if (c && c.version === version && c.versionExportee !== precedente) maj[id] = { ...c, versionExportee: precedente }
-  }
-  return {
-    ...e,
-    creneaux: { ...e.creneaux, ...maj },
-    premierExportFait: avant.premierExportFait ?? e.premierExportFait,
-    suppressions: avant.suppressions ? { ...avant.suppressions, ...e.suppressions } : e.suppressions,
-  }
 }
 
 /**
