@@ -664,8 +664,117 @@ test.describe('iPad : glisser fluide', () => {
   })
 })
 
+// Bords de la grille pendant un glisser (spec §C.2) : défilement progressif en haut et en bas, 600 ms contre le bord
+// gauche ou droit pour changer de semaine (de jour en vue Jour) sans interrompre le glisser.
+test.describe('iPad : bords de la grille', () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 900, 'semaine de l’iPad')
+
+  const defil = (page: Page) =>
+    page.locator('.calendrier-defilement').evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      return { gauche: r.left, droite: r.right, haut: r.top, bas: r.bottom, scroll: el.scrollTop }
+    })
+  const periode = (page: Page) => page.locator('.calendrier-periode')
+
+  test('600 ms contre le bord droit : semaine suivante, le glisser continue et le dépôt est possible', async ({ page }) => {
+    await ouvrir(page)
+    const avant = await periode(page).textContent()
+    const b = (await bloc(page, 'cr-a').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    const d = await defil(page)
+    const bord = { x: d.droite - 8, y: (await pointGrille(page, MARDI, 14, 0, 10)).y }
+    await saisir(page, de, bord)
+    await expect(periode(page)).not.toHaveText(avant ?? '', { timeout: 3000 })
+    // Le glisser continue : la copie est toujours là, la grille est toujours en mode glisser.
+    await expect(copie(page)).toHaveAttribute('data-visible', 'true')
+    await expect(page.locator('.grille')).toHaveAttribute('data-glisse', 'true')
+    await expect(page.locator('.colonne[data-jour="2026-11-09"]')).toHaveCount(1)
+    // Le doigt est sur la dernière colonne de la nouvelle semaine : l'emplacement y est posé, à la même heure.
+    await expect(page.locator('[data-atterrissage]')).toHaveAttribute('data-atterrissage', '2026-11-15T14:00')
+    await lacher(page, bord)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', '2026-11-15T14:00')
+  })
+
+  test('600 ms contre le bord gauche : semaine précédente, dépôt possible', async ({ page }) => {
+    await ouvrir(page)
+    const avant = await periode(page).textContent()
+    const b = (await bloc(page, 'cr-a').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    const premiere = (await page.locator('.jour-tete').first().boundingBox())!
+    const bord = { x: premiere.x + 8, y: (await pointGrille(page, MARDI, 14, 0, 10)).y }
+    await saisir(page, de, bord)
+    await expect(periode(page)).not.toHaveText(avant ?? '', { timeout: 3000 })
+    await expect(page.locator('.colonne[data-jour="2026-10-26"]')).toHaveCount(1)
+    await lacher(page, bord)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', '2026-10-26T14:00')
+  })
+
+  test('moins de 600 ms contre le bord : la semaine ne change pas', async ({ page }) => {
+    await ouvrir(page)
+    const avant = await periode(page).textContent()
+    const b = (await bloc(page, 'cr-a').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    const d = await defil(page)
+    const y = (await pointGrille(page, MARDI, 14, 0, 10)).y
+    await saisir(page, de, { x: d.droite - 8, y })
+    await page.waitForTimeout(300)
+    await deplacer(page, { x: d.droite - 8, y }, de)
+    await page.waitForTimeout(500)
+    await expect(periode(page)).toHaveText(avant ?? '')
+    await lacher(page, de)
+  })
+
+  test('contre le bas : la grille défile et l’emplacement suit, le lâcher dépose ce qu’il montrait', async ({ page }) => {
+    await ouvrir(page)
+    const b = (await bloc(page, 'cr-a').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    const d = await defil(page)
+    expect(d.scroll).toBe(0)
+    const bas = { x: de.x, y: d.bas - 6 }
+    await saisir(page, de, bas)
+    // La grille ne déborde que de ~120 px à 820 px de haut : elle va jusqu'en bas.
+    await expect.poll(async () => (await defil(page)).scroll, { timeout: 3000 }).toBeGreaterThan(100)
+    // L'emplacement est réévalué à mesure que la grille défile, sans que le doigt bouge : il a quitté 14 h.
+    const lieu = page.locator('[data-atterrissage]')
+    await expect(lieu).not.toHaveAttribute('data-atterrissage', `${MARDI}T14:00`)
+    const milieu = { x: bas.x, y: (d.haut + d.bas) / 2 }
+    await deplacer(page, bas, milieu) // quitte la zone : le défilement s'arrête
+    const prevu = await lieu.getAttribute('data-atterrissage')
+    await lacher(page, milieu)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', prevu ?? '')
+  })
+
+  test('mouvement réduit : le défilement fonctionne toujours', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await ouvrir(page)
+    const b = (await bloc(page, 'cr-a').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    const d = await defil(page)
+    await saisir(page, de, { x: de.x, y: d.bas - 6 })
+    await expect.poll(async () => (await defil(page)).scroll, { timeout: 3000 }).toBeGreaterThan(100)
+    await page.keyboard.press('Escape')
+    await lacher(page, de)
+  })
+})
+
 test.describe('iPhone', () => {
   test.skip(({ viewport }) => (viewport?.width ?? 1000) >= 900, 'vue Jour du téléphone')
+
+  test('vue Jour : 600 ms contre le bord droit, le jour suivant s’affiche et le glisser continue', async ({ page }) => {
+    await ouvrir(page)
+    const cr = bloc(page, 'cr-d')
+    await cr.scrollIntoViewIfNeeded()
+    const b = (await cr.boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 8 }
+    const avant = await page.locator('.calendrier-periode').textContent()
+    const droite = await page.locator('.calendrier-defilement').evaluate((el) => el.getBoundingClientRect().right)
+    await saisir(page, de, { x: droite - 8, y: de.y })
+    await expect(page.locator('.calendrier-periode')).not.toHaveText(avant ?? '', { timeout: 3000 })
+    await expect(page.locator('.colonne[data-jour="2026-11-05"]')).toHaveCount(1)
+    await expect(copie(page)).toHaveAttribute('data-visible', 'true')
+    await page.keyboard.press('Escape')
+    await lacher(page, { x: droite - 8, y: de.y })
+  })
 
   test('vue Jour : appui long sur un créneau et glisser d’une heure', async ({ page }) => {
     await ouvrir(page)

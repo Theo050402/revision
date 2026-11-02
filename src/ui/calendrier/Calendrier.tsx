@@ -1,7 +1,8 @@
 // Zone du calendrier : barre de navigation (précédent / Aujourd'hui / suivant), balayage horizontal
 // pour changer de période, et la vue choisie (Semaine, Jour ou Mois).
-import { useMemo, useRef, useSyncExternalStore, type PointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useSyncExternalStore, type PointerEvent } from 'react'
 import { ajouterJours } from '../../domain/temps'
+import { enregistrerChangementPeriode } from '../dnd/bords'
 import { Corbeille } from '../dnd/Corbeille'
 import { gesteDepuis } from '../dnd/glisse'
 import type { Vue } from '../ecran'
@@ -84,6 +85,12 @@ export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTap
   const precedent = () => decaler(-1)
   const suivant = () => decaler(1)
   const balayage = useBalayage(precedent, suivant)
+
+  // Pendant un glisser, le doigt tenu contre le bord gauche ou droit de la grille change de période (spec §C.2) :
+  // une semaine en vue Semaine, un jour en vue Jour (même sur trois jours : on avance jour par jour) ; rien en vue Mois.
+  const deplacer = useRef((_sens: 1 | -1) => {})
+  deplacer.current = (sens) => onJour(ajouterJours(jour, sens * (vue === 'semaine' ? 7 : 1)))
+  useEffect(() => enregistrerChangementPeriode(vue === 'mois' ? null : (sens) => deplacer.current(sens)), [vue])
 
   const unite = vue === 'semaine' ? 'semaine' : vue === 'jour' ? (nbJours > 1 ? 'période' : 'jour') : 'mois'
   const genre = unite === 'semaine' || unite === 'période' ? ['précédente', 'suivante'] : ['précédent', 'suivant']

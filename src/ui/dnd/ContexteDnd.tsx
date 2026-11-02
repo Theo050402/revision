@@ -2,8 +2,9 @@
 // 6 px) et le cycle du geste ; la cible, l'aperçu, la copie flottante et l'emplacement d'atterrissage sont gérés ici :
 // - un seul `useDraggable` par conteneur (bibliothèque, grille) : la carte ou le bloc saisi est trouvé au
 //   `pointerdown` (délégation), les 367 cartes mémoïsées ne se redessinent donc pas au début du geste ;
-// - le doigt est lu par `pointermove` puis traité une fois par image (rAF) : lecture de la cible, défilement
-//   au bord, position de la copie flottante (écrite dans le DOM, sans rendu React, voir CopieFlottante.tsx) ;
+// - le doigt est lu par `pointermove` puis traité une fois par image (rAF) : lecture de la cible, bords de la grille
+//   (défilement en haut et en bas, 600 ms contre le bord gauche ou droit : autre semaine, voir bords.ts), position de
+//   la copie flottante (écrite dans le DOM, sans rendu React, voir CopieFlottante.tsx) ;
 // - l'aperçu (`apercu`) n'est recalculé, et l'état `useGlisse` écrit, que si la minute magnétisée, le jour,
 //   le créneau visé ou la moitié changent ; l'emplacement d'atterrissage (Atterrissage.tsx) en découle ;
 // - le lâcher rejoue les mêmes actions (`deposer`) par `appliquer` : une seule étape d'annulation. La copie rejoint
@@ -18,6 +19,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { useCallback, useEffect, useId, useRef, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { supprimerCreneau } from '../../domain/actions-creneaux'
 import type { Etat } from '../../domain/types'
 import { haptique } from '../mouvement/haptique'
@@ -26,6 +28,7 @@ import { toast } from '../Toast'
 import { trembler } from '../trembler'
 import { apercu, cibleMois, creneauFantome, deposer, type Apercu, type Source } from './apercu'
 import { cibleAtterrissage, oublierAtterrissages } from './Atterrissage'
+import { coteBord, periodeChangeable, useMaintienBord, vitesseDefilement } from './bords'
 import { cleSurvol, lire } from './cibles'
 import {
   arreterCopie,
@@ -60,9 +63,10 @@ type Origine = { el: HTMLElement; r: { left: number; top: number; width: number;
 export type DonneesSource = { source: Source; prise: number; depuisFeuille: boolean; origine?: Origine | null }
 type Porteur = { courant: DonneesSource | null }
 
-/** Marge (px) au bord haut / bas de la grille où elle défile pendant le geste, et vitesse maximale (px / image). */
-const BORD_DEFILEMENT = 56
-const VITESSE_DEFILEMENT = 14
+/** Au-delà du bord haut / bas de la grille (px), le défilement continue à pleine vitesse puis cesse. */
+const DEBORD_DEFILEMENT = 64
+/** Pas d'une image au-delà duquel (onglet en veille) le défilement n'avance pas d'un bond (s). */
+const DT_MAX = 0.05
 /** Échantillons de `pointermove` gardés pour la vitesse au lâcher. */
 const ECHANTILLONS = 5
 
@@ -108,9 +112,28 @@ export function ContexteDnd({ children, onDepose }: Props) {
     /** Taille de l'objet saisi : la copie y revient. */
     taille: Taille | null
     echantillons: Echantillon[]
+    /** Instant (ms) de l'image précédente, et partie fractionnaire du défilement pas encore appliquée (px). */
+    instant: number
+    reste: number
     image: number
     arreter: () => void
   } | null>(null)
+
+  /**
+   * Le doigt est resté contre le bord gauche ou droit : la période change (semaine, ou jour en vue Jour) et le glisser
+   * continue. La grille est rendue tout de suite (`flushSync`) pour que le survol soit relu sur la nouvelle période
+   * dans la même image ; le dernier survol évalué ne peut ainsi jamais être celui de l'ancienne.
+   */
+  const changerDePeriode = useCallback((sens: -1 | 1) => {
+    const g = geste.current
+    const changer = periodeChangeable()
+    if (!g || !changer) return
+    flushSync(() => changer(sens))
+    haptique('leger')
+    g.cle = null
+    g.sale = true
+  }, [])
+  const maintien = useMaintienBord(changerDePeriode)
 
   useEffect(() => bloquerDefilement(), [])
   useEffect(() => filtrerPointeurs(), [])
@@ -128,23 +151,41 @@ export function ContexteDnd({ children, onDepose }: Props) {
     if (!g) return
     g.image = requestAnimationFrame(image)
 
-    // Défilement au bord de la grille (pas au-dessus de la corbeille, posée près du bord bas).
+    // Bords de la grille (pas au-dessus de la corbeille, posée près du bord bas).
+    const maintenant = performance.now()
+    const dt = Math.min(DT_MAX, (maintenant - g.instant) / 1000)
+    g.instant = maintenant
     const defil = document.querySelector<HTMLElement>('.calendrier-defilement')
+    let cote: -1 | 0 | 1 = 0
     if (defil && g.cle !== 'corbeille') {
       const r = defil.getBoundingClientRect()
       if (g.x >= r.left && g.x <= r.right) {
-        const haut = g.y - r.top
+        // Haut : le corps de la grille commence sous l'en-tête collant des jours ; bas : le bas visible de la zone.
+        const tete = defil.querySelector<HTMLElement>('.grille-tete, .mois-entete')
+        const haut = g.y - (tete?.getBoundingClientRect().bottom ?? r.top)
         const bas = r.bottom - g.y
         let v = 0
-        if (haut < BORD_DEFILEMENT && haut > -BORD_DEFILEMENT) v = -VITESSE_DEFILEMENT * (1 - Math.max(0, haut) / BORD_DEFILEMENT)
-        else if (bas < BORD_DEFILEMENT && bas > -BORD_DEFILEMENT) v = VITESSE_DEFILEMENT * (1 - Math.max(0, bas) / BORD_DEFILEMENT)
+        if (haut < bas && haut > -DEBORD_DEFILEMENT) v = -vitesseDefilement(haut)
+        else if (bas > -DEBORD_DEFILEMENT) v = vitesseDefilement(bas)
         if (v !== 0) {
-          const avant = defil.scrollTop
-          defil.scrollTop += v
-          if (defil.scrollTop !== avant) g.sale = true
+          // Les pixels entiers seulement (WebKit arrondit `scrollTop`) ; le reste s'ajoute à l'image suivante.
+          const total = g.reste + v * dt
+          const pas = Math.trunc(total)
+          g.reste = total - pas
+          if (pas !== 0) {
+            const avant = defil.scrollTop
+            defil.scrollTop += pas
+            if (defil.scrollTop !== avant) g.sale = true
+          }
+        } else {
+          g.reste = 0
         }
       }
+      // Gauche / droite : la période change après 600 ms contre le bord (colonnes seulement, pas la colonne des heures).
+      const premiere = defil.querySelector<HTMLElement>('.jour-tete')
+      if (premiere && g.y >= r.top && g.y <= r.bottom) cote = coteBord(g.x, premiere.getBoundingClientRect().left, r.right)
     }
+    maintien.maj(periodeChangeable() ? cote : 0, maintenant)
     if (!g.sale) return
     g.sale = false
 
@@ -168,19 +209,20 @@ export function ContexteDnd({ children, onDepose }: Props) {
     g.cle = cle
     g.el = el
     useGlisse.setState(evaluer(e, g.source, survol))
-  }, [evaluer])
+  }, [evaluer, maintien])
 
   const terminer = useCallback(() => {
     saisirPointeur(null)
     const g = geste.current
     geste.current = null
+    maintien.arreter()
     if (g) {
       cancelAnimationFrame(g.image)
       g.arreter()
     }
     marquerGeste(false)
     return g
-  }, [])
+  }, [maintien])
 
   /**
    * Retour à l'origine par ressort (refus, lâcher hors cible ou sur place, Échap) : la copie rejoint l'objet saisi
@@ -243,6 +285,8 @@ export function ContexteDnd({ children, onDepose }: Props) {
         surGrille: false,
         taille: o ? { largeur: o.r.width, hauteur: o.r.height } : null,
         echantillons: [],
+        instant: performance.now(),
+        reste: 0,
         image: 0,
         arreter: () => {
           window.removeEventListener('pointermove', suivre)
