@@ -542,3 +542,22 @@
   gap: 8px;
   margin-top: 6px;
 }
+
+/* Détail technique d'un échec d'import : sert au diagnostic sur l'appareil. */
+.detail-technique {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.detail-technique summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.detail-technique p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}

@@ -216,6 +216,11 @@ test('fichier corrompu : message « illisible » de la §14, on peut en choisir 
   await expect(page.getByRole('alert')).toHaveText(MESSAGE_ILLISIBLE)
   await expect(page.getByRole('progressbar')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Choisir un autre PDF' })).toBeVisible()
+  // Le détail technique (diagnostic sur l'appareil) donne la cause réelle, la taille du fichier et la version.
+  await page.getByText('Détail technique').click()
+  await expect(page.getByTestId('detail-technique')).toContainText('ErreurPdf illisible ← ')
+  await expect(page.getByTestId('detail-technique')).toContainText(' o, ')
+  await expect(page.getByTestId('detail-technique')).toContainText('version ')
 
   // Le même champ accepte un autre fichier.
   await choisir(page, await pdfSansTexte())

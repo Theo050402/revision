@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { ajouterCollege, reimporterCollege } from '../../domain/actions-etat'
 import { construireItems, nomDepuisFichier, type ItemExtrait } from '../../import/catalog'
-import { ErreurPdf, lirePdf } from '../../import/lirePdf'
+import { ErreurPdf, descriptionTechnique, lirePdf } from '../../import/lirePdf'
+import { VERSION_APP } from '../../version'
 import { useDemandeImport } from '../importDemande'
 import { useStore } from '../store'
 import { toast } from '../Toast'
@@ -25,7 +26,7 @@ const DUREE_MIN_ANALYSE_MS = 450
 type Phase =
   | { type: 'choix' }
   | { type: 'analyse'; fichier: string; fait: number; total: number }
-  | { type: 'erreur'; message: string }
+  | { type: 'erreur'; message: string; detail: string }
   | { type: 'verification'; nom: string; items: ItemExtrait[] }
 
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -85,7 +86,8 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
             ? MESSAGE_MISE_A_JOUR
             : MESSAGE_PDF_ILLISIBLE
           : `L'analyse a échoué : ${e instanceof Error ? e.message : String(e)}`
-      setPhase({ type: 'erreur', message })
+      const detail = `${descriptionTechnique(e)} · fichier ${fichier.size} o, ${fichier.type || 'type inconnu'} · version ${VERSION_APP}`
+      setPhase({ type: 'erreur', message, detail })
     }
   }
 
@@ -160,9 +162,15 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
         ) : (
           <>
             {phase.type === 'erreur' ? (
-              <p className="bandeau-erreur bandeau-seul" role="alert">
-                {phase.message}
-              </p>
+              <>
+                <p className="bandeau-erreur bandeau-seul" role="alert">
+                  {phase.message}
+                </p>
+                <details className="detail-technique">
+                  <summary>Détail technique</summary>
+                  <p data-testid="detail-technique">{phase.detail}</p>
+                </details>
+              </>
             ) : (
               <p className="aide">
                 Choisis le PDF du collège : les items sont lus dans son sommaire. Le PDF n'est pas conservé, seuls les

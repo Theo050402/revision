@@ -18,6 +18,33 @@ export class ErreurPdf extends Error {
   }
 }
 
+/**
+ * Description technique d'un échec de lecture, en remontant la chaîne des causes (Error, DOMException, ErrorEvent
+ * d'un worker). Affichée sous le message d'erreur pour pouvoir diagnostiquer un échec sur l'appareil.
+ */
+export function descriptionTechnique(e: unknown): string {
+  const morceaux: string[] = []
+  let courant: unknown = e
+  for (let profondeur = 0; courant != null && profondeur < 5; profondeur++) {
+    if (courant instanceof ErreurPdf) {
+      morceaux.push(`ErreurPdf ${courant.code}`)
+    } else if (courant instanceof Error || courant instanceof DOMException) {
+      morceaux.push(`${courant.name} : ${courant.message}`)
+    } else if (typeof courant === 'object' && 'type' in courant) {
+      const ev = courant as { type: unknown; message?: unknown; filename?: unknown; lineno?: unknown }
+      const fichier = typeof ev.filename === 'string' && ev.filename !== '' ? ev.filename.split('/').pop() : ''
+      const lieu = fichier ? ` (${fichier}:${String(ev.lineno ?? '?')})` : ''
+      morceaux.push(`${String(ev.type)} : ${String(ev.message ?? '')}${lieu}`)
+      break
+    } else {
+      morceaux.push(String(courant))
+      break
+    }
+    courant = (courant as { cause?: unknown }).cause
+  }
+  return morceaux.join(' ← ')
+}
+
 export type ResultatLecture = {
   entrees: EntreeSommaire[]
   strategie: 'sommaire' | 'titres' | 'aucune'

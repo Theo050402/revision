@@ -8,6 +8,7 @@ import { Colleges } from './reglages/Colleges'
 import { Durees, Journee } from './reglages/Durees'
 import { Indispos } from './reglages/Indispos'
 import { Restauration } from './Restauration'
+import { VERSION_APP } from '../../version'
 import './reglages.css'
 
 const THEMES: ReadonlyArray<{ valeur: ReglagesEtat['theme']; libelle: string }> = [
@@ -105,6 +106,9 @@ export function Reglages({ onRetour, recurrenceInitiale = null }: Props) {
           </button>
           <Restauration />
         </div>
+        <p className="aide" data-testid="version-app">
+          Version de l'app : {VERSION_APP}
+        </p>
       </section>
     </section>
   )
