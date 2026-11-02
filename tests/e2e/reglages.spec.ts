@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { MAINTENANT, creneau, item, semer } from './graine-calendrier'
+import { pdfSommaire } from './pdfs'
 
 // Fiches (créneau, indisponibilité) et Réglages (tâche 19). Données : celles du calendrier. « Maintenant » figé :
 // mercredi 4 novembre 2026, 10 h 30 à Paris.
@@ -199,8 +200,9 @@ test('la fiche d’une indisponibilité se modifie et se supprime', async ({ pag
 
 // ───────────────────────────── Durées ─────────────────────────────
 
-test('Réglages › Durées : l’aperçu suit le rythme, les créneaux existants gardent leur durée', async ({ page }) => {
+test('Réglages › Durées : l’aperçu suit le rythme, un créneau à durée personnalisée garde sa durée', async ({ page }) => {
   await ouvrir(page)
+  await semerPerso(page) // cr-d : durée réglée à la main, donc jamais recalculée
   const labelA = await bloc(page, 'cr-d').getAttribute('aria-label')
   await versReglages(page)
   const apercu = page.getByTestId('apercu-durees')
@@ -212,7 +214,7 @@ test('Réglages › Durées : l’aperçu suit le rythme, les créneaux existant
   await expect(page.getByRole('button', { name: 'Enregistrer les durées' })).toBeDisabled()
   await reglagesEnBase(page, (r) => r.rythme.pages === 6)
 
-  // Persisté (rechargement) ; les créneaux déjà posés n'ont pas bougé.
+  // Persisté (rechargement) ; le créneau à durée personnalisée n'a pas bougé.
   await page.reload()
   await versReglages(page)
   await expect(page.getByLabel('Pages du rythme')).toHaveValue('6')
@@ -260,6 +262,147 @@ test('Réglages › Journée : bornes inversées refusées ; changer le pas reca
   await expect(pas.getByRole('button', { name: '5 min', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await retourCalendrier(page)
   await expect(page.locator('.grille')).toHaveAttribute('data-plage-debut', '480')
+})
+
+// ───────────────────────────── Recalcul des créneaux à venir ─────────────────────────────
+
+/** Items de la graine : on écarte leurs créneaux pour que le recalcul ne touche que ceux du test. */
+const ITEMS_GRAINE = ['c1:290', 'c1:291', 'c1:292', 'c2:300', 'c3:301', 'c3:304']
+
+type CreneauBase = { id: string; debut: string | null; duree: number; version: number }
+const creneauxEnBase = async (page: Page) =>
+  Object.fromEntries((await lireTable<CreneauBase>(page, 'creneaux')).map((c) => [c.id, c]))
+
+/** Créneau d'aujourd'hui à durée réglée à la main : jamais recalculé, il sert à créer une étape d'historique. */
+const creneauHistorique = creneau('r-h', 'c3:301', '2026-11-04T15:00', 90, { dureePerso: true })
+
+/** Une note sur `r-h` : ↶ devient actif. */
+async function creerEtapeHistorique(page: Page) {
+  await bloc(page, 'r-h').click()
+  await page.getByRole('dialog').getByLabel('Note').fill('à revoir')
+  await page.getByRole('dialog').getByRole('button', { name: 'Fermer' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(annuler(page)).toBeEnabled()
+}
+
+const toastRecalcul = (page: Page, texte: string) => page.locator('.toast', { hasText: texte })
+
+test('Réglages › Durées : les créneaux à venir sont recalculés, le suivant ne bouge pas, ↶ est vidé', async ({ page }) => {
+  // r-a : 16 p, demain 14 h–16 h ; r-b : durée manuelle, à 16 h pile derrière lui.
+  await ouvrir(page, {
+    items: [item('c1', 299, 'Cancer du rein', 16), item('c1', 298, 'Autre', 16)],
+    sansCreneaux: ITEMS_GRAINE,
+    creneaux: [
+      creneauHistorique,
+      creneau('r-a', 'c1:299', '2026-11-05T14:00', 120),
+      creneau('r-b', 'c1:298', '2026-11-05T16:00', 60, { dureePerso: true }),
+    ],
+  })
+  await creerEtapeHistorique(page)
+  await versReglages(page)
+  await page.getByLabel('Minutes du rythme').fill('45')
+  await page.getByRole('button', { name: 'Enregistrer les durées' }).click()
+
+  await expect(toastRecalcul(page, '1 créneau recalculé')).toBeVisible()
+  await expect(annuler(page)).toBeDisabled()
+  await expect
+    .poll(async () => (await creneauxEnBase(page))['r-a'])
+    .toMatchObject({ debut: '2026-11-05T14:00', duree: 90, version: 2 })
+  const apres = await creneauxEnBase(page)
+  expect(apres['r-b']).toMatchObject({ debut: '2026-11-05T16:00', duree: 60, version: 1 })
+  expect(apres['r-h']).toMatchObject({ duree: 90 })
+})
+
+test('Réglages › Collèges : le coefficient ne recalcule que les créneaux de ce collège', async ({ page }) => {
+  await ouvrir(page, {
+    items: [item('c1', 299, 'Cancer du rein', 16), item('c2', 298, 'Fibrome', 16)],
+    sansCreneaux: ITEMS_GRAINE,
+    creneaux: [
+      creneauHistorique,
+      creneau('k-a', 'c1:299', '2026-11-05T14:00', 120),
+      creneau('k-b', 'c2:298', '2026-11-06T14:00', 120),
+    ],
+  })
+  await creerEtapeHistorique(page)
+  await versReglages(page)
+  const ligne = page.locator('.ligne-college[data-college="c1"]')
+  await ligne.getByLabel('Coefficient').fill('0,5')
+  await ligne.getByLabel('Nom du collège').click() // quitte le champ : le coefficient est enregistré
+
+  await expect(toastRecalcul(page, '1 créneau recalculé')).toBeVisible()
+  await expect(annuler(page)).toBeDisabled()
+  await expect.poll(async () => (await creneauxEnBase(page))['k-a']).toMatchObject({ duree: 60, version: 2 })
+  expect((await creneauxEnBase(page))['k-b']).toMatchObject({ duree: 120, version: 1 })
+})
+
+test('Réglages › Journée : passer le pas à 10 min arrondit les durées à venir au pas', async ({ page }) => {
+  // 18 p → 135 min au pas de 15, 140 au pas de 10.
+  await ouvrir(page, {
+    items: [item('c1', 299, 'Cancer du rein', 18)],
+    sansCreneaux: ITEMS_GRAINE,
+    creneaux: [creneauHistorique, creneau('p-a', 'c1:299', '2026-11-05T14:00', 135)],
+  })
+  await versReglages(page)
+  await page.getByRole('group', { name: 'Pas de la grille' }).getByRole('button', { name: '10 min' }).click()
+  await page.getByRole('button', { name: 'Enregistrer la journée' }).click()
+
+  await expect(toastRecalcul(page, '1 créneau recalculé')).toBeVisible()
+  await expect.poll(async () => (await creneauxEnBase(page))['p-a']).toMatchObject({ debut: '2026-11-05T14:00', duree: 140 })
+})
+
+test('Réglages › Journée : changer seulement les bornes ne recalcule rien', async ({ page }) => {
+  await ouvrir(page, {
+    items: [item('c1', 299, 'Cancer du rein', 18)],
+    sansCreneaux: ITEMS_GRAINE,
+    creneaux: [creneauHistorique, creneau('p-a', 'c1:299', '2026-11-05T14:00', 100)], // incohérent avec les réglages : preuve qu'on n'y touche pas
+  })
+  await versReglages(page)
+  await page.getByLabel('Début de journée').fill('08:00')
+  await page.getByRole('button', { name: 'Enregistrer la journée' }).click()
+  await expect(page.locator('.toast', { hasText: 'Journée enregistrée.' })).toBeVisible()
+  await expect(toastRecalcul(page, 'recalculé')).toHaveCount(0)
+  await reglagesEnBase(page, (r) => (r as unknown as { journee: { debut: string } }).journee.debut === '08:00')
+  expect((await creneauxEnBase(page))['p-a']).toMatchObject({ duree: 100, version: 1 })
+})
+
+test('Réimport : un item dont le nombre de pages change allonge son créneau à venir', async ({ page }) => {
+  // c1:290 a 14 p dans la graine ; le PDF en donne 8, corrigées ici à 24 (180 min). Le créneau de c2:300 reste en l'état.
+  await ouvrir(page, {
+    sansCreneaux: ITEMS_GRAINE,
+    creneaux: [
+      creneauHistorique,
+      creneau('ri-a', 'c1:290', '2026-11-05T14:00', 60),
+      creneau('ri-b', 'c2:300', '2026-11-06T14:00', 100),
+    ],
+  })
+  await versReglages(page)
+  await page.getByRole('button', { name: 'Réimporter Cancérologie' }).click()
+  await expect(page.getByRole('heading', { name: 'Réimporter Cancérologie' })).toBeVisible()
+  await page.locator('input[type="file"]').setInputFiles(await pdfSommaire())
+  await expect(page.getByRole('heading', { name: 'Réimporter le collège' })).toBeVisible()
+  await page.getByLabel("Pages de l'item 290").fill('24')
+  await page.getByRole('button', { name: 'Valider' }).click()
+
+  await expect(toastRecalcul(page, '1 créneau recalculé')).toBeVisible()
+  await expect.poll(async () => (await creneauxEnBase(page))['ri-a']).toMatchObject({ debut: '2026-11-05T14:00', duree: 180, version: 2 })
+  expect((await creneauxEnBase(page))['ri-b']).toMatchObject({ duree: 100, version: 1 })
+  await expect(annuler(page)).toBeDisabled()
+})
+
+test('Réglages › Durées : rien à recalculer, pas de message et l’historique est conservé', async ({ page }) => {
+  await ouvrir(page, {
+    sansCreneaux: ITEMS_GRAINE,
+    creneaux: [creneauHistorique, creneau('n-a', 'c3:301', '2026-11-05T14:00', 100, { dureePerso: true })],
+  })
+  await creerEtapeHistorique(page)
+  await versReglages(page)
+  await page.getByLabel('Pages du rythme').fill('7')
+  await page.getByRole('button', { name: 'Enregistrer les durées' }).click()
+
+  await expect(page.locator('.toast', { hasText: 'Durées enregistrées.' })).toBeVisible()
+  await reglagesEnBase(page, (r) => r.rythme.pages === 7)
+  await expect(toastRecalcul(page, 'recalculé')).toHaveCount(0)
+  await expect(annuler(page)).toBeEnabled()
 })
 
 // ───────────────────────────── Récurrence ─────────────────────────────
@@ -438,7 +581,7 @@ test('réduire la journée et changer le pas avec des créneaux hors bornes ou h
   const erreurs: string[] = []
   page.on('pageerror', (e) => erreurs.push(e.message))
   // cr-odd : hors grille de 10 min (16 h 05, 55 min) ; cr-d (13 h 30) sera hors des nouvelles bornes.
-  await ouvrir(page, { creneaux: [creneau('cr-odd', 'c3:304', '2026-11-04T16:05', 55)] })
+  await ouvrir(page, { creneaux: [creneau('cr-odd', 'c3:304', '2026-11-04T16:05', 55, { dureePerso: true })] })
   await versReglages(page)
   await page.getByLabel('Début de journée').fill('09:00')
   await page.getByLabel('Fin de journée').fill('12:00')

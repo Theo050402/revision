@@ -6,6 +6,7 @@ import type { College } from '../../../domain/types'
 import { lireCoefficient } from '../../../domain/validation'
 import { FeuilleConfirmation } from '../../feuilles/FeuilleConfirmation'
 import { ouvrirImport, useDemandeImport } from '../../importDemande'
+import { appliquerEtRecalculer } from '../../recalcul'
 import { useStore } from '../../store'
 import { toast } from '../../Toast'
 import { Champ } from './Champ'
@@ -54,7 +55,10 @@ function LigneCollege({ college }: { college: College }) {
     if (nomValide && nom.trim() !== college.nom) appliquer((e) => modifierCollege(e, college.id, { nom: nom.trim() }))
   }
   const validerCoef = () => {
-    if (coefLu !== null && coefLu !== college.coefficient) appliquer((e) => modifierCollege(e, college.id, { coefficient: coefLu }))
+    // Le coefficient change la durée des créneaux à venir de ce collège, et d'eux seuls.
+    if (coefLu !== null && coefLu !== college.coefficient) {
+      appliquerEtRecalculer((e) => modifierCollege(e, college.id, { coefficient: coefLu }), { portee: { collegeId: college.id } })
+    }
   }
 
   const supprimer = () => {

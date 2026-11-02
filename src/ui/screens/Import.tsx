@@ -2,10 +2,12 @@
 // puis écran de vérification (Verification.tsx). Le PDF n'est pas conservé.
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { ajouterCollege, reimporterCollege } from '../../domain/actions-etat'
+import type { Etat } from '../../domain/types'
 import { construireItems, nomDepuisFichier, type ItemExtrait } from '../../import/catalog'
 import { ErreurPdf, descriptionTechnique, lirePdf } from '../../import/lirePdf'
 import { VERSION_APP } from '../../version'
 import { useDemandeImport } from '../importDemande'
+import { appliquerEtRecalculer } from '../recalcul'
 import { useStore } from '../store'
 import { toast } from '../Toast'
 import { Verification } from './Verification'
@@ -32,6 +34,13 @@ type Phase =
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 const pluriel = (n: number) => `${n} ${n > 1 ? 'items' : 'item'}`
+
+/** Items du collège présents avant et après le réimport dont le nombre de pages a changé. */
+function itemsAvecPagesChangees(avant: Etat, apres: Etat, collegeId: string): string[] {
+  return Object.values(avant.items)
+    .filter((it) => it.collegeId === collegeId && apres.items[it.id] !== undefined && apres.items[it.id].pages !== it.pages)
+    .map((it) => it.id)
+}
 
 /** `onTermine(true)` après un enregistrement, `onTermine(false)` si Emma abandonne. */
 export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void }) {
@@ -99,16 +108,15 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
 
   function valider(nom: string, items: ItemExtrait[]) {
     // Ajouter ou réimporter un collège n'est pas une opération sur les créneaux : hors historique (§9.6).
-    const ok = useStore
-      .getState()
-      .appliquerSansHistorique(
-        (e) =>
-          college && e.colleges[college.id]
-            ? reimporterCollege(e, college.id, items)
-            : ajouterCollege(e, nom, items),
-        // Un réimport remplace les items : annuler ne doit pas ramener l'ancien état (ni ses créneaux).
-        { viderHistorique: Boolean(college) },
-      )
+    const cible = college && useStore.getState().etat.colleges[college.id] ? college : null
+    const ok = cible
+      ? appliquerEtRecalculer((e) => reimporterCollege(e, cible.id, items), {
+          // Seuls les items dont le nombre de pages change : leurs créneaux à venir sont recalculés.
+          portee: (avant, apres) => ({ itemIds: itemsAvecPagesChangees(avant, apres, cible.id) }),
+          // Un réimport remplace les items : annuler ne doit pas ramener l'ancien état (ni ses créneaux).
+          viderHistorique: true,
+        })
+      : useStore.getState().appliquerSansHistorique((e) => ajouterCollege(e, nom, items), { viderHistorique: Boolean(college) })
     if (!ok) return
     toast(`${college ? 'Collège réimporté' : 'Collège ajouté'} : ${college ? college.nom : nom} (${pluriel(items.length)})`)
     onTermine(true)

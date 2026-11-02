@@ -1,9 +1,10 @@
 // Réglages › Durées et Journée (spec §6, §11). Les champs sont des brouillons : rien n'est enregistré tant que
-// « Enregistrer » n'est pas pressé, et il reste désactivé tant qu'un champ est invalide. Les créneaux existants
-// gardent leur durée : seuls les prochains dépôts utilisent les nouvelles valeurs.
+// « Enregistrer » n'est pas pressé, et il reste désactivé tant qu'un champ est invalide. L'enregistrement recalcule
+// les créneaux à venir (`appliquerEtRecalculer`).
 import { modifierReglages } from '../../../domain/actions-etat'
 import type { Reglages } from '../../../domain/types'
 import { brutDurees, lireDurees, lireJournee, reglagesPourPas } from '../../../domain/validation'
+import { appliquerEtRecalculer } from '../../recalcul'
 import { useStore } from '../../store'
 import { toast } from '../../Toast'
 import { apercuDurees } from '../reglagesLogique'
@@ -24,15 +25,17 @@ export function Durees() {
 
   const enregistrer = () => {
     if (!lecture.ok) return
-    useStore.getState().appliquerSansHistorique((e) => modifierReglages(e, lecture.valeurs))
     toast('Durées enregistrées.')
+    // Les réglages s'appliquent aussi aux créneaux à venir (ni faits, ni à durée réglée à la main).
+    appliquerEtRecalculer((e) => modifierReglages(e, lecture.valeurs))
   }
 
   return (
     <section className="carte reglage" aria-labelledby="titre-durees">
       <h2 id="titre-durees">Durées</h2>
       <p className="aide">
-        Seuls les prochains créneaux déposés utilisent ces valeurs : les créneaux existants gardent leur durée.
+        À l'enregistrement, les créneaux à venir sont recalculés avec ces valeurs, sauf ceux déjà faits ou dont la
+        durée a été réglée à la main.
       </p>
 
       <fieldset className="groupe">
@@ -143,11 +146,12 @@ export function Journee() {
 
   const enregistrer = () => {
     if (!lecture.ok) return
-    useStore.getState().appliquerSansHistorique((e) => ({
-      ...e,
-      reglages: { ...reglagesPourPas(e.reglages, pas), journee: lecture.valeurs },
-    }))
     toast('Journée enregistrée.')
+    // Seul un changement de pas touche aux durées : les bornes de la journée ne recalculent rien.
+    appliquerEtRecalculer(
+      (e) => ({ ...e, reglages: { ...reglagesPourPas(e.reglages, pas), journee: lecture.valeurs } }),
+      { portee: (avant, apres) => (apres.reglages.pas !== avant.reglages.pas ? {} : null) },
+    )
   }
 
   return (

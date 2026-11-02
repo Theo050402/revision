@@ -43,6 +43,11 @@ export function useMaintenant(): string {
   return useSyncExternalStore(abonner, instantane)
 }
 
+/** Jour courant `YYYY-MM-DD` (Paris), lu à l'instant de l'appel : pour les gestionnaires, hors rendu. */
+export function aujourdhuiParis(): string {
+  return jourDe(utcVersLocal(new Date()))
+}
+
 /** Jour courant `YYYY-MM-DD` (Paris) ; ne change qu'à minuit. */
 export function useAujourdhui(): string {
   return useSyncExternalStore(abonner, () => jourDe(instantane()))
