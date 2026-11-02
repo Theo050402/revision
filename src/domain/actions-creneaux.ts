@@ -220,7 +220,7 @@ export function redimensionner(e: Etat, creneauId: string, duree: number): Etat 
 }
 
 /** Retire un créneau de `etat` (muté : copie locale) ; exporté, sa suppression est mise en attente (§12.1). */
-function retirer(etat: Etat, ancien: Etat, c: Creneau): void {
+export function retirer(etat: Etat, ancien: Etat, c: Creneau): void {
   delete etat.creneaux[c.id]
   if (c.versionExportee !== null) {
     etat.suppressions = {
