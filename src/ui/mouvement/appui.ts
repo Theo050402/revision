@@ -47,7 +47,11 @@ export function installerAppui(): () => void {
     if (dans) presse.setAttribute('data-presse', '')
     else presse.removeAttribute('data-presse')
   }
-  const fin = () => retirer()
+  // Un deuxième doigt qui se lève ne relâche pas l'appui du premier.
+  const fin = (e: Event) => {
+    if (e instanceof PointerEvent && !e.isPrimary) return
+    retirer()
+  }
   document.addEventListener('pointerdown', bas, true)
   document.addEventListener('pointermove', bouge, true)
   document.addEventListener('pointerup', fin, true)
@@ -63,6 +67,13 @@ export function installerAppui(): () => void {
     window.removeEventListener('blur', fin)
     retirer()
   }
+}
+
+/** L'élément qui vient d'ouvrir une feuille : le dernier touché, sinon celui qui a le focus (ouverture au clavier). */
+export function elementDeclencheur(): HTMLElement | null {
+  if (dernier && performance.now() - dernier.t <= FRAICHEUR && dernier.el instanceof HTMLElement) return dernier.el
+  const actif = document.activeElement
+  return actif instanceof HTMLElement && actif !== document.body && !actif.closest('[role="dialog"]') ? actif : null
 }
 
 /** Point (px écran) d'où une feuille s'ouvre : le centre de l'élément touché s'il est petit, sinon le doigt. */

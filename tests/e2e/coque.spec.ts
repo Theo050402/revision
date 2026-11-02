@@ -218,7 +218,11 @@ test("appui : un bouton pressé est réduit avant le relâchement, un bloc ou un
   const s = await centre(segment)
   await pointeur(page, 'pointerdown', s)
   await expect.poll(async () => (await matrice(segment)).a, { timeout: 1000 }).toBeLessThan(1)
-  await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', bubbles: true })))
+  // Un deuxième doigt qui se lève ne relâche pas l'appui du premier.
+  await pointeur(page, 'pointerup', s, 9)
+  await page.waitForTimeout(200)
+  expect((await matrice(segment)).a).toBeLessThan(1)
+  await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', isPrimary: true, bubbles: true })))
   await expect.poll(async () => (await matrice(segment)).a, { timeout: 1000 }).toBe(1)
 
   // Un bloc de la grille se fonce au lieu de rétrécir (il se glisse).
@@ -382,4 +386,99 @@ test('balayage de semaine : la grille suit le doigt puis se pose par ressort', a
   expect(Math.min(...vus)).toBeLessThan(-zone.width * 0.6)
   expect(Math.max(...vus)).toBeGreaterThan(zone.width * 0.3)
   expect(vus.filter((e) => e > 1 && e < zone.width * 0.9).length).toBeGreaterThan(2)
+})
+
+/** Valeurs d'un axe du `transform` relevées image par image (voir `echantillonner`) : croissantes ou décroissantes ? */
+const monotone = (valeurs: number[], sens: 1 | -1) => valeurs.every((v, i) => i === 0 || (v - valeurs[i - 1]) * sens >= -0.01)
+
+test('sortie : le corps de la feuille est inerte et un appui sur Fermer ne fait pas hoqueter la sortie', async ({ page }, info) => {
+  await ouvrirSemee(page)
+  const bloc = page.locator('[data-creneau="cr-c"]')
+  await bloc.click()
+  const feuille = page.getByRole('dialog')
+  await expect(feuille).toBeVisible()
+  await expect(page.locator('[data-anime]')).toHaveCount(0)
+  const supprimer = await centre(feuille.getByRole('button', { name: 'Supprimer' }), false)
+  const fermer = await centre(feuille.getByRole('button', { name: 'Fermer' }), false)
+
+  await echantillonner(page, '.feuille')
+  await page.keyboard.press('Escape')
+  // Pendant la sortie : le corps est inerte (clavier, lecteur d'écran) et ne reçoit plus le doigt ; la tête reste active.
+  await expect(page.locator('.feuille[data-sortie] .feuille-corps[inert]')).toHaveCount(1)
+  expect(await page.locator('.feuille .feuille-corps').evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none')
+  await page.mouse.click(supprimer.x, supprimer.y)
+  // Un appui sur « Fermer » en pleine sortie : elle ne s'arrête pas, ne repart pas en arrière, ne se ferme pas deux fois.
+  await page.mouse.click(fermer.x, fermer.y)
+  await expect(page.locator('.feuille')).toHaveCount(0)
+  const vus = await echantillons(page)
+  const axe = estIpad(info.project.name) ? vus.map((v) => -echelle(v.transform)) : vus.map((v) => decalage(v.transform, 'f'))
+  expect(axe.length).toBeGreaterThan(3)
+  expect(monotone(axe, 1)).toBe(true)
+  // « Supprimer » n'a rien déclenché : le créneau est toujours là.
+  await expect(bloc).toHaveCount(1)
+  await expect(page.locator('.toast')).toHaveCount(0)
+})
+
+test('fermeture par le parent (Enregistrer) : la même sortie animée, puis le focus revient au bloc', async ({ page }, info) => {
+  await ouvrirSemee(page)
+  await page.getByRole('button', { name: 'Semaine', exact: true }).click()
+  const stage = page.locator('[data-indispo="in-stage"]')
+  await stage.click()
+  const feuille = page.getByRole('dialog')
+  await expect(feuille).toBeVisible()
+  await expect(page.locator('[data-anime]')).toHaveCount(0)
+  await feuille.getByRole('textbox', { name: 'Titre' }).fill('Stage de nuit')
+  await echantillonner(page, '.feuille')
+  await feuille.getByRole('button', { name: 'Enregistrer' }).click()
+  // La fiche est retirée tout de suite (plus de dialogue), mais sa sortie se joue sur une copie sans effet.
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.locator('.feuille')).toHaveCount(0)
+  const vus = await echantillons(page)
+  if (estIpad(info.project.name)) {
+    const e = vus.map((v) => echelle(v.transform))
+    expect(Math.min(...e)).toBeLessThan(0.97)
+    expect(monotone(e.map((v) => -v), 1)).toBe(true)
+  } else {
+    const f = vus.map((v) => decalage(v.transform, 'f'))
+    expect(Math.max(...f)).toBeGreaterThan(100)
+    expect(monotone(f, 1)).toBe(true)
+  }
+  expect(vus.some((v) => v.opacite < 1) || !estIpad(info.project.name)).toBe(true)
+  // Enregistré, et le focus est revenu au bloc qui avait ouvert la fiche.
+  await expect(stage).toContainText('Stage de nuit')
+  await expect(stage).toBeFocused()
+})
+
+test('balayage : une piste saisie en plein mouvement puis relâchée sur place se pose, sans rechanger de semaine', async ({ page }) => {
+  await ouvrirSemee(page)
+  const zone = (await page.locator('.calendrier-defilement').boundingBox())!
+  const periode = page.locator('.calendrier-periode')
+  const piste = page.locator('.calendrier-piste')
+  const y = zone.y + 280
+  const x0 = zone.x + zone.width * 0.8
+  const avant = await periode.textContent()
+  await pointeur(page, 'pointerdown', { x: x0, y })
+  await pointeur(page, 'pointermove', { x: x0 - 30, y })
+  await pointeur(page, 'pointermove', { x: x0 - zone.width * 0.4, y })
+  await page.waitForTimeout(200)
+  await pointeur(page, 'pointerup', { x: x0 - zone.width * 0.4, y })
+  await expect(periode).not.toHaveText(avant ?? '')
+  const apres = await periode.textContent()
+  // La nouvelle semaine entre par la droite : on la saisit en route et on la relâche sans bouger.
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 2000 }).toBeGreaterThan(5)
+  const e0 = (await matrice(piste)).e
+  expect(e0).toBeLessThan(zone.width)
+  await pointeur(page, 'pointerdown', { x: x0, y })
+  await page.waitForTimeout(150)
+  await pointeur(page, 'pointerup', { x: x0, y })
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 2000 }).toBeCloseTo(0, 0)
+  await expect(periode).toHaveText(apres ?? '')
+  // Rien ne reste d'inline sur la piste au repos.
+  await expect.poll(() => piste.evaluate((el) => [el.style.transform, el.style.willChange])).toEqual(['', ''])
+  // Un geste trop court, ou annulé, ne laisse pas will-change non plus.
+  await pointeur(page, 'pointerdown', { x: x0, y })
+  await pointeur(page, 'pointermove', { x: x0 - 20, y })
+  await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', isPrimary: true, bubbles: true })))
+  await page.evaluate(() => document.querySelector('.calendrier-defilement')!.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', isPrimary: true, bubbles: true })))
+  await expect.poll(() => piste.evaluate((el) => [el.style.transform, el.style.willChange])).toEqual(['', ''])
 })

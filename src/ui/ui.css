@@ -538,6 +538,11 @@ button {
   background: var(--panel);
 }
 
+/* Pendant sa sortie, le corps de la feuille ne répond plus (il est aussi `inert` : clavier et lecteurs d'écran). */
+.feuille[data-sortie] .feuille-corps {
+  pointer-events: none;
+}
+
 /* Tête de la feuille (poignée et titre) : la prise pour la tirer vers le bas. */
 .feuille-prise {
   flex: none;

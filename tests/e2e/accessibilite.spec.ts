@@ -235,7 +235,7 @@ test.describe('mouvement réduit', () => {
     await pointeur(page, 'pointerdown', await centre(bouton))
     await expect.poll(() => bouton.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe(avant)
     expect(await bouton.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
-    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', bubbles: true })))
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', isPrimary: true, bubbles: true })))
 
     // Feuille : jamais de transformation, seulement l'opacité, de 0 à 1 en ~150 ms.
     await page.evaluate(() => {

@@ -83,6 +83,17 @@ function creerBalayage(piste: () => HTMLElement | null, aller: (sens: -1 | 1) =>
     }
   }
 
+  /** Fin de geste sans mouvement en cours : plus rien d'inline sur la piste (ni `transform`, ni `will-change`). */
+  const nettoyer = () => {
+    if (anim) return
+    const el = piste()
+    if (el) {
+      el.style.transform = ''
+      el.style.willChange = ''
+    }
+    x = 0
+  }
+
   /** La piste revient à sa place par ressort, avec la vitesse du doigt. */
   const revenir = (vitesse: number) => {
     anim?.arreter()
@@ -119,6 +130,7 @@ function creerBalayage(piste: () => HTMLElement | null, aller: (sens: -1 | 1) =>
     if (!doigt) return
     doigt.mode = 'abandon'
     if (x !== 0) revenir(0)
+    else nettoyer()
   }
 
   return {
@@ -150,7 +162,7 @@ function creerBalayage(piste: () => HTMLElement | null, aller: (sens: -1 | 1) =>
         }
         doigt.mode = 'horizontal'
         const el = piste()
-        if (el) el.style.willChange = 'transform'
+        if (el && !mouvementReduit()) el.style.willChange = 'transform'
       }
       suivi.ajouter(e.clientX, performance.now())
       if (!mouvementReduit()) ecrire(doigt.base + dx)
@@ -161,25 +173,34 @@ function creerBalayage(piste: () => HTMLElement | null, aller: (sens: -1 | 1) =>
       if (!d || d.id !== e.pointerId) return
       if (gesteDepuis(d.t) || d.mode === 'abandon') {
         if (x !== 0) revenir(0)
+        else nettoyer()
         return
       }
       const dx = e.clientX - d.x
       const dy = e.clientY - d.y
       // Aucun mouvement relevé avant le relâchement (geste très bref) : le sens se tranche sur le déplacement total.
-      if (d.mode === 'attente' && (Math.abs(dx) < VERROU || Math.abs(dx) < 1.5 * Math.abs(dy))) return
+      if (d.mode === 'attente' && (Math.abs(dx) < VERROU || Math.abs(dx) < 1.5 * Math.abs(dy))) return nettoyer()
       const maintenant = performance.now()
       suivi.ajouter(e.clientX, maintenant)
       const pos = d.base + dx
       const v = suivi.vitesse(maintenant)
       const projete = pos + projeter(v, 0.99)
       const sens: -1 | 1 = pos < 0 ? 1 : -1
-      const change = Math.abs(pos) >= DISTANCE_MIN && Math.sign(projete) === Math.sign(pos) && Math.abs(projete) > PART_LARGEUR * largeur
+      // Le doigt doit avoir bougé, et dans le sens où la piste s'éloigne de sa place : une piste saisie en plein
+      // mouvement puis relâchée sur place (ou ramenée vers sa place) se pose, elle ne rechange pas de période.
+      const intention = dx + projeter(v, 0.99)
+      const change =
+        Math.abs(dx) >= VERROU &&
+        Math.sign(intention) === Math.sign(pos) &&
+        Math.abs(pos) >= DISTANCE_MIN &&
+        Math.sign(projete) === Math.sign(pos) &&
+        Math.abs(projete) > PART_LARGEUR * largeur
       if (mouvementReduit()) {
-        if (!change) return
+        if (!change) return nettoyer()
         const el = piste()
         aller(sens)
         if (el) fade = fondu((o) => (el.style.opacity = String(o)), 0, 1, 150, () => (el.style.opacity = ''))
-        return
+        return nettoyer()
       }
       ecrire(pos)
       if (change) changer(sens, v)
@@ -188,6 +209,7 @@ function creerBalayage(piste: () => HTMLElement | null, aller: (sens: -1 | 1) =>
     onPointerCancel() {
       doigt = null
       if (x !== 0) revenir(0)
+      else nettoyer()
     },
     detruire() {
       anim?.arreter()

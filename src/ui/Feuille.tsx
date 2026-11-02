@@ -1,18 +1,23 @@
 import { useEffect, useId, useLayoutEffect, useRef, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { animerFeuille, type MouvementFeuille } from './mouvement/feuille'
+import { elementDeclencheur } from './mouvement/appui'
+import { animerFeuille, laisserPartir, type MouvementFeuille } from './mouvement/feuille'
 
 /**
  * Feuille modale : sur iPhone elle monte du bas et se ferme en la tirant vers le bas ; sur iPad (feuille étroite)
  * c'est un popover qui grandit depuis le bouton qui l'a ouvert (mouvement : `mouvement/feuille.ts`, spec §C.6).
- * Échap, le fond, « Fermer » et la tirée la ferment, avec la sortie animée ; le focus entre dans la feuille.
- * Le parent rend le reste de l'interface inerte pendant ce temps et rend le focus au bouton qui l'a ouverte.
- * `onFermer` n'est appelé qu'une fois la sortie terminée.
+ * Échap, le fond, « Fermer » et la tirée la ferment, avec la sortie animée (`onFermer` n'est appelé qu'une fois
+ * celle-ci terminée, et le corps de la feuille est inerte pendant qu'elle s'en va) ; le focus entre dans la feuille.
+ * Quand c'est le parent qui la retire (Enregistrer, Annuler, Supprimer…), elle joue la même sortie sur une copie
+ * sans effet (`laisserPartir`). Le parent rend le reste de l'interface inerte pendant ce temps ; le focus revient au
+ * bouton qui l'a ouverte, sauf si le parent l'a déjà placé ailleurs.
  *
  * Rendue dans `document.body` (portail) : un ancêtre contenu (`contain`) ou transformé deviendrait sinon le bloc
  * conteneur de son fond `position: fixed`, qui ne couvrirait plus l'écran (ex. la feuille d'une indisponibilité
  * tracée dans la grille, qui défile).
  */
+const FOCALISABLE = 'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"])'
+
 export function Feuille({
   titre,
   onFermer,
@@ -41,11 +46,22 @@ export function Feuille({
 
   // Avant la première peinture : la feuille est posée hors de l'écran (ou réduite) avant d'être vue.
   useLayoutEffect(() => {
-    const m = animerFeuille({ fond: fond.current!, voile: voile.current!, feuille: feuille.current! }, () => surFermer.current())
+    const racine = fond.current!
+    const origine = elementDeclencheur()
+    const m = animerFeuille({ fond: racine, voile: voile.current!, feuille: feuille.current! }, () => surFermer.current())
     mouvement.current = m
     return () => {
-      m.detruire()
+      // Retirée par le parent avant la fin de sa propre sortie : une copie la joue (le DOM est encore dans la page).
+      const reprise = m.detruire()
+      if (reprise) laisserPartir(racine, reprise)
       mouvement.current = null
+      // Le focus d'une feuille retirée tombe sur le document : il revient au bouton qui l'avait ouverte (après les
+      // effets des parents, qui peuvent le placer eux-mêmes).
+      requestAnimationFrame(() => {
+        const actif = document.activeElement
+        if (actif && actif !== document.body) return
+        if (origine?.isConnected && !origine.closest('[inert]') && origine.matches(FOCALISABLE)) origine.focus({ preventScroll: true })
+      })
     }
   }, [])
 
