@@ -18,9 +18,13 @@ export const RESSORT_FEUILLE: ParamsRessort = { amortissement: 0.8, reponse: 0.3
 const PAS = 1 / 120
 /** Au-delà, une image trop longue (onglet en veille) est écrêtée pour ne pas faire sauter le mouvement. */
 const DT_MAX = 0.05
-/** Seuils de repos : sous ces écarts, la valeur est posée exactement sur la cible. */
-const EPSILON_POSITION = 0.01
-const EPSILON_VITESSE = 0.01
+/**
+ * Seuils de repos, relatifs à la course : sous `max(1e-4, |course| × 1e-3)` d'écart (et autant en unités/s
+ * de vitesse), la valeur est posée exactement sur la cible. Une opacité ou une échelle (course ≤ 1) ne saute
+ * donc pas de 1 % à l'arrivée, et une course de 1 000 px ne traîne pas d'images invisibles.
+ */
+const SEUIL_RELATIF = 1e-3
+const SEUIL_MIN = 1e-4
 
 /**
  * Un pas d'intégration semi-implicite (Euler symplectique, masse 1) :
@@ -34,6 +38,8 @@ export function pasRessort(
   p: ParamsRessort,
   dt: number,
 ): { x: number; v: number } {
+  // Horodatage absent, à rebours ou infini : aucun pas (une boucle infinie ou un recul seraient pires).
+  if (!Number.isFinite(dt) || dt <= 0) return { x, v }
   const omega = (2 * Math.PI) / p.reponse
   const k = omega * omega
   const c = 4 * Math.PI * p.amortissement / p.reponse
@@ -101,21 +107,29 @@ export function animerValeur(
   let x = depart
   let v = 0
   let cible = depart
+  let seuil = SEUIL_MIN
+  /** Image demandée et pas encore exécutée, ou image en cours d'exécution : `null` = boucle arrêtée. */
   let id: number | null = null
   let dernier = 0
 
   const image = (ts: number) => {
-    id = null
+    const courante = id
     const dt = Math.min(Math.max((ts - dernier) / 1000, 0), DT_MAX)
     dernier = ts
     ;({ x, v } = pasRessort(x, v, cible, p, dt))
-    if (Math.abs(x - cible) < EPSILON_POSITION && Math.abs(v) < EPSILON_VITESSE) {
+    const pose = Math.abs(x - cible) < seuil && Math.abs(v) < seuil
+    if (pose) {
       x = cible
       v = 0
-      appliquer(x)
+    }
+    // Pendant `appliquer`, `id` reste celui de cette image : un `vers()` ré-entrant ne lance pas de seconde
+    // boucle (il change seulement la cible), un `arreter()` ré-entrant la remet à `null` et elle s'arrête.
+    appliquer(x)
+    if (id !== courante) return // arrêtée (ou relancée ailleurs) pendant `appliquer`
+    if (pose && x === cible && v === 0) {
+      id = null
       return
     }
-    appliquer(x)
     id = horloge.requestAnimationFrame(image)
   }
 
@@ -128,6 +142,7 @@ export function animerValeur(
   return {
     vers(nouvelleCible, vitesse) {
       cible = nouvelleCible
+      seuil = Math.max(SEUIL_MIN, Math.abs(cible - x) * SEUIL_RELATIF)
       if (mouvementReduit()) {
         arreter()
         x = cible

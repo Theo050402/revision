@@ -105,6 +105,13 @@ describe('pasRessort', () => {
     expect(pose(avec)).toBeGreaterThan(pose(sans))
   })
 
+  it.each([-0.01, 0, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'ignore un dt non fini ou non positif (%s)',
+    (dt) => {
+      expect(pasRessort(10, 5, 100, RESSORT_DOUX, dt)).toEqual({ x: 10, v: 5 })
+    },
+  )
+
   it('un pas plus long que 1/120 s reste stable (sous-pas internes)', () => {
     let x = 0
     let v = 0
@@ -197,6 +204,78 @@ describe('animerValeur', () => {
     expect(vu).toEqual([100])
     expect(anim.valeur()).toBe(100)
     expect(h.enAttente()).toBe(0)
+  })
+})
+
+describe('animerValeur : ré-entrance', () => {
+  it('appliquer qui rappelle vers() ne lance pas une seconde boucle', () => {
+    const h = horlogeManuelle()
+    let n = 0
+    const anim = animerValeur(0, RESSORT_DOUX, () => {
+      n++
+      if (n === 3) anim.vers(200)
+      expect(h.enAttente()).toBeLessThanOrEqual(1)
+    }, h.horloge)
+    anim.vers(100)
+    for (let i = 0; i < 10; i++) {
+      h.avancer(1000 / 60)
+      expect(h.enAttente()).toBeLessThanOrEqual(1)
+    }
+    h.avancer(3000)
+    expect(anim.valeur()).toBe(200)
+    expect(h.enAttente()).toBe(0)
+  })
+
+  it('appliquer qui appelle arreter() arrête vraiment la boucle', () => {
+    const h = horlogeManuelle()
+    let n = 0
+    const anim = animerValeur(0, RESSORT_DOUX, () => {
+      n++
+      if (n === 3) anim.arreter()
+    }, h.horloge)
+    anim.vers(100)
+    h.avancer(1000)
+    expect(n).toBe(3)
+    expect(h.enAttente()).toBe(0)
+    expect(anim.valeur()).toBeLessThan(100)
+  })
+
+  it('appliquer qui relance vers() à la dernière image (repos) repart', () => {
+    const h = horlogeManuelle()
+    let relance = false
+    const anim = animerValeur(0, RESSORT_RAPIDE, (x) => {
+      if (x === 10 && !relance) {
+        relance = true
+        anim.vers(20)
+      }
+    }, h.horloge)
+    anim.vers(10)
+    h.avancer(3000)
+    expect(relance).toBe(true)
+    expect(anim.valeur()).toBe(20)
+    expect(h.enAttente()).toBe(0)
+  })
+})
+
+describe('animerValeur : seuils de repos relatifs à la course', () => {
+  /** Valeurs appliquées pour une course de `d` depuis 0. */
+  function course(d: number, p: ParamsRessort = RESSORT_DOUX): number[] {
+    const h = horlogeManuelle()
+    const vu: number[] = []
+    animerValeur(0, p, (x) => vu.push(x), h.horloge).vers(d)
+    h.avancer(5000)
+    return vu
+  }
+
+  it('une petite course (échelle 1 → 1,04) se pose sans saut visible', () => {
+    const vu = course(0.04)
+    expect(vu[vu.length - 1]).toBe(0.04)
+    // Dernier saut (posé exactement sur la cible) : moins de 0,5 % de la course.
+    expect(Math.abs(vu[vu.length - 1] - vu[vu.length - 2]) / 0.04).toBeLessThan(0.005)
+  })
+
+  it('une course de 1 000 px ne traîne pas plus d’images qu’une course de 1', () => {
+    expect(course(1000, RESSORT_RAPIDE).length).toBeLessThanOrEqual(course(1, RESSORT_RAPIDE).length + 1)
   })
 })
 

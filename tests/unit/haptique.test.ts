@@ -6,6 +6,7 @@ type Noeud = {
   style: Record<string, string>
   enfants: Noeud[]
   clics: number
+  isConnected: boolean
   setAttribute(k: string, v: string): void
   appendChild(n: Noeud): Noeud
   click(): void
@@ -18,11 +19,13 @@ function noeud(tag: string): Noeud {
     style: {},
     enfants: [],
     clics: 0,
+    isConnected: tag === 'body',
     setAttribute(k, v) {
       n.attrs[k] = v
     },
     appendChild(e) {
       n.enfants.push(e)
+      e.isConnected = n.isConnected
       return e
     },
     click() {
@@ -109,6 +112,7 @@ describe("haptique : interrupteur caché (iOS)", () => {
     expect(label!.attrs['aria-hidden']).toBe('true')
     expect(input!.attrs.type).toBe('checkbox')
     expect(input!.attrs).toHaveProperty('switch')
+    expect(input!.attrs.tabindex).toBe('-1')
     expect(label!.enfants).toContain(input)
     expect(doc.body.enfants).toContain(label)
     expect(label!.style.position).toBe('fixed')
@@ -149,6 +153,20 @@ describe("haptique : interrupteur caché (iOS)", () => {
     expect(doc.crees.filter((n) => n.tag === 'input')).toHaveLength(1)
     expect(doc.body.enfants).toHaveLength(1)
     expect(doc.crees.find((n) => n.tag === 'label')!.clics).toBe(1 + 2 + 2)
+  })
+
+  it("recrée l'interrupteur s'il a été retiré du document", async () => {
+    const doc = installer()
+    const haptique = await charger()
+    haptique('leger')
+    const premier = doc.crees.find((n) => n.tag === 'label')!
+    premier.isConnected = false // retiré (re-rendu de body, test…)
+    haptique('leger')
+    const labels = doc.crees.filter((n) => n.tag === 'label')
+    expect(labels).toHaveLength(2)
+    expect(labels[1].isConnected).toBe(true)
+    expect(labels[1].clics).toBe(1)
+    expect(premier.clics).toBe(1)
   })
 
   it('ne lève jamais, même sans document ni navigator', async () => {

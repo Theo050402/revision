@@ -22,11 +22,14 @@ const BASCULES: Record<MotifHaptique, number> = { leger: 1, succes: 2, erreur: 2
 /** Écart entre deux tics d'un motif double. */
 const ECART_MS = 60
 
-/** Interrupteur caché, créé au premier besoin puis réutilisé. */
-let interrupteur: { click(): void } | null = null
+type Interrupteur = { click(): void; isConnected?: boolean }
 
-function obtenirInterrupteur(): { click(): void } | null {
-  if (interrupteur) return interrupteur
+/** Interrupteur caché, créé au premier besoin puis réutilisé tant qu'il reste dans le document. */
+let interrupteur: Interrupteur | null = null
+
+function obtenirInterrupteur(): Interrupteur | null {
+  if (interrupteur?.isConnected) return interrupteur
+  interrupteur = null
   if (typeof document === 'undefined' || !document) return null
   const label = document.createElement('label')
   label.setAttribute('aria-hidden', 'true')
