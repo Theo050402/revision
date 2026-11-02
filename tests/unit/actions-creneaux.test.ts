@@ -8,6 +8,7 @@ import {
   modifierNote,
   redimensionner,
   supprimerCreneau,
+  viderPlanning,
   vueJour,
   type Cible,
 } from '../../src/domain/actions-creneaux'
@@ -351,6 +352,35 @@ describe('supprimerCreneau', () => {
   it('ne renumérote pas les autres tours', () => {
     const e = base([creneau('A', { tour: 1 }), creneau('B', { tour: 2, debut: `${J}T09:00` })])
     expect(supprimerCreneau(e, 'A').creneaux.B.tour).toBe(2)
+  })
+})
+
+describe('viderPlanning', () => {
+  it("supprime tous les créneaux (placés et à placer) ; seul l'exporté laisse une suppression en attente", () => {
+    const A = creneau('A', { versionExportee: 2 })
+    const B = creneau('B', { debut: `${J}T09:00` })
+    const C = creneau('C', { debut: null })
+    const e = base([A, B, C], [indispo('I', `${J}T08:00`, `${J}T09:00`)])
+    const apres = viderPlanning(e)
+    expect(apres.creneaux).toEqual({})
+    expect(apres.suppressions).toEqual({ A: { creneauId: 'A', libelle: '300 · T1 · mardi 5 nov. 14h' } })
+    expect(apres.colleges).toBe(e.colleges)
+    expect(apres.items).toBe(e.items)
+    expect(apres.indispos).toBe(e.indispos)
+    expect(apres.reglages).toBe(e.reglages)
+    expect(e.creneaux.A).toBe(A)
+  })
+
+  it('conserve les suppressions déjà en attente', () => {
+    const e = base([creneau('A', { versionExportee: 1 })])
+    e.suppressions = { Z: { creneauId: 'Z', libelle: 'ancien' } }
+    const apres = viderPlanning(e)
+    expect(Object.keys(apres.suppressions).sort()).toEqual(['A', 'Z'])
+  })
+
+  it("renvoie le même état s'il n'y a aucun créneau", () => {
+    const e = base()
+    expect(viderPlanning(e)).toBe(e)
   })
 })
 

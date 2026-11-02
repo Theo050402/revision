@@ -871,3 +871,63 @@ test('lecture impossible : la restauration est le chemin de récupération', asy
   await expect(page.locator('.toast', { hasText: "utilise « Repartir d'un calendrier vide » dans Exporter." })).toBeVisible()
   await expect.poll(async () => (await lireTable<{ nom: string }>(page, 'colleges')).map((c) => c.nom)).toEqual(['Récupéré'])
 })
+
+// ───────────────────────────── Vider le planning ─────────────────────────────
+
+const TOUS_LES_ITEMS = ['c2:300', 'c3:301', 'c1:290', 'c1:291', 'c1:292', 'c3:304']
+
+/** Trois créneaux le même jour (les créneaux de base sont écartés), dont un déjà exporté si `exporte`. */
+function troisCreneaux(exporte: boolean) {
+  return {
+    sansCreneaux: TOUS_LES_ITEMS,
+    creneaux: [
+      creneau('v-1', 'c2:300', '2026-11-04T09:00', 60),
+      creneau('v-2', 'c1:290', '2026-11-04T11:00', 60, exporte ? { versionExportee: 1 } : {}),
+      creneau('v-3', 'c3:301', '2026-11-04T14:00', 60),
+    ],
+  }
+}
+
+test('Réglages › Données : « Vider le planning » supprime tous les créneaux, ↶ les ramène', async ({ page }) => {
+  await ouvrir(page, troisCreneaux(false))
+  await expect(page.locator('.bloc-creneau')).toHaveCount(3)
+  await versReglages(page)
+
+  const vider = page.getByRole('button', { name: 'Vider le planning' })
+  await expect(vider).toBeEnabled()
+  expect((await vider.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  await vider.click()
+
+  const feuille = page.getByRole('dialog', { name: 'Supprimer les 3 créneaux du planning ?' })
+  await expect(feuille).toContainText('Les collèges, les indisponibilités et les réglages sont conservés.')
+  await expect(feuille).not.toContainText('Calendrier')
+  // Annuler la confirmation ne change rien.
+  await feuille.getByRole('button', { name: 'Annuler' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(vider).toBeEnabled()
+
+  await vider.click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Supprimer' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(vider).toBeDisabled()
+
+  // Collèges, indisponibilités et réglages sont conservés.
+  await expect(page.getByRole('heading', { name: 'Collèges' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Indisponibilités' })).toBeVisible()
+  await retourCalendrier(page)
+  await expect(page.locator('.bloc-creneau')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Annuler', exact: true }).click()
+  await expect(page.locator('.bloc-creneau')).toHaveCount(3)
+  await versReglages(page)
+  await expect(vider).toBeEnabled()
+})
+
+test('Réglages › Données : vider un planning déjà exporté prévient pour le Calendrier', async ({ page }) => {
+  await ouvrir(page, troisCreneaux(true))
+  await versReglages(page)
+  await page.getByRole('button', { name: 'Vider le planning' }).click()
+  await expect(page.getByRole('dialog', { name: 'Supprimer les 3 créneaux du planning ?' })).toContainText(
+    'Ils sont aussi dans ton Calendrier : le plus simple est ensuite de supprimer le calendrier « Révisions » et de le recréer.',
+  )
+})

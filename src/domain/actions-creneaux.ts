@@ -219,19 +219,32 @@ export function redimensionner(e: Etat, creneauId: string, duree: number): Etat 
   return avecCreneaux(e, { [c.id]: { ...c, duree: nouvelle, dureePerso: true, version } })
 }
 
+/** Retire un créneau de `etat` (muté : copie locale) ; exporté, sa suppression est mise en attente (§12.1). */
+function retirer(etat: Etat, ancien: Etat, c: Creneau): void {
+  delete etat.creneaux[c.id]
+  if (c.versionExportee !== null) {
+    etat.suppressions = {
+      ...etat.suppressions,
+      [c.id]: { creneauId: c.id, libelle: libelleSuppression(ancien, c) },
+    }
+  }
+}
+
 /** Supprime un créneau ; s'il a déjà été exporté, la suppression est mise en attente (§12.1). */
 export function supprimerCreneau(e: Etat, creneauId: string): Etat {
   const c = e.creneaux[creneauId]
   if (!c) return e
-  const creneaux = { ...e.creneaux }
-  delete creneaux[creneauId]
-  const etat: Etat = { ...e, creneaux }
-  if (c.versionExportee !== null) {
-    etat.suppressions = {
-      ...e.suppressions,
-      [creneauId]: { creneauId, libelle: libelleSuppression(e, c) },
-    }
-  }
+  const etat: Etat = { ...e, creneaux: { ...e.creneaux } }
+  retirer(etat, e, c)
+  return etat
+}
+
+/** Vide le planning (Réglages › Données) : tous les créneaux, placés ou à placer, comme `supprimerCreneau`. */
+export function viderPlanning(e: Etat): Etat {
+  const tous = Object.values(e.creneaux)
+  if (tous.length === 0) return e
+  const etat: Etat = { ...e, creneaux: { ...e.creneaux } }
+  for (const c of tous) retirer(etat, e, c)
   return etat
 }
 

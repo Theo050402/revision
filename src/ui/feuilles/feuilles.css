@@ -140,7 +140,8 @@
 }
 
 .btn-danger {
-  background: var(--now);
+  /* --now assombri de 12 % : le texte --bg y atteint 4,5:1 en clair (4,15:1 sur --now seul) ; en sombre, plus de 5,7:1. */
+  background: color-mix(in srgb, var(--now) 88%, #000);
   color: var(--bg);
 }
 
