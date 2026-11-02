@@ -1,5 +1,5 @@
 // Texte des blocs du calendrier (spec §9.2) : « 300 · titre », puis « T1 · 22 p · 2h45 » (+ « · 1/2 »).
-import { ajouterMinutes, minutesDe } from '../../domain/temps'
+import { ajouterMinutes, minutesDe, versHm } from '../../domain/temps'
 import type { Creneau, Item } from '../../domain/types'
 import { formaterDuree } from '../duree'
 
@@ -28,3 +28,7 @@ export function descriptionCreneau(c: Creneau, item: Item | undefined): string {
   const horaire = `de ${heure(debut)} à ${heure(ajouterMinutes(debut, c.duree))}`
   return [titre, meta, horaire, ...etats].join(', ')
 }
+
+/** 480 → « 8h », 810 → « 13h30 », 1440 → « 24h ». */
+export const heureCourte = (min: number): string =>
+  min >= 1440 ? '24h' : versHm(min).replace(/^0/, '').replace(':00', 'h').replace(':', 'h')

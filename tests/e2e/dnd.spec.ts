@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
-import { MAINTENANT, item, semer } from './graine-calendrier'
-import { centre, deplacer, glisser, lacher, pointGrille, pointeur, pointeurs, saisir } from './gestes'
+import { MAINTENANT, creneau, item, semer } from './graine-calendrier'
+import { centre, deplacer, glisser, images, lacher, pointGrille, pointeur, pointeurs, saisir, type Point } from './gestes'
 
 // Glisser-déposer (tâche 18, spec §9.3–9.6). Données : celles du calendrier (semaine du 2 au 8 nov. 2026, « Stage »
 // de 8 h à 13 h lundi, mardi, jeudi et vendredi ; 300 mardi de 14 h à 16 h 45), plus trois items jamais planifiés.
@@ -24,6 +24,9 @@ const carte = (page: Page, itemId: string) =>
   page.locator(`#panneau-bibliotheque section[aria-label="Tous les items"] [data-item-id="${itemId}"]`).first()
 const bloc = (page: Page, id: string) => page.locator(`[data-creneau="${id}"]`)
 const blocsDu = (page: Page, jour: string) => page.locator(`.colonne[data-jour="${jour}"] .bloc-creneau[data-creneau]`)
+/** Copie flottante (collée au doigt) et emplacement d'atterrissage (magnétisé), spec §C.2. */
+const copie = (page: Page) => page.locator('[data-copie]')
+const atterrissage = (page: Page) => page.locator('[data-atterrissage]')
 
 async function ouvrir(page: Page, extra: Parameters<typeof semer>[1] = {}): Promise<void> {
   await page.clock.setFixedTime(MAINTENANT)
@@ -72,8 +75,8 @@ test.describe('iPad', () => {
     const vers = await pointGrille(page, MARDI, 14, 30)
     await saisir(page, await centre(carte(page, 'c1:291')), vers)
 
-    // Pendant le geste : le fantôme est posé à 14h30, 300 s'écarte vers le bas (translateY), rien n'est écrit.
-    await expect(page.locator(`.colonne[data-jour="${MARDI}"] .fantome`)).toHaveCount(1)
+    // Pendant le geste : l'emplacement est posé à 14h30, 300 s'écarte vers le bas (translateY), rien n'est écrit.
+    await expect(page.locator(`.colonne[data-jour="${MARDI}"] [data-atterrissage]`)).toHaveAttribute('data-atterrissage', `${MARDI}T14:30`)
     await expect(bloc(page, 'cr-a')).toHaveAttribute('style', /translateY\(\d+(\.\d+)?px\)/)
     await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MARDI}T14:00`)
 
@@ -81,7 +84,7 @@ test.describe('iPad', () => {
     // 291 au 4e tour : 30 min, de 14h30 à 15h ; 300 repart de 15h.
     await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MARDI}T15:00`)
     await expect(page.locator(`.colonne[data-jour="${MARDI}"] [data-debut="${MARDI}T14:30"]`)).toHaveCount(1)
-    await expect(page.locator('.fantome')).toHaveCount(0)
+    await expect(atterrissage(page)).toHaveCount(0)
   })
 
   test('lâcher sur « Stage » : la colonne tremble et rien ne change', async ({ page }) => {
@@ -90,8 +93,8 @@ test.describe('iPad', () => {
     const avant = await page.locator('.bloc-creneau[data-creneau]').count()
     const vers = await pointGrille(page, '2026-11-02', 10)
     await saisir(page, await centre(carte(page, 'c2:300')), vers)
-    // Pendant le geste : fantôme rouge, colonne teintée.
-    await expect(page.locator('.fantome[data-refus="true"]')).toHaveCount(1)
+    // Pendant le geste : emplacement rouge, colonne teintée.
+    await expect(page.locator('[data-atterrissage][data-refus="true"]')).toHaveCount(1)
     await expect(page.locator('.colonne[data-jour="2026-11-02"]')).toHaveAttribute('data-refus', 'true')
     await lacher(page, vers)
 
@@ -223,7 +226,8 @@ test.describe('iPad : robustesse', () => {
 
   /** Rien ne reste de l'aperçu, rien n'est écrit. */
   async function intact(page: Page, avant: number): Promise<void> {
-    await expect(page.locator('.fantome')).toHaveCount(0)
+    await expect(atterrissage(page)).toHaveCount(0)
+    await expect(copie(page)).toHaveAttribute('data-visible', 'false')
     await expect(page.locator('.bloc-creneau[style*="translateY"]')).toHaveCount(0)
     await expect(page.locator('.grille')).toHaveAttribute('data-glisse', 'false')
     await expect(page.locator('.bloc-creneau[data-creneau]')).toHaveCount(avant)
@@ -236,7 +240,8 @@ test.describe('iPad : robustesse', () => {
     const haut = await pointGrille(page, MARDI, 15, 15)
     const bas = await pointGrille(page, MARDI, 15, 30)
     await saisir(page, await centre(carte(page, 'c1:296')), haut)
-    await expect(page.locator(`.colonne[data-jour="${MARDI}"] .fantome`)).toContainText('15h15 → 16h15')
+    await expect(page.locator(`.colonne[data-jour="${MARDI}"] [data-atterrissage]`)).toHaveAttribute('data-atterrissage', `${MARDI}T15:15`)
+    await expect(copie(page)).toContainText('15h15 → 16h15')
     // Le doigt glisse sur l'autre moitié et se lève dans la même tâche : aucune image n'a montré cette position.
     await pointeurs(page, [
       { type: 'pointermove', ...bas },
@@ -263,7 +268,7 @@ test.describe('iPad : robustesse', () => {
     const de = await centre(bloc(page, 'cr-a'))
     const vers = await pointGrille(page, MARDI, 18)
     await saisir(page, de, vers)
-    await expect(page.locator('.fantome')).toHaveCount(1)
+    await expect(atterrissage(page)).toHaveCount(1)
     const dehors = { x: 150, y: 400 } // panneau de la bibliothèque
     await deplacer(page, vers, dehors)
     await lacher(page, dehors)
@@ -341,6 +346,201 @@ test.describe('iPad : robustesse', () => {
   })
 })
 
+// Glisser fluide (spec §C.1–C.3) : copie libre collée au doigt, emplacement d'atterrissage magnétisé, colonne visée
+// éclairée, étiquette d'heure, refus et retour à l'origine, mouvement réduit.
+test.describe('iPad : glisser fluide', () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 900, 'semaine de l’iPad')
+
+  const MERCREDI = '2026-11-04'
+  /** Un créneau d'une heure le lundi à 15 h (le lundi n'a que « Stage » le matin). */
+  const LUNDI_15H = creneau('cr-l', 'c1:294', '2026-11-02T15:00', 60)
+
+  /** Rectangle (écran) d'un élément, sans attendre ni faire défiler. */
+  const rect = (page: Page, sel: string) =>
+    page.locator(sel).first().evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      return { x: r.left, y: r.top, w: r.width, h: r.height }
+    })
+
+  test('copie continue : elle glisse librement d’un jour à l’autre, collée au doigt', async ({ page }) => {
+    await ouvrir(page, { creneaux: [LUNDI_15H] })
+    const b = (await bloc(page, 'cr-l').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    const vers = await pointGrille(page, MERCREDI, 15, 0, 10)
+    await saisir(page, de, de, 1)
+    await expect(copie(page)).toHaveAttribute('data-visible', 'true')
+    const gauches = await page.locator('.colonne').evaluateAll((cs) => cs.map((c) => c.getBoundingClientRect().left))
+
+    const ecarts: number[] = []
+    const libres: number[] = []
+    for (let i = 1; i <= 12; i++) {
+      const p = { x: de.x + ((vers.x - de.x) * i) / 12, y: de.y }
+      await pointeur(page, 'pointermove', p)
+      await images(page)
+      const c = await rect(page, '[data-copie]')
+      expect(Number(await copie(page).evaluate((el) => getComputedStyle(el).opacity))).toBeGreaterThan(0.5)
+      ecarts.push(c.x - p.x)
+      // Position entre deux colonnes : loin du bord gauche de toute colonne (un bloc magnétisé y serait calé).
+      if (gauches.every((g) => Math.abs(c.x - (g + 3)) > 12)) libres.push(c.x)
+    }
+    expect(libres.length).toBeGreaterThan(0)
+    // 1:1 : l'écart entre le doigt et la copie ne change jamais (aucun saut, aucun recentrage).
+    for (const e of ecarts) expect(Math.abs(e - ecarts[0])).toBeLessThan(0.5)
+    // Le point de saisie est respecté : la copie part du bord du bloc saisi.
+    expect(Math.abs(ecarts[0] - (b.x - de.x))).toBeLessThan(1)
+    await lacher(page, vers)
+    await expect(bloc(page, 'cr-l')).toHaveAttribute('data-debut', `${MERCREDI}T15:00`)
+  })
+
+  test('emplacement d’atterrissage : dans la colonne visée, à l’heure magnétisée, identique au lâcher', async ({ page }) => {
+    await ouvrir(page)
+    const b = (await bloc(page, 'cr-a').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    const vers = await pointGrille(page, MERCREDI, 17, 0, 10)
+    await saisir(page, de, vers)
+
+    const dansMercredi = page.locator(`.colonne[data-jour="${MERCREDI}"] [data-atterrissage]`)
+    await expect(atterrissage(page)).toHaveCount(1)
+    await expect(dansMercredi).toHaveAttribute('data-atterrissage', `${MERCREDI}T17:00`)
+    // Une fois posé par son ressort : dans la colonne, son haut à 17 h.
+    const col = await rect(page, `.colonne[data-jour="${MERCREDI}"]`)
+    const haut = (await pointGrille(page, MERCREDI, 17, 0, 0)).y
+    await expect
+      .poll(async () => {
+        const s = await rect(page, '[data-atterrissage]')
+        return Math.abs(s.y - haut) < 1 && s.x >= col.x && s.x + s.w <= col.x + col.w + 0.5
+      })
+      .toBe(true)
+    const prevu = await dansMercredi.getAttribute('data-atterrissage')
+    await lacher(page, vers)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', prevu ?? '')
+  })
+
+  test('colonne éclairée : la colonne visée et son en-tête, aucune autre', async ({ page }) => {
+    await ouvrir(page)
+    const de = await centre(bloc(page, 'cr-a'))
+    const mercredi = await pointGrille(page, MERCREDI, 17)
+    await saisir(page, de, mercredi)
+    await expect(page.locator('.colonne[data-visee]')).toHaveCount(1)
+    await expect(page.locator('.colonne[data-visee]')).toHaveAttribute('data-jour', MERCREDI)
+    await expect(page.locator('.jour-tete[data-visee]')).toHaveCount(1)
+    await expect(page.locator('.jour-tete').nth(2)).toHaveAttribute('data-visee', 'true')
+
+    const jeudi = await pointGrille(page, '2026-11-05', 18)
+    await deplacer(page, mercredi, jeudi)
+    await expect(page.locator('.colonne[data-visee]')).toHaveCount(1)
+    await expect(page.locator('.colonne[data-visee]')).toHaveAttribute('data-jour', '2026-11-05')
+    await expect(page.locator('.jour-tete[data-visee]')).toHaveCount(1)
+    await expect(page.locator('.jour-tete').nth(3)).toHaveAttribute('data-visee', 'true')
+
+    await page.keyboard.press('Escape')
+    await lacher(page, jeudi)
+    await expect(page.locator('[data-visee]')).toHaveCount(0)
+  })
+
+  test('étiquette d’heure accrochée à la copie : « mer. 4 · 14h30 → 15h30 »', async ({ page }) => {
+    await ouvrir(page, { creneaux: [LUNDI_15H], sansCreneaux: ['c1:292'] })
+    const b = (await bloc(page, 'cr-l').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    await saisir(page, de, await pointGrille(page, MERCREDI, 14, 30, 10))
+    const etiquette = copie(page).locator('[data-etiquette-heure]')
+    await expect(etiquette).toBeVisible()
+    await expect(etiquette).toHaveText('mer. 4 · 14h30 → 15h30')
+  })
+
+  test('refus : emplacement rouge ; au lâcher, la copie revient à son origine et rien ne change', async ({ page }) => {
+    await ouvrir(page)
+    const avant = await page.locator('.bloc-creneau[data-creneau]').count()
+    const c = carte(page, 'c2:300')
+    const origine = await centre(c)
+    const boite = (await c.boundingBox())!
+    const vers = await pointGrille(page, '2026-11-02', 10)
+    await saisir(page, origine, vers)
+    await expect(page.locator('[data-atterrissage][data-refus="true"]')).toHaveCount(1)
+
+    // Lâcher puis suivre la copie image par image jusqu'à ce qu'elle disparaisse.
+    const trace = await page.evaluate(
+      ({ x, y }) =>
+        new Promise<{ x: number; y: number }[]>((fini) => {
+          const sous = document.elementFromPoint(x, y) ?? document.body
+          sous.dispatchEvent(
+            new PointerEvent('pointerup', {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              pointerId: 7,
+              pointerType: 'touch',
+              isPrimary: true,
+              button: 0,
+              buttons: 0,
+            }),
+          )
+          const vu: { x: number; y: number }[] = []
+          const debut = performance.now()
+          const image = () => {
+            const el = document.querySelector<HTMLElement>('[data-copie]')
+            if (!el || el.dataset.visible !== 'true' || performance.now() - debut > 3000) return fini(vu)
+            const r = el.getBoundingClientRect()
+            vu.push({ x: r.left, y: r.top })
+            requestAnimationFrame(image)
+          }
+          image()
+        }),
+      vers,
+    )
+    expect(trace.length).toBeGreaterThan(3) // animée, et non effacée sur place
+    const loin = (p: Point) => Math.hypot(p.x - boite.x, p.y - boite.y)
+    expect(loin(trace[0])).toBeGreaterThan(100)
+    expect(loin(trace[trace.length - 1])).toBeLessThan(2)
+    await expect(copie(page)).toHaveAttribute('data-visible', 'false')
+    await expect(page.locator('.bloc-creneau[data-creneau]')).toHaveCount(avant)
+    await expect(page.getByRole('button', { name: 'Annuler' })).toBeDisabled()
+  })
+
+  test('origine atténuée : le bloc saisi reste en place à 35 %', async ({ page }) => {
+    await ouvrir(page)
+    const de = await centre(bloc(page, 'cr-a'))
+    await saisir(page, de, await pointGrille(page, MERCREDI, 17))
+    await expect(bloc(page, 'cr-a')).toHaveCSS('opacity', '0.35')
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MARDI}T14:00`)
+  })
+
+  test('mouvement réduit : aucune animation sur la copie ni sur l’emplacement', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await ouvrir(page)
+    // Pris à 10 px du haut du bloc : le haut du créneau suit le doigt à 10 px au-dessus.
+    const b = (await bloc(page, 'cr-a').boundingBox())!
+    const de = { x: b.x + b.width / 2, y: b.y + 10 }
+    const v1 = await pointGrille(page, MERCREDI, 17, 0, 10)
+    await saisir(page, de, v1)
+    await expect(copie(page)).toHaveAttribute('data-visible', 'true')
+    const v2 = await pointGrille(page, MERCREDI, 18, 0, 10)
+    await deplacer(page, v1, v2)
+    // Dès l'image suivante, l'emplacement est à 18 h ; rien ne bouge ensuite, aucune animation CSS.
+    const haut = (await pointGrille(page, MERCREDI, 18, 0, 0)).y
+    const etat = () =>
+      page.evaluate(() => {
+        const c = document.querySelector<HTMLElement>('[data-copie]')!
+        const a = document.querySelector<HTMLElement>('[data-atterrissage]')!
+        const anims = [c, a].flatMap((el) => el.getAnimations({ subtree: true })).length
+        const tr = [c, a, ...c.querySelectorAll<HTMLElement>('*')].map((el) => getComputedStyle(el).transform).join('|')
+        return { anims, tr, haut: a.getBoundingClientRect().top }
+      })
+    const e1 = await etat()
+    expect(Math.abs(e1.haut - haut)).toBeLessThan(1)
+    expect(e1.anims).toBe(0)
+    await images(page)
+    await images(page)
+    const e2 = await etat()
+    expect(e2.tr).toBe(e1.tr)
+    expect(e2.anims).toBe(0)
+    await lacher(page, v2)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MERCREDI}T18:00`)
+    await expect(copie(page)).toHaveAttribute('data-visible', 'false')
+  })
+})
+
 test.describe('iPhone', () => {
   test.skip(({ viewport }) => (viewport?.width ?? 1000) >= 900, 'vue Jour du téléphone')
 
@@ -405,6 +605,48 @@ test.describe('captures', () => {
       await page.waitForTimeout(300)
       await page.screenshot({ path: `${dossier}/task-18-ipad-${theme}-corbeille.png` })
       await page.keyboard.press('Escape') // annule le geste : rien n'est déposé
+      await lacher(page, { x: 5, y: 5 })
+    })
+  }
+})
+
+// Captures pendant le glisser fluide (rapport de la tâche 7 des améliorations) :
+// `CAPTURES=1 npx playwright test dnd --project=ipad -g "glisser fluide"`.
+test.describe('captures : glisser fluide', () => {
+  test.skip(!process.env.CAPTURES, 'captures à la demande')
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 900, 'iPad')
+  const dossier = '.superpowers/sdd/2026-11-02-ameliorations/shots'
+
+  for (const theme of ['clair', 'sombre'] as const) {
+    test(`captures glisser fluide ${theme}`, async ({ page }) => {
+      await ouvrir(page, theme === 'sombre' ? { reglages: { theme: 'sombre' } } : {})
+      // 300 (mardi 14h) saisi à 10 px du haut, le doigt entre mercredi et jeudi : copie libre, emplacement mercredi.
+      const b = (await bloc(page, 'cr-a').boundingBox())!
+      const de = { x: b.x + b.width / 2, y: b.y + 10 }
+      const mer = await pointGrille(page, '2026-11-04', 16, 30, 10)
+      const jeu = await pointGrille(page, '2026-11-05', 16, 30, 10)
+      await saisir(page, de, { x: mer.x + (jeu.x - mer.x) * 0.4, y: mer.y })
+      await page.waitForTimeout(600)
+      await page.screenshot({ path: `${dossier}/task-7-ipad-${theme}-glisser.png` })
+      await page.keyboard.press('Escape')
+      await lacher(page, { x: 5, y: 5 })
+      await page.waitForTimeout(800)
+
+      // Aperçu de cascade : 296 sur la moitié haute de 300.
+      const v1 = await pointGrille(page, MARDI, 14, 30)
+      await saisir(page, await centre(carte(page, 'c1:296')), v1)
+      await page.waitForTimeout(600)
+      await page.screenshot({ path: `${dossier}/task-7-ipad-${theme}-cascade.png` })
+      await page.keyboard.press('Escape')
+      await lacher(page, { x: 5, y: 5 })
+      await page.waitForTimeout(800)
+
+      // Refus : au-dessus de « Stage ».
+      const v2 = await pointGrille(page, '2026-11-05', 10)
+      await saisir(page, await centre(carte(page, 'c2:300')), v2)
+      await page.waitForTimeout(600)
+      await page.screenshot({ path: `${dossier}/task-7-ipad-${theme}-refus.png` })
+      await page.keyboard.press('Escape')
       await lacher(page, { x: 5, y: 5 })
     })
   }

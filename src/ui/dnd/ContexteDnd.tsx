@@ -1,12 +1,13 @@
-// Glisser-déposer (spec §9.3–9.5, §13.3). dnd-kit fournit le capteur (appui long de 150 ms, tolérance 6 px)
-// et le cycle du geste ; la cible, l'aperçu et le fantôme sont gérés ici :
+// Glisser-déposer (spec §9.3–9.5, §13.3, §C.1–C.3). dnd-kit fournit le capteur (appui long de 150 ms, tolérance
+// 6 px) et le cycle du geste ; la cible, l'aperçu, la copie flottante et l'emplacement d'atterrissage sont gérés ici :
 // - un seul `useDraggable` par conteneur (bibliothèque, grille) : la carte ou le bloc saisi est trouvé au
 //   `pointerdown` (délégation), les 367 cartes mémoïsées ne se redessinent donc pas au début du geste ;
 // - le doigt est lu par `pointermove` puis traité une fois par image (rAF) : lecture de la cible, défilement
-//   au bord, position du fantôme flottant (écrite dans le DOM, sans rendu React) ;
+//   au bord, position de la copie flottante (écrite dans le DOM, sans rendu React, voir CopieFlottante.tsx) ;
 // - l'aperçu (`apercu`) n'est recalculé, et l'état `useGlisse` écrit, que si la minute magnétisée, le jour,
-//   le créneau visé ou la moitié changent ;
-// - le lâcher rejoue les mêmes actions (`deposer`) par `appliquer` : une seule étape d'annulation.
+//   le créneau visé ou la moitié changent ; l'emplacement d'atterrissage (Atterrissage.tsx) en découle ;
+// - le lâcher rejoue les mêmes actions (`deposer`) par `appliquer` : une seule étape d'annulation. La copie rejoint
+//   alors l'emplacement par ressort, avec la vitesse du doigt (cinq derniers `pointermove`), ou revient à son origine.
 import {
   DndContext,
   PointerSensor,
@@ -16,24 +17,25 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  type CSSProperties,
-  type PointerEvent,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, useId, useRef, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
 import { supprimerCreneau } from '../../domain/actions-creneaux'
 import type { Etat } from '../../domain/types'
-import { etiquetteCreneau } from '../calendrier/etiquette'
+import { haptique } from '../mouvement/haptique'
 import { useStore } from '../store'
 import { toast } from '../Toast'
 import { trembler } from '../trembler'
 import { apercu, cibleMois, creneauFantome, deposer, type Apercu, type Source } from './apercu'
+import { cibleAtterrissage, oublierAtterrissages } from './Atterrissage'
 import { cleSurvol, lire } from './cibles'
+import {
+  arreterCopie,
+  contenuCopie,
+  CopieFlottante,
+  poserCopie,
+  souleverCopie,
+  suivreCopie,
+  survolCorbeille,
+} from './CopieFlottante'
 import {
   bloquerDefilement,
   filtrerPointeurs,
@@ -42,19 +44,25 @@ import {
   pointeurOccupe,
   saisirPointeur,
   useGlisse,
+  useVol,
+  vitesseLacher,
+  type Echantillon,
   type Survol,
 } from './glisse'
 import './dnd.css'
 
+/** L'objet saisi et le point de saisie, relevés au `pointerdown` (avant que le doigt ne bouge). */
+type Origine = { el: HTMLElement; r: { left: number; top: number; width: number; height: number }; x: number; y: number }
+
 /** Ce que la source donne au `pointerdown` ; lu par dnd-kit au début du geste. */
-export type DonneesSource = { source: Source; prise: number; depuisFeuille: boolean }
+export type DonneesSource = { source: Source; prise: number; depuisFeuille: boolean; origine?: Origine | null }
 type Porteur = { courant: DonneesSource | null }
 
 /** Marge (px) au bord haut / bas de la grille où elle défile pendant le geste, et vitesse maximale (px / image). */
 const BORD_DEFILEMENT = 56
 const VITESSE_DEFILEMENT = 14
-/** Le doigt tient le fantôme flottant par ce point (px depuis son coin haut gauche). */
-const PRISE_FLOTTANT = { x: 28, y: 22 }
+/** Échantillons de `pointermove` gardés pour la vitesse au lâcher. */
+const ECHANTILLONS = 5
 
 export function texteVersBac(n: number): string {
   return n > 1 ? `${n} items mis dans À placer` : '1 item mis dans À placer'
@@ -76,7 +84,6 @@ type Props = {
 
 export function ContexteDnd({ children, onDepose }: Props) {
   const capteurs = useSensors(useSensor(PointerSensor, { activationConstraint: { delay: 150, tolerance: 6 } }))
-  const flottant = useRef<HTMLDivElement>(null)
   const rappelDepose = useRef(onDepose)
   rappelDepose.current = onDepose
 
@@ -90,8 +97,12 @@ export function ContexteDnd({ children, onDepose }: Props) {
     cle: string | null
     /** Élément de la dernière cible évaluée (colonne, carreau du mois, corbeille) : il tremble en cas de refus. */
     el: HTMLElement | null
-    /** Inclinaison de −1,5° du fantôme flottant, sauf en mouvement réduit. */
-    incliner: boolean
+    /** Objet saisi : la copie y revient en cas de refus ou de lâcher hors cible. */
+    origine: HTMLElement | null
+    /** Forme de la copie : un bloc de la grille garde sa taille, une carte peut être plus étroite. */
+    forme: 'bloc' | 'carte'
+    surCorbeille: boolean
+    echantillons: Echantillon[]
     image: number
     arreter: () => void
   } | null>(null)
@@ -134,16 +145,12 @@ export function ContexteDnd({ children, onDepose }: Props) {
 
     const e = useStore.getState().etat
     const { survol, el } = lire(g.x, g.y, g.source, g.prise, e)
-    const f = flottant.current
-    if (f) {
-      const pos = `translate3d(${g.x - PRISE_FLOTTANT.x}px, ${g.y - PRISE_FLOTTANT.y}px, 0)`
-      f.style.transform = g.incliner ? `${pos} rotate(-1.5deg)` : pos
-      // Au-dessus d'une colonne, le fantôme se pose dans la grille à l'heure magnétisée : le flottant s'efface.
-      // Écrits seulement s'ils changent : pas de recalcul de style à chaque image.
-      const cache = String(survol?.type === 'colonne')
-      const surCorbeille = String(survol?.type === 'corbeille')
-      if (f.dataset.cache !== cache) f.dataset.cache = cache
-      if (f.dataset.surCorbeille !== surCorbeille) f.dataset.surCorbeille = surCorbeille
+    // La copie suit le doigt 1:1, sans magnétisme ; l'emplacement d'atterrissage, lui, se pose à l'heure visée.
+    suivreCopie(g.x, g.y)
+    const surCorbeille = survol?.type === 'corbeille'
+    if (surCorbeille !== g.surCorbeille) {
+      g.surCorbeille = surCorbeille
+      survolCorbeille(surCorbeille)
     }
     const cle = cleSurvol(survol)
     if (cle === g.cle) return
@@ -156,14 +163,34 @@ export function ContexteDnd({ children, onDepose }: Props) {
     saisirPointeur(null)
     const g = geste.current
     geste.current = null
-    // Le fantôme flottant n'est pas piloté par React : il repart caché au prochain geste.
-    if (flottant.current) flottant.current.dataset.cache = 'true'
     if (g) {
       cancelAnimationFrame(g.image)
       g.arreter()
     }
     marquerGeste(false)
     return g
+  }, [])
+
+  /**
+   * Retour à l'origine par ressort (refus, lâcher hors cible ou sur place, Échap) : la copie rejoint l'objet saisi,
+   * masqué jusqu'à son arrivée s'il s'agit d'un créneau de la grille. Objet disparu : la copie s'efface sur place.
+   */
+  const revenir = useCallback((g: NonNullable<typeof geste.current>, v: { vx: number; vy: number }) => {
+    const id = g.source.type === 'creneau' ? g.source.id : null
+    const el =
+      g.origine?.isConnected === true
+        ? g.origine
+        : id !== null
+          ? document.querySelector<HTMLElement>(`.bloc-creneau[data-creneau="${CSS.escape(id)}"]`)
+          : null
+    const r = el?.getBoundingClientRect()
+    if (!el || !r || r.width === 0) {
+      poserCopie(null, v)
+      return
+    }
+    const masque = id !== null && el.matches('.bloc-creneau[data-creneau]') ? [id] : []
+    if (masque.length > 0) useVol.setState({ caches: masque })
+    poserCopie({ x: r.left, y: r.top }, v, () => useVol.setState({ caches: [] }))
   }, [])
 
   const debut = useCallback(
@@ -178,12 +205,18 @@ export function ContexteDnd({ children, onDepose }: Props) {
         g.x = m.clientX
         g.y = m.clientY
         g.sale = true
+        g.echantillons.push({ t: m.timeStamp, x: m.clientX, y: m.clientY })
+        if (g.echantillons.length > ECHANTILLONS) g.echantillons.shift()
       }
       const defiler = () => {
         if (geste.current) geste.current.sale = true
       }
       window.addEventListener('pointermove', suivre, { passive: true })
       window.addEventListener('scroll', defiler, { capture: true, passive: true })
+      const etat = useStore.getState().etat
+      const fantome = creneauFantome(etat, d.source)
+      const o = d.origine ?? null
+      const forme = o?.el.matches('.bloc-creneau[data-creneau]') ? 'bloc' : 'carte'
       geste.current = {
         source: d.source,
         prise: d.prise,
@@ -192,7 +225,10 @@ export function ContexteDnd({ children, onDepose }: Props) {
         sale: true,
         cle: null,
         el: null,
-        incliner: !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        origine: o?.el ?? null,
+        forme,
+        surCorbeille: false,
+        echantillons: [],
         image: 0,
         arreter: () => {
           window.removeEventListener('pointermove', suivre)
@@ -200,14 +236,19 @@ export function ContexteDnd({ children, onDepose }: Props) {
         },
       }
       marquerGeste(true)
+      useVol.setState({ caches: [] })
+      oublierAtterrissages()
+      // La copie apparaît exactement sur l'objet saisi, puis se soulève : le doigt garde sa prise.
+      const r = o?.r ?? { left: pe.clientX - 28, top: pe.clientY - 22, width: 230, height: 0 }
+      souleverCopie(contenuCopie(etat, d.source, fantome, forme, r, o?.x ?? pe.clientX, o?.y ?? pe.clientY), o?.x ?? pe.clientX, o?.y ?? pe.clientY)
       useGlisse.setState({
         ...GLISSE_VIDE,
         source: d.source,
         prise: d.prise,
         depuisFeuille: d.depuisFeuille,
-        fantome: creneauFantome(useStore.getState().etat, d.source),
+        fantome,
       })
-      navigator.vibrate?.(8)
+      haptique('leger')
       image()
     },
     [image],
@@ -229,15 +270,20 @@ export function ContexteDnd({ children, onDepose }: Props) {
         survol = evaluer(etat, g.source, lu.survol).survol
         el = lu.el
       }
+      // Où la copie se pose : l'emplacement d'atterrissage tel qu'il est affiché, lu avant tout rendu.
+      const atterrir = survol?.type === 'colonne' ? cibleAtterrissage() : null
+      const v = vitesseLacher(g.echantillons, performance.now())
 
       let reussi = false
+      let refus = false
       let versBac = 0
+      let poses: string[] = []
       if (survol?.type === 'corbeille' && g.source.type === 'creneau') {
         const id = g.source.id
         reussi = appliquer((e) => supprimerCreneau(e, id))
       } else if (survol?.type === 'colonne' || survol?.type === 'mois') {
         const cible = survol.cible
-        let refus = cible === null
+        refus = cible === null
         if (cible) {
           const source = g.source
           // `appliquer` renvoie faux si rien n'est écrit (refus, lâcher sur place, store pas prêt) : pas de succès.
@@ -248,6 +294,8 @@ export function ContexteDnd({ children, onDepose }: Props) {
               return null
             }
             versBac = r.versBac
+            // Les créneaux posés restent masqués sous la copie jusqu'à son arrivée.
+            poses = source.type === 'creneau' ? [source.id] : Object.keys(r.etat.creneaux).filter((id) => !(id in e.creneaux))
             return r.etat
           })
           if (!reussi) versBac = 0
@@ -255,20 +303,41 @@ export function ContexteDnd({ children, onDepose }: Props) {
         // Refus (spec §14) : tremblement et teinte rouge, sans message ; l'état ne change pas.
         if (refus && el) trembler(el)
       }
-      // Même lot de rendu que l'écriture : les transitions s'arrêtent au moment où les blocs prennent leur place.
+
+      if (reussi) {
+        haptique('succes')
+        if (atterrir) {
+          useVol.setState({ caches: poses })
+          // Une carte (plus large que le créneau) s'efface en rejoignant l'emplacement ; un bloc s'y pose exactement.
+          poserCopie({ x: atterrir.x, y: atterrir.y, fondre: g.forme === 'carte' }, v, () => useVol.setState({ caches: [] }))
+        } else {
+          poserCopie(null, v) // corbeille, vue Mois : la copie s'efface sur place
+        }
+      } else {
+        if (refus) haptique('erreur')
+        revenir(g, v)
+      }
+      // Même lot de rendu que l'écriture : les blocs prennent leur place quand l'aperçu disparaît.
       useGlisse.setState(GLISSE_VIDE)
       if (versBac > 0) toast(texteVersBac(versBac))
       if (reussi) rappelDepose.current?.(depuisFeuille)
     },
-    [evaluer, terminer],
+    [evaluer, terminer, revenir],
   )
 
   const annuler = useCallback(() => {
-    terminer()
+    const g = terminer()
+    if (g) revenir(g, { vx: 0, vy: 0 })
     useGlisse.setState(GLISSE_VIDE)
-  }, [terminer])
+  }, [terminer, revenir])
 
-  useEffect(() => () => void terminer(), [terminer])
+  useEffect(
+    () => () => {
+      terminer()
+      arreterCopie()
+    },
+    [terminer],
+  )
 
   return (
     <DndContext
@@ -285,44 +354,12 @@ export function ContexteDnd({ children, onDepose }: Props) {
       }}
     >
       {children}
-      <Flottant ref={flottant} />
+      <CopieFlottante />
     </DndContext>
   )
 }
 
 const REFUS_MOIS: Apercu = { ok: false, positions: {}, nouveaux: [], versBac: 0 }
-
-/** Fantôme qui suit le doigt hors de la grille (bibliothèque, corbeille) : la carte soulevée, −1,5°. */
-const Flottant = forwardRef<HTMLDivElement>(function Flottant(_props, ref) {
-  const source = useGlisse((s) => s.source)
-  const cr = useGlisse((s) => s.fantome)
-  const etat = useStore((s) => (source ? s.etat : null))
-  if (!source || !etat) return <div ref={ref} className="glisse-flottant" hidden />
-
-  const item = cr ? etat.items[cr.itemId] : undefined
-  const couleur = item ? (etat.colleges[item.collegeId]?.couleur ?? 0) : 0
-  const n = source.type === 'item' ? source.itemIds.length : 1
-  const { titre, meta } = cr ? etiquetteCreneau(cr, item) : { titre: '', meta: '' }
-  const style = { '--teinte': `var(--c${((couleur % 6) + 6) % 6})` } as CSSProperties
-  return (
-    // Deux boîtes : l'extérieure suit le doigt (`transform` écrit à chaque image) ; l'intérieure rétrécit au-dessus
-    // de la corbeille (la propriété `scale` sur l'extérieure multiplierait aussi la translation).
-    <div ref={ref} className="glisse-flottant" style={style} aria-hidden="true">
-      <div className="glisse-carte">
-        <b>{n > 1 ? `${n} items` : titre}</b>
-        <small>{n > 1 ? source.type === 'item' && listeNumeros(etat, source.itemIds) : meta}</small>
-      </div>
-    </div>
-  )
-})
-
-function listeNumeros(e: Etat, ids: string[]): string {
-  return ids
-    .map((id) => e.items[id]?.numero)
-    .filter((n): n is number => n !== undefined)
-    .sort((a, b) => a - b)
-    .join(' · ')
-}
 
 /**
  * Source de glisser déléguée : un seul `useDraggable` pour tout un conteneur. `trouver` reçoit le
@@ -335,7 +372,7 @@ export function SourceGlisse({
   style,
   children,
 }: {
-  trouver: (cible: HTMLElement, e: PointerEvent) => Omit<DonneesSource, 'depuisFeuille'> | null
+  trouver: (cible: HTMLElement, e: PointerEvent) => Omit<DonneesSource, 'depuisFeuille' | 'origine'> | null
   className?: string
   style?: CSSProperties
   children: ReactNode
@@ -353,7 +390,14 @@ export function SourceGlisse({
       const cible = e.target as HTMLElement
       const d = rappel.current(cible, e)
       if (!d) return
-      porteur.courant = { ...d, depuisFeuille: cible.closest('.feuille') !== null }
+      // L'objet saisi et le point de saisie : la copie flottante apparaîtra exactement dessus.
+      const el = cible.closest<HTMLElement>('.bloc-creneau[data-creneau], .carte-item')
+      const r = el?.getBoundingClientRect()
+      porteur.courant = {
+        ...d,
+        depuisFeuille: cible.closest('.feuille') !== null,
+        origine: el && r ? { el, r: { left: r.left, top: r.top, width: r.width, height: r.height }, x: e.clientX, y: e.clientY } : null,
+      }
       listeners?.onPointerDown?.(e)
       // Le capteur a pris ce pointeur : les autres sont ignorés jusqu'à la fin (voir `filtrerPointeurs`).
       if ((e.nativeEvent as globalThis.PointerEvent & { dndKit?: unknown }).dndKit) saisirPointeur(e.pointerId)

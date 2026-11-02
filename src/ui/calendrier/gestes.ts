@@ -57,7 +57,7 @@ export function useAppuiVide(
   return useCallback(
     (e: ReactPointerEvent<HTMLElement>) => {
       if (!e.isPrimary || e.button !== 0 || pointeurOccupe()) return
-      if ((e.target as HTMLElement).closest('.bloc, .poignee-redim, .fantome, .trace-indispo')) return
+      if ((e.target as HTMLElement).closest('.bloc, .poignee-redim, .atterrissage, .trace-indispo')) return
       const col = e.currentTarget
       const x0 = e.clientX
       const y0 = e.clientY

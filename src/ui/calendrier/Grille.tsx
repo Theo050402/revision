@@ -3,17 +3,19 @@
 // chaque `.colonne[data-jour]` commence à la minute `plage.debut` (voir geometrie.ts).
 // Gestes : appui long sur un créneau puis glisser (dnd-kit, délégué au corps de la grille), poignée du bord bas
 // (durée), tap sur un emplacement libre (« Pour combler ce trou »), appui long sur un emplacement libre puis
-// étirer (indisponibilité). Pendant un glisser, les créneaux poussés s'écartent par `translateY` (aperçu).
+// étirer (indisponibilité). Pendant un glisser, les créneaux poussés s'écartent par `translateY` (aperçu, ressort),
+// l'emplacement d'atterrissage se pose dans la colonne visée et celle-ci s'éclaire avec son en-tête (`data-visee`).
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { ajouterIndispo } from '../../domain/actions-etat'
 import type { Intervalle } from '../../domain/cascade'
 import { hm, local, minutesDe } from '../../domain/temps'
 import type { Etat } from '../../domain/types'
+import { Atterrissage, Eclairage } from '../dnd/Atterrissage'
 import { SourceGlisse } from '../dnd/ContexteDnd'
 import { apercuColonne, cleColonne, useGlisse, useRedim } from '../dnd/glisse'
 import { libelleJourCourt } from '../periode'
 import { useStore } from '../store'
-import { BlocCreneau, BlocFantome, BlocIndispo, heureCourte } from './Bloc'
+import { BlocCreneau, BlocIndispo, heureCourte } from './Bloc'
 import { FeuilleIndispo } from './FeuilleIndispo'
 import { blocsDesJours, minutesVersY, plageDesJours, PX_HEURE_IPAD, type BlocsDuJour } from './geometrie'
 import { useAppuiVide, useRedimension, type Trace } from './gestes'
@@ -63,6 +65,8 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
   const reglages = useStore((s) => s.etat.reglages)
   const aujourdhui = useAujourdhui()
   const glisse = useGlisse((s) => s.source !== null)
+  // Jour visé par le glisser : son en-tête passe en gras (la colonne, elle, lit son propre aperçu).
+  const jourVise = useGlisse((s) => (s.survol?.type === 'colonne' ? s.survol.cible.jour : null))
   const redim = useRedim((s) => s.id !== null)
   const [trace, setTrace] = useState<Trace | null>(null)
 
@@ -120,7 +124,7 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
         {jours.map((j) => {
           const { nom, numero } = libelleJourCourt(j)
           return (
-            <div key={j} className="jour-tete" data-aujourdhui={j === aujourdhui}>
+            <div key={j} className="jour-tete" data-aujourdhui={j === aujourdhui} data-visee={j === jourVise || undefined}>
               <span>{nom}</span>
               <b>{numero}</b>
             </div>
@@ -204,7 +208,7 @@ const ColonneJour = memo(function ColonneJour({
 }: ColonneProps) {
   // Aperçu du glisser en cours, réduit à ce jour : la colonne ne se redessine que si ce qui la concerne change.
   const cle = useGlisse((s) => cleColonne(s, jour))
-  const { idSource, debuts, fantomes, refus } = useMemo(() => apercuColonne(useGlisse.getState(), jour), [cle, jour])
+  const { idSource, debuts, fantomes, refus, visee } = useMemo(() => apercuColonne(useGlisse.getState(), jour), [cle, jour])
   const redim = useRedim((s) => (s.id !== null && blocs.creneaux.some((c) => c.id === s.id) ? s : AUCUN_REDIM))
 
   const appuiVide = useAppuiVide(jour, { plage, pxHeure, pas }, onTapTrou, onTrace)
@@ -224,8 +228,10 @@ const ColonneJour = memo(function ColonneJour({
       data-jour={jour}
       data-aujourdhui={aujourdhui}
       data-refus={refus || undefined}
+      data-visee={visee || undefined}
       onPointerDown={appuiVide}
     >
+      <Eclairage visee={visee} />
       {avant > 0 && <div className="hors-bornes" style={{ top: 0, height: (avant * pxHeure) / 60 }} />}
       {apres > 0 && <div className="hors-bornes" style={{ bottom: 0, height: (apres * pxHeure) / 60 }} />}
 
@@ -290,15 +296,16 @@ const ColonneJour = memo(function ColonneJour({
       {fantomes.map((f) => {
         const item = items[f.creneau.itemId]
         return (
-          <BlocFantome
+          <Atterrissage
             key={`f-${f.creneau.id}`}
-            creneau={f.creneau}
-            item={item}
-            couleur={(item && colleges[item.collegeId]?.couleur) ?? 0}
+            cle={f.creneau.id}
+            jour={jour}
+            debut={f.debut}
             haut={y(f.debut)}
             hauteur={hauteurDe(f.debut, f.creneau.duree)}
-            debut={f.debut}
+            couleur={(item && colleges[item.collegeId]?.couleur) ?? 0}
             refus={f.refus}
+            principal={f.principal}
           />
         )
       })}

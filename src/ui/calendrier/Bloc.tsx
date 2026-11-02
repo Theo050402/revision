@@ -1,10 +1,14 @@
 // Blocs de la grille (spec §9.2, §13). Le glisser-déposer est délégué à la grille (un seul `useDraggable`, voir
-// dnd/ContexteDnd.tsx) : ici, seulement le tap (`onOuvrir`, fiche de la tâche 19), le décalage de l'aperçu
-// (`transform`, jamais `top` pendant le geste) et le fantôme. `data-creneau` / `data-indispo` servent de cibles.
-import { memo, type CSSProperties, type KeyboardEvent } from 'react'
-import { versHm } from '../../domain/temps'
+// dnd/ContexteDnd.tsx) : ici, seulement le tap (`onOuvrir`, fiche de la tâche 19) et le décalage de l'aperçu de
+// cascade (`transform` animé par ressort, jamais `top` pendant le geste). `data-creneau` / `data-indispo` servent
+// de cibles. L'emplacement d'atterrissage du glisser est dans dnd/Atterrissage.tsx.
+import { memo, useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent, type RefObject } from 'react'
 import type { Creneau, Indispo, Item } from '../../domain/types'
-import { descriptionCreneau, etiquetteCreneau } from './etiquette'
+import { useVol } from '../dnd/glisse'
+import { animerValeur, RESSORT_RAPIDE, type Anim } from '../mouvement/ressort'
+import { descriptionCreneau, etiquetteCreneau, heureCourte } from './etiquette'
+
+export { heureCourte }
 
 /** Hauteur minimale (px) pour montrer deux lignes (titre + « T1 · 22 p · 2h45 ») ; en dessous, une seule. */
 export const HAUTEUR_DEUX_LIGNES = 34
@@ -29,9 +33,9 @@ type CreneauProps = {
   couleur: number
   haut: number
   hauteur: number
-  /** Aperçu de cascade : décalage vertical (px) pendant le geste, animé par `transform`. */
+  /** Aperçu de cascade : décalage vertical (px) pendant le geste, animé par ressort sur `transform`. */
   decalage?: number
-  /** Créneau en cours de déplacement : il reste à sa place, estompé ; le fantôme montre où il ira. */
+  /** Créneau en cours de déplacement : il reste à sa place, estompé ; l'emplacement montre où il ira. */
   source?: boolean
   /** Tap sans glisser : ouvre la fiche du créneau (tâche 19). */
   onOuvrir?: (id: string) => void
@@ -48,6 +52,9 @@ export const BlocCreneau = memo(function BlocCreneau({
   onOuvrir,
 }: CreneauProps) {
   const { numero, titre, meta } = etiquetteCreneau(creneau, item)
+  const ref = useRef<HTMLDivElement>(null)
+  useDecalage(ref, haut, decalage)
+  const enVol = useVol((s) => s.caches.includes(creneau.id))
   const deuxLignes = hauteur >= HAUTEUR_DEUX_LIGNES
   const nonExporte = creneau.versionExportee !== creneau.version
   const marques = (nonExporte ? 1 : 0) + (creneau.fait ? 1 : 0)
@@ -58,10 +65,10 @@ export const BlocCreneau = memo(function BlocCreneau({
     height: hauteur,
     '--teinte': teinte(couleur),
     '--lignes': lignes,
-    transform: decalage !== 0 ? `translateY(${decalage}px)` : undefined,
   } as CSSProperties
   return (
     <div
+      ref={ref}
       className="bloc bloc-creneau"
       data-creneau={creneau.id}
       data-debut={creneau.debut ?? undefined}
@@ -70,6 +77,7 @@ export const BlocCreneau = memo(function BlocCreneau({
       data-fait={creneau.fait}
       data-marques={marques}
       data-source={source || undefined}
+      data-vol={enVol || undefined}
       style={style}
       role="group"
       aria-label={descriptionCreneau(creneau, item)}
@@ -96,6 +104,39 @@ export const BlocCreneau = memo(function BlocCreneau({
   )
 })
 
+/**
+ * Décalage de l'aperçu de cascade (spec §C.2) : les créneaux poussés glissent par ressort, interruptibles (une
+ * nouvelle cible repart de leur position à l'écran). Au lâcher, le bloc prend sa vraie place (`haut` change du
+ * même coup que le décalage retombe à 0) : sa position à l'écran est conservée et le ressort finit le trajet en
+ * cours, sans saut ni second mouvement. La source d'un déplacement (aucun décalage) se pose directement.
+ */
+function useDecalage(ref: RefObject<HTMLDivElement | null>, haut: number, decalage: number): void {
+  const anim = useRef<Anim | null>(null)
+  const avant = useRef({ haut, decalage })
+  useLayoutEffect(() => {
+    const el = ref.current
+    const p = avant.current
+    avant.current = { haut, decalage }
+    if (!el) return
+    const ecrire = (x: number) => {
+      el.style.transform = x === 0 ? '' : `translateY(${x}px)`
+    }
+    if (!anim.current) {
+      if (decalage === 0) return
+      anim.current = animerValeur(0, RESSORT_RAPIDE, ecrire)
+    }
+    if (haut !== p.haut) {
+      // Le bloc a vraiment bougé : on garde sa position affichée (s'il était poussé) et on repart de là.
+      const ecran = p.decalage !== 0 ? anim.current.valeur() - (haut - p.haut) : decalage
+      anim.current.arreter()
+      anim.current = animerValeur(ecran, RESSORT_RAPIDE, ecrire)
+      ecrire(ecran)
+    }
+    anim.current.vers(decalage)
+  }, [ref, haut, decalage])
+  useLayoutEffect(() => () => anim.current?.arreter(), [])
+}
+
 type IndispoProps = {
   indispo: Indispo
   debut: number
@@ -105,10 +146,6 @@ type IndispoProps = {
   /** Tap : ouvre l'indisponibilité (tâche 19). */
   onOuvrir?: (id: string) => void
 }
-
-/** 480 → « 8h », 810 → « 13h30 », 1440 → « 24h ». */
-export const heureCourte = (min: number): string =>
-  min >= 1440 ? '24h' : versHm(min).replace(/^0/, '').replace(':00', 'h').replace(':', 'h')
 
 export const BlocIndispo = memo(function BlocIndispo({ indispo, debut, fin, haut, hauteur, onOuvrir }: IndispoProps) {
   const deuxLignes = hauteur >= HAUTEUR_DEUX_LIGNES
@@ -132,34 +169,3 @@ export const BlocIndispo = memo(function BlocIndispo({ indispo, debut, fin, haut
     </div>
   )
 })
-
-type FantomeProps = {
-  creneau: Creneau
-  item: Item | undefined
-  couleur: number
-  haut: number
-  hauteur: number
-  /** Heure (minutes) où le créneau serait posé. */
-  debut: number
-  /** Dépôt refusé à cet endroit : teinte rouge, sans message (spec §14). */
-  refus: boolean
-}
-
-/**
- * Fantôme du glisser (spec §9.3, §13.3) : le bloc à l'heure magnétisée, soulevé (−1,5°, ombre, contour
- * tireté). Sans `data-creneau` : ce n'est pas un créneau et il n'est jamais une cible.
- */
-export function BlocFantome({ creneau, item, couleur, haut, hauteur, debut, refus }: FantomeProps) {
-  const { titre } = etiquetteCreneau(creneau, item)
-  const style = { top: haut, height: hauteur, '--teinte': teinte(couleur) } as CSSProperties
-  return (
-    <div className="bloc bloc-creneau fantome" data-fantome={creneau.id} data-refus={refus} style={style} aria-hidden="true">
-      <span className="bloc-titre bloc-titre-une">{titre}</span>
-      {hauteur >= HAUTEUR_DEUX_LIGNES && (
-        <span className="bloc-meta">
-          {heureCourte(debut)} → {heureCourte(debut + creneau.duree)}
-        </span>
-      )}
-    </div>
-  )
-}

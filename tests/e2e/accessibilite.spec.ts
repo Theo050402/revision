@@ -165,6 +165,23 @@ test('le focus clavier est visible sur chaque contrôle atteint par Tab', async 
   expect(sans, 'contrôles sans contour de focus').toEqual([])
 })
 
+/**
+ * Relève chaque valeur de `translateY` que prend le bloc 300 (cr-a) : l'aperçu de cascade l'anime par ressort
+ * (spec §C.2), image par image, et non par une transition CSS.
+ */
+async function guetterDecalages(page: Page): Promise<() => Promise<string[]>> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __decalages: string[] }
+    w.__decalages = []
+    const el = document.querySelector<HTMLElement>('[data-creneau="cr-a"]')!
+    new MutationObserver(() => {
+      const t = el.style.transform
+      if (t && w.__decalages[w.__decalages.length - 1] !== t) w.__decalages.push(t)
+    }).observe(el, { attributes: true, attributeFilter: ['style'] })
+  })
+  return () => page.evaluate(() => (window as unknown as { __decalages: string[] }).__decalages)
+}
+
 test.describe('mouvement réduit', () => {
   test.use({ reducedMotion: 'reduce' })
 
@@ -192,23 +209,33 @@ test.describe('mouvement réduit', () => {
       return
     }
 
-    // iPad : 291 glissé sur la moitié haute du bloc 300 le fait descendre (translateY) sans transition.
+    // iPad : 291 glissé sur la moitié haute du bloc 300 le fait descendre (translateY) d'un coup, sans transition
+    // ni ressort : une seule valeur de décalage.
+    const carte = await centre(page.locator('#panneau-bibliotheque section[aria-label="Tous les items"] [data-item-id="c1:291"]').first())
+    const decalages = await guetterDecalages(page)
     const vers = await pointGrille(page, MARDI, 14, 30)
-    await saisir(page, await centre(page.locator('#panneau-bibliotheque section[aria-label="Tous les items"] [data-item-id="c1:291"]').first()), vers)
+    await saisir(page, carte, vers)
     const bloc = page.locator('[data-creneau="cr-a"]')
     await expect(bloc).toHaveAttribute('style', /translateY\(\d+(\.\d+)?px\)/)
     expect(await bloc.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0s')
     expect(await bloc.evaluate((el) => el.getAnimations().length)).toBe(0)
+    await page.waitForTimeout(400)
+    expect(await decalages()).toHaveLength(1)
   })
 
-  test('sans le réglage, ce même bloc a bien une transition (la vérification n\'est pas vide)', async ({ page }, info) => {
+  test('sans le réglage, ce même bloc glisse par ressort (la vérification n\'est pas vide)', async ({ page }, info) => {
     test.skip(iphone(info), 'le déplacement d\'un bloc se fait depuis le panneau iPad')
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     await ouvrir(page)
+    const carte = await centre(page.locator('#panneau-bibliotheque section[aria-label="Tous les items"] [data-item-id="c1:291"]').first())
+    const decalages = await guetterDecalages(page)
     const vers = await pointGrille(page, MARDI, 14, 30)
-    await saisir(page, await centre(page.locator('#panneau-bibliotheque section[aria-label="Tous les items"] [data-item-id="c1:291"]').first()), vers)
+    await saisir(page, carte, vers)
     const bloc = page.locator('[data-creneau="cr-a"]')
     await expect(bloc).toHaveAttribute('style', /translateY\(\d+(\.\d+)?px\)/)
-    expect(await bloc.evaluate((el) => getComputedStyle(el).transitionDuration)).not.toBe('0s')
+    // Spec §C.2 : plus de transition CSS ; le ressort passe par des positions intermédiaires, image par image.
+    expect(await bloc.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0s')
+    await page.waitForTimeout(600)
+    expect((await decalages()).length).toBeGreaterThan(3)
   })
 })

@@ -1,6 +1,8 @@
-/* Glisser-déposer (spec §9.3, §13.3) : fantôme soulevé (−1,5°, ombre, contour tireté), écart des créneaux
-   poussés (translateY, 180 ms), refus (teinte --now à 20 %), corbeille, poignée de durée, tracé d'indisponibilité.
-   Couleurs : jetons de theme/tokens.css. Mouvement réduit : ni transition ni inclinaison. */
+/* Glisser-déposer (spec §9.3, §13.3, §C.1–C.3) : copie flottante soulevée (échelle 1,04, ombre profonde, −1,5°),
+   emplacement d'atterrissage translucide à la couleur du collège, colonne visée éclairée, écart des créneaux poussés
+   (translateY par ressort), refus (rouge), corbeille, poignée de durée, tracé d'indisponibilité.
+   Tout ce qui suit le geste est animé par les ressorts de mouvement/ressort.ts (`transform`, `opacity`), jamais par
+   une transition CSS. Couleurs : jetons de theme/tokens.css. */
 
 /* Un appui long ne sélectionne pas de texte et n'ouvre pas le menu contextuel d'iOS. */
 .grille-corps,
@@ -16,91 +18,173 @@
 
 /* ---------- Aperçu dans la grille ---------- */
 
-/* Les transitions n'existent que pendant le geste : au lâcher, les blocs prennent leur place sans rebond. */
-.grille[data-glisse='true'] .bloc-creneau:not(.fantome) {
-  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
 .grille[data-redim='true'] .bloc-creneau {
   transition: height 90ms ease-out;
 }
 
-/* Créneau en cours de déplacement : il reste en place, estompé. */
+/* Créneau en cours de déplacement : il reste en place, estompé (on voit d'où il part). */
 .bloc-creneau[data-source='true'] {
   opacity: 0.35;
 }
 
-.fantome {
+/* Créneau posé (ou revenu) que la copie n'a pas encore rejoint : il apparaît à son arrivée. */
+.bloc-creneau[data-vol='true'] {
+  opacity: 0;
+}
+
+/* Emplacement d'atterrissage : contour translucide à la couleur du collège, magnétisé au jour et au pas. Sa boîte
+   est déplacée par ressort (`transform`) ; le corps porte le tremblement d'un refus. */
+.atterrissage {
+  position: absolute;
+  top: 0;
+  left: 3px;
+  right: 3px;
   z-index: 5;
   pointer-events: none;
-  outline: 2px dashed var(--accent);
-  outline-offset: -2px;
-  transform: rotate(-1.5deg);
-  box-shadow: var(--ombre);
-  opacity: 0.95;
+  will-change: transform, opacity;
+  contain: size layout style;
 }
 
-.fantome[data-refus='true'] {
-  outline-color: var(--now);
-  border-left-color: var(--now);
-  background: color-mix(in srgb, var(--now) 20%, var(--bg));
+.atterrissage-corps {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 2px solid color-mix(in srgb, var(--teinte) 80%, var(--ink));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--teinte) 26%, transparent);
 }
 
-.colonne[data-refus='true'] {
-  background-color: color-mix(in srgb, var(--now) 8%, transparent);
+.atterrissage[data-refus='true'] .atterrissage-corps {
+  border-color: var(--now);
+  background: color-mix(in srgb, var(--now) 18%, transparent);
 }
 
-/* ---------- Fantôme flottant (hors de la grille) ---------- */
+/* Colonne du jour visé : teinte d'accent à 8 % sur toute la hauteur (opacité animée par ressort), rouge en cas de
+   refus ; elle passe au-dessus de ses voisines, pour que l'emplacement qui arrive d'un autre jour reste visible. */
+.colonne-eclairage {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
 
-.glisse-flottant {
+.colonne[data-refus='true'] .colonne-eclairage {
+  background: color-mix(in srgb, var(--now) 8%, transparent);
+}
+
+.colonne[data-visee='true'] {
+  z-index: 1;
+}
+
+.jour-tete[data-visee='true'] {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* ---------- Copie flottante (portail, au-dessus de tout) ---------- */
+
+.copie {
   position: fixed;
   left: 0;
   top: 0;
   z-index: 40;
-  width: 230px;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms ease;
+  will-change: transform, opacity;
 }
 
-.glisse-flottant[data-cache='false'] {
-  opacity: 0.96;
+.copie[data-visible='false'] {
+  visibility: hidden;
 }
 
-/* La carte rétrécit autour du doigt (tenu à 28 × 22 px du coin, voir ContexteDnd) au-dessus de la corbeille. */
-.glisse-carte {
+/* Le corps se soulève autour du point de saisie (`transform-origin` posé à la saisie). */
+.copie-corps {
   box-sizing: border-box;
-  padding: 8px 12px 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow: hidden;
+  color: var(--ink);
+  will-change: transform;
+  box-shadow:
+    0 18px 36px -10px rgb(0 0 0 / 0.38),
+    0 4px 12px -2px rgb(0 0 0 / 0.2);
+}
+
+.copie-corps[data-forme='bloc'] {
+  padding: 3px 5px;
+  border-radius: 4px;
+  line-height: 1.2;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--teinte) var(--bloc-a1), var(--bloc-fond)),
+    color-mix(in srgb, var(--teinte) var(--bloc-a2), var(--bloc-fond))
+  ),
+  var(--bg);
+  border-left: var(--bloc-trait) solid color-mix(in srgb, var(--teinte) var(--bloc-trait-teinte), var(--ink));
+}
+
+.copie-corps[data-forme='carte'] {
+  padding: 8px 12px 8px 10px;
   border-radius: var(--rayon);
   border-left: 5px solid var(--teinte);
   background: var(--card);
-  color: var(--ink);
-  outline: 2px dashed var(--accent);
+}
+
+.copie[data-sur-corbeille='true'] .copie-corps {
+  outline: 2px solid var(--now);
   outline-offset: -2px;
-  box-shadow: var(--ombre);
-  transform-origin: 28px 22px;
-  transition: scale 120ms ease;
 }
 
-.glisse-flottant[data-sur-corbeille='true'] .glisse-carte {
-  scale: 0.82;
-  outline-color: var(--now);
-}
-
-.glisse-carte b {
+.copie-corps b {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+}
+
+.copie-corps small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.copie-corps[data-forme='bloc'] b {
+  font-size: var(--fs-2);
+  line-height: 15px;
+}
+
+.copie-corps[data-forme='bloc'] small {
+  font-size: var(--fs-1);
+  line-height: 13px;
+  color: inherit;
+  opacity: 0.82;
+}
+
+.copie-corps[data-forme='carte'] b {
   font-size: var(--fs-3);
 }
 
-.glisse-carte small {
+.copie-corps[data-forme='carte'] small {
   font-size: var(--fs-2);
-  color: var(--muted);
+}
+
+/* Étiquette d'heure accrochée à la copie : « mer. 4 · 14h30 → 15h30 ». */
+.copie-heure {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: var(--fs-2);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: var(--ombre);
 }
 
 /* Glisser depuis la feuille de la bibliothèque (iPhone) : elle s'efface et découvre la grille. */
@@ -248,22 +332,15 @@
 /* ---------- Mouvement réduit ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .grille[data-glisse='true'] .bloc-creneau:not(.fantome),
   .grille[data-redim='true'] .bloc-creneau,
-  .glisse-flottant,
-  .glisse-carte,
   .corbeille,
   .feuille-fond[data-efface='true'] {
     transition: none;
   }
-
-  .fantome {
-    transform: none;
-  }
 }
 
 /* ---------- Limites de mise en page (fluidité du geste) ----------
-   Sans elles, chaque image du glisser (fantôme déplacé, texte de l'horaire, bloc écarté) relançait la mise en page
+   Sans elles, chaque image du glisser (emplacement déplacé, texte de l'horaire, bloc écarté) relançait la mise en page
    et la peinture du document entier (≈ 7 500 boîtes, bibliothèque comprise). Les zones qui défilent et les colonnes
    ont une taille fixée par leur parent : on peut la contenir. */
 .calendrier-defilement,

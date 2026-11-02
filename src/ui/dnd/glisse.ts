@@ -5,6 +5,8 @@ import { create } from 'zustand'
 import type { Cible } from '../../domain/actions-creneaux'
 import { jourDe, minutesDe } from '../../domain/temps'
 import type { Creneau } from '../../domain/types'
+import { heureCourte } from '../calendrier/etiquette'
+import { libelleJourCourt } from '../periode'
 import type { Apercu, Source } from './apercu'
 
 export type { Source } from './apercu'
@@ -35,6 +37,12 @@ export const useGlisse = create<Glisse>()(() => GLISSE_VIDE)
 
 /** Redimensionnement en cours : la durée prévue s'affiche, rien n'est écrit avant le lâcher. */
 export const useRedim = create<{ id: string | null; duree: number }>()(() => ({ id: null, duree: 0 }))
+
+/**
+ * Créneaux masqués pendant le vol de la copie après le lâcher (spec §C.3) : le créneau posé (ou la source qui
+ * revient à son origine) n'apparaît qu'à l'arrivée de la copie, qui « cède la place au vrai créneau ».
+ */
+export const useVol = create<{ caches: readonly string[] }>()(() => ({ caches: [] }))
 
 // ───────────────── Geste en cours (balayage, défilement) ─────────────────
 
@@ -108,19 +116,23 @@ export function pointeurOccupe(): boolean {
 
 // ───────────────── Aperçu vu depuis une colonne ─────────────────
 
-export type FantomeColonne = { creneau: Creneau; debut: number; refus: boolean }
+/** Emplacement d'atterrissage dans une colonne. `principal` : celui que rejoint la copie au lâcher. */
+export type FantomeColonne = { creneau: Creneau; debut: number; refus: boolean; principal: boolean }
 export type ApercuColonne = {
   /** Créneau glissé (estompé à sa place d'origine), quel que soit le jour visé. */
   idSource: string | null
   /** Créneaux de ce jour qui s'écartent : nouveau début (minutes). */
   debuts: Record<string, number>
+  /** Emplacements d'atterrissage posés ce jour-là. */
   fantomes: FantomeColonne[]
   refus: boolean
+  /** Le doigt vise ce jour : la colonne et son en-tête s'éclairent. */
+  visee: boolean
 }
 
 /**
- * Ce que l'aperçu change dans une colonne : les créneaux de ce jour qui s'écartent, les fantômes posés ce jour-là
- * (sinon, en cas de refus, le créneau glissé à l'heure visée) et la teinte de refus.
+ * Ce que l'aperçu change dans une colonne : les créneaux de ce jour qui s'écartent, les emplacements posés ce
+ * jour-là (sinon, en cas de refus, le créneau glissé à l'heure visée), la teinte de refus et l'éclairage.
  */
 export function apercuColonne(s: Glisse, jour: string): ApercuColonne {
   const { source, apercu: vu, fantome } = s
@@ -137,17 +149,22 @@ export function apercuColonne(s: Glisse, jour: string): ApercuColonne {
     if (vu?.ok) {
       if (idSource !== null) {
         const debut = vu.positions[idSource] ?? fantome?.debut
-        if (fantome && debut && jourDe(debut) === jour) fantomes.push({ creneau: fantome, debut: minutesDe(debut), refus: false })
+        if (fantome && debut && jourDe(debut) === jour) {
+          fantomes.push({ creneau: fantome, debut: minutesDe(debut), refus: false, principal: true })
+        }
       } else {
+        const principal = vu.nouveaux[0]?.id
         for (const n of vu.nouveaux) {
-          if (jourDe(n.debut as string) === jour) fantomes.push({ creneau: n, debut: minutesDe(n.debut as string), refus: false })
+          if (jourDe(n.debut as string) === jour) {
+            fantomes.push({ creneau: n, debut: minutesDe(n.debut as string), refus: false, principal: n.id === principal })
+          }
         }
       }
     } else if (fantome) {
-      fantomes.push({ creneau: fantome, debut: survol.cible.t, refus: vu !== null })
+      fantomes.push({ creneau: fantome, debut: survol.cible.t, refus: vu !== null, principal: true })
     }
   }
-  return { idSource, debuts, fantomes, refus: survol !== null && vu !== null && !vu.ok }
+  return { idSource, debuts, fantomes, refus: survol !== null && vu !== null && !vu.ok, visee: survol !== null }
 }
 
 /**
@@ -157,6 +174,61 @@ export function apercuColonne(s: Glisse, jour: string): ApercuColonne {
 export function cleColonne(s: Glisse, jour: string): string {
   const a = apercuColonne(s, jour)
   const d = Object.entries(a.debuts).map(([id, m]) => `${id}@${m}`).sort().join(',')
-  const f = a.fantomes.map((x) => `${x.creneau.id}@${x.debut}${x.refus ? '!' : ''}`).join(',')
-  return `${a.idSource ?? ''}|${d}|${f}|${a.refus}`
+  const f = a.fantomes.map((x) => `${x.creneau.id}@${x.debut}${x.refus ? '!' : ''}${x.principal ? '*' : ''}`).join(',')
+  return `${a.idSource ?? ''}|${d}|${f}|${a.refus}|${a.visee}`
+}
+
+// ───────────────── Emplacement principal ─────────────────
+
+/** Où le lâcher poserait le créneau glissé (ou le premier des nouveaux), minutes depuis minuit. */
+export type Emplacement = { creneau: Creneau; jour: string; debut: number; refus: boolean }
+
+/**
+ * L'emplacement d'atterrissage principal, tiré du même survol et du même aperçu que le lâcher (« lâcher = aperçu ») :
+ * le créneau déplacé à sa position projetée, ou le premier nouveau créneau ; en cas de refus, le créneau glissé à
+ * l'heure visée. `null` hors d'une cible (ou sur un jour du mois sans heure libre).
+ */
+export function emplacementPrincipal(s: Glisse): Emplacement | null {
+  const { source, apercu: vu, fantome, survol } = s
+  const cible = survol?.type === 'colonne' || survol?.type === 'mois' ? survol.cible : null
+  if (!source || !cible) return null
+  if (vu?.ok) {
+    if (source.type === 'creneau') {
+      const debut = vu.positions[source.id] ?? fantome?.debut
+      return fantome && debut ? { creneau: fantome, jour: jourDe(debut), debut: minutesDe(debut), refus: false } : null
+    }
+    const n = vu.nouveaux[0]
+    return n?.debut ? { creneau: n, jour: jourDe(n.debut), debut: minutesDe(n.debut), refus: false } : null
+  }
+  return fantome ? { creneau: fantome, jour: cible.jour, debut: cible.t, refus: vu !== null } : null
+}
+
+/** Étiquette d'heure accrochée à la copie (spec §C.2) : « mer. 4 · 14h30 → 15h30 ». */
+export function etiquetteHeure(e: Emplacement): string {
+  const { nom, numero } = libelleJourCourt(e.jour)
+  return `${nom} ${numero} · ${heureCourte(e.debut)} → ${heureCourte(e.debut + e.creneau.duree)}`
+}
+
+// ───────────────── Vitesse au lâcher ─────────────────
+
+/** Un `pointermove` du doigt qui glisse : horodatage (ms, `performance.now()`) et position (px). */
+export type Echantillon = { t: number; x: number; y: number }
+
+/** Au-delà, le doigt était immobile au lâcher (ms). */
+const IMMOBILE_MS = 80
+/** Vitesse transmise au ressort du lâcher, bornée (px/s). */
+const VITESSE_MAX = 4000
+
+/**
+ * Vitesse du doigt au lâcher (px/s), sur les derniers `pointermove` (les cinq derniers, voir ContexteDnd) ; nulle
+ * si le doigt était immobile (dernier mouvement plus vieux que 80 ms) ou faute d'échantillons. Bornée à 4 000 px/s.
+ */
+export function vitesseLacher(ech: readonly Echantillon[], maintenant: number): { vx: number; vy: number } {
+  if (ech.length < 2) return { vx: 0, vy: 0 }
+  const a = ech[0]
+  const b = ech[ech.length - 1]
+  const dt = (b.t - a.t) / 1000
+  if (maintenant - b.t > IMMOBILE_MS || dt <= 0) return { vx: 0, vy: 0 }
+  const borne = (v: number) => Math.max(-VITESSE_MAX, Math.min(VITESSE_MAX, v))
+  return { vx: borne((b.x - a.x) / dt), vy: borne((b.y - a.y) / dt) }
 }
