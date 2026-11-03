@@ -16,6 +16,7 @@ import { Import } from './screens/Import'
 import { Reglages } from './screens/Reglages'
 import { TestExport } from './screens/TestExport'
 import { ContexteDnd } from './dnd/ContexteDnd'
+import { quitterSelection } from './selection/useSelection'
 import { useGlisse } from './dnd/glisse'
 import { MESSAGE_QUOTA, useStore } from './store'
 import { Toasts } from './Toast'
@@ -159,6 +160,13 @@ function Coque() {
     }
   }, [fiche])
 
+  // Mode sélection (spec §D.2) : ouvrir un autre écran (Réglages, import), une feuille (bibliothèque sur iPhone, fiche,
+  // « + Indisponibilité ») ou changer de vue le quitte. L'export le quitte aussi (BoutonExport).
+  useEffect(() => {
+    if (ecran !== 'calendrier' || feuilleVisible || fiche !== null) quitterSelection()
+  }, [ecran, feuilleVisible, fiche])
+  useEffect(() => quitterSelection(), [vue])
+
   // L'import commence depuis la feuille de la bibliothèque (iPhone) : elle se ferme pour laisser place à l'écran.
   useEffect(() => {
     if (importOuvert) setFeuilleOuverte(false)
@@ -226,7 +234,10 @@ function Coque() {
               onAnnuler={annuler}
               onRetablir={retablir}
               panneauOuvert={panneauOuvert}
-              onItems={() => setPanneauOuvert((o) => !o)}
+              onItems={() => {
+                if (!panneauOuvert) quitterSelection() // ouvrir la bibliothèque quitte le mode sélection
+                setPanneauOuvert((o) => !o)
+              }}
               exporter={<BoutonExport />}
             />
 

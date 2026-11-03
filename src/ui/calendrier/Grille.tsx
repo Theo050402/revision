@@ -2,23 +2,24 @@
 // Seuls les jours de `jours` sont rendus. `.grille` publie `data-px-heure`, `data-plage-debut` et `data-plage-fin` ;
 // chaque `.colonne[data-jour]` commence à la minute `plage.debut` (voir geometrie.ts).
 // Gestes : appui long sur un créneau puis glisser (dnd-kit, délégué au corps de la grille), poignée du bord bas
-// (durée), tap sur un emplacement libre (« Pour combler ce trou »), appui long sur un emplacement libre puis
-// étirer (indisponibilité). Pendant un glisser, les créneaux poussés s'écartent par `translateY` (aperçu, ressort),
+// (durée), tap sur un emplacement libre (« Pour combler ce trou »), appui long sur un emplacement libre puis glisser
+// (lasso de sélection, spec §D.1). En mode sélection (§D.2), toucher un créneau l'ajoute ou le retire au lieu
+// d'ouvrir sa fiche, et toucher un emplacement libre quitte le mode. Pendant un glisser, les créneaux poussés s'écartent par `translateY` (aperçu, ressort),
 // l'emplacement d'atterrissage se pose dans la colonne visée et celle-ci s'éclaire avec son en-tête (`data-visee`).
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import { ajouterIndispo } from '../../domain/actions-etat'
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, type CSSProperties, type PointerEvent } from 'react'
 import type { Intervalle } from '../../domain/cascade'
-import { hm, local, minutesDe } from '../../domain/temps'
+import { hm, minutesDe } from '../../domain/temps'
 import type { Etat } from '../../domain/types'
 import { Atterrissage, Eclairage } from '../dnd/Atterrissage'
 import { SourceGlisse } from '../dnd/ContexteDnd'
 import { apercuColonne, cleColonne, useGlisse, useRedim } from '../dnd/glisse'
 import { libelleJourCourt } from '../periode'
+import { Lasso } from '../selection/Lasso'
+import { enSelection, quitterSelection, useSelection } from '../selection/useSelection'
 import { useStore } from '../store'
-import { BlocCreneau, BlocIndispo, heureCourte } from './Bloc'
-import { FeuilleIndispo } from './FeuilleIndispo'
+import { BlocCreneau, BlocIndispo } from './Bloc'
 import { blocsDesJours, minutesVersY, plageDesJours, PX_HEURE_IPAD, type BlocsDuJour } from './geometrie'
-import { useAppuiVide, useRedimension, type Trace } from './gestes'
+import { useAppuiVide, useRedimension } from './gestes'
 import { LigneMaintenant } from './LigneMaintenant'
 import { useAujourdhui } from './maintenant'
 
@@ -29,7 +30,7 @@ type Props = {
   pxHeure?: number
   /** Tap sur un emplacement libre : `t` est le début du pas touché (minutes). */
   onTapTrou?: (jour: string, t: number) => void
-  /** Tap sur un créneau, sans glisser (fiche : tâche 19). */
+  /** Tap sur un créneau, sans glisser (fiche : tâche 19) ; en mode sélection, il bascule le créneau. */
   onOuvrirCreneau?: (id: string) => void
   /** Tap sur une indisponibilité (tâche 19). */
   onOuvrirIndispo?: (id: string) => void
@@ -37,7 +38,6 @@ type Props = {
 
 /** Un bloc ne descend jamais sous cette hauteur (px), même pour une durée très courte. */
 const HAUTEUR_MIN_BLOC = 14
-const rien = () => {}
 
 /** Rappel stable (référence fixe) qui appelle toujours la dernière version : les blocs mémoïsés n'en souffrent pas. */
 function useStable<A extends unknown[]>(f: ((...a: A) => void) | undefined): (...a: A) => void {
@@ -73,7 +73,6 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
   const itemGlisse = useGlisse((s) => s.fantome?.itemId ?? null)
   const teinteVisee = teinteDuCollege(itemGlisse, items, colleges)
   const redim = useRedim((s) => s.id !== null)
-  const [trace, setTrace] = useState<Trace | null>(null)
 
   const cle = jours.join(',')
   const blocs = useMemo(() => blocsDesJours({ creneaux, indispos }, cle.split(',')), [creneaux, indispos, cle])
@@ -99,16 +98,11 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
     defilement.scrollTop = dehors ? Math.max(0, ligne.offsetTop - defilement.clientHeight / 3) : 0
   }, [pxHeure])
 
-  const tapTrou = useStable(onTapTrou)
-  const ouvrirCreneau = useStable(onOuvrirCreneau ?? rien)
-  const ouvrirIndispo = useStable(onOuvrirIndispo ?? rien)
-
-  const creerIndispo = (titre: string) => {
-    if (!trace) return
-    const t = trace
-    useStore.getState().appliquer((e) => ajouterIndispo(e, titre, local(t.jour, t.debut), local(t.jour, t.fin)))
-    setTrace(null)
-  }
+  // Mode sélection lu au moment du toucher : les blocs mémoïsés gardent des rappels fixes. Une indisponibilité n'est
+  // jamais sélectionnable : en mode sélection, la toucher ne fait rien.
+  const tapTrou = useStable((j: string, t: number) => (enSelection() ? quitterSelection() : onTapTrou?.(j, t)))
+  const ouvrirCreneau = useStable((id: string) => (enSelection() ? useSelection.getState().basculer(id) : onOuvrirCreneau?.(id)))
+  const ouvrirIndispo = useStable((id: string) => (enSelection() ? undefined : onOuvrirIndispo?.(id)))
 
   const style = { '--px-heure': `${pxHeure}px`, '--nb-jours': jours.length } as CSSProperties
 
@@ -165,16 +159,13 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
             items={items}
             colleges={colleges}
             aujourdhui={j === aujourdhui}
-            trace={trace?.jour === j ? trace : null}
-            onTrace={setTrace}
             onTapTrou={tapTrou}
             onOuvrirCreneau={ouvrirCreneau}
             onOuvrirIndispo={ouvrirIndispo}
           />
         ))}
+        <Lasso jours={jours} plage={plage} pxHeure={pxHeure} />
       </SourceGlisse>
-
-      {trace?.fini && <FeuilleIndispo trace={trace} onCreer={creerIndispo} onAnnuler={() => setTrace(null)} />}
     </div>
   )
 }
@@ -191,9 +182,6 @@ type ColonneProps = {
   items: Etat['items']
   colleges: Etat['colleges']
   aujourdhui: boolean
-  /** Indisponibilité en cours de tracé dans cette colonne. */
-  trace: Trace | null
-  onTrace: (t: Trace | null) => void
   onTapTrou: (jour: string, t: number) => void
   onOuvrirCreneau: (id: string) => void
   onOuvrirIndispo: (id: string) => void
@@ -219,8 +207,6 @@ const ColonneJour = memo(function ColonneJour({
   items,
   colleges,
   aujourdhui,
-  trace,
-  onTrace,
   onTapTrou,
   onOuvrirCreneau,
   onOuvrirIndispo,
@@ -231,7 +217,7 @@ const ColonneJour = memo(function ColonneJour({
   const teinteVisee = visee ? teinteDuCollege(useGlisse.getState().fantome?.itemId, items, colleges) : undefined
   const redim = useRedim((s) => (s.id !== null && blocs.creneaux.some((c) => c.id === s.id) ? s : AUCUN_REDIM))
 
-  const appuiVide = useAppuiVide(jour, { plage, pxHeure, pas }, onTapTrou, onTrace)
+  const appuiVide = useAppuiVide(jour, { plage, pxHeure, pas }, onTapTrou)
   const redimensionner = useRedimension({ plage, pxHeure, pas })
 
   const y = (m: number) => minutesVersY(m, plage, pxHeure)
@@ -329,14 +315,6 @@ const ColonneJour = memo(function ColonneJour({
           />
         )
       })}
-
-      {trace && (
-        <div className="trace-indispo" style={{ top: y(trace.debut), height: y(trace.fin) - y(trace.debut) }} aria-hidden="true">
-          <span className="bloc-meta">
-            {heureCourte(trace.debut)}–{heureCourte(trace.fin)}
-          </span>
-        </div>
-      )}
 
       {aujourdhui && <LigneMaintenant plage={plage} pxHeure={pxHeure} />}
     </div>

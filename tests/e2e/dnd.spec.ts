@@ -177,26 +177,6 @@ test.describe('iPad', () => {
     await expect(page.locator('[data-debut="2026-11-02T13:00"]')).toHaveCount(1)
   })
 
-  test('appui long sur une zone vide et étirer : titre demandé, bloc hachuré créé', async ({ page }) => {
-    await ouvrir(page)
-    const de = await pointGrille(page, SAMEDI, 15, 0, 6)
-    const vers = await pointGrille(page, SAMEDI, 17, 0, 0)
-    await saisir(page, de, vers)
-    await expect(page.locator(`.colonne[data-jour="${SAMEDI}"] .trace-indispo`)).toBeVisible()
-    await lacher(page, vers)
-
-    const feuille = page.getByRole('dialog', { name: "Titre de l'indisponibilité" })
-    await expect(feuille).toBeVisible()
-    await expect(feuille).toContainText('15h–17h')
-    await feuille.getByRole('textbox', { name: 'Titre' }).fill('Sport')
-    await feuille.getByRole('button', { name: 'Créer' }).click()
-
-    const cree = page.locator(`.colonne[data-jour="${SAMEDI}"] .bloc-indispo`)
-    await expect(cree).toHaveCount(1)
-    await expect(cree).toHaveAttribute('aria-label', 'Sport, indisponible de 15h à 17h')
-    await expect(page.locator('.trace-indispo')).toHaveCount(0)
-  })
-
   test('tap sur un emplacement libre : « Pour combler ce trou »', async ({ page }) => {
     await ouvrir(page)
     const p = await pointGrille(page, SAMEDI, 10, 0, 10)
@@ -275,17 +255,14 @@ test.describe('iPad : robustesse', () => {
     await intact(page, avant)
   })
 
-  test('grille défilée : la feuille de l’indisponibilité couvre tout l’écran', async ({ page }) => {
+  test('grille défilée : la feuille « Nouvelle indisponibilité » couvre tout l’écran', async ({ page }) => {
     await ouvrir(page)
     // La grille (contenue, `contain: strict`) défile : la feuille, rendue en portail, n'en dépend pas.
     await page.locator('.calendrier-defilement').evaluate((el) => {
       el.scrollTop = 300
     })
-    const de = await pointGrille(page, SAMEDI, 15, 0, 6)
-    const vers = await pointGrille(page, SAMEDI, 17, 0, 0)
-    await saisir(page, de, vers)
-    await lacher(page, vers)
-    await expect(page.getByRole('dialog', { name: "Titre de l'indisponibilité" })).toBeVisible()
+    await page.getByRole('button', { name: '+ Indisponibilité' }).click()
+    await expect(page.getByRole('dialog', { name: 'Nouvelle indisponibilité' })).toBeVisible()
 
     const fond = await page.locator('.feuille-fond').boundingBox()
     const vue = page.viewportSize()!

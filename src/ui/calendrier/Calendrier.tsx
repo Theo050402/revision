@@ -11,6 +11,7 @@ import type { Vue } from '../ecran'
 import { creerSuiviVitesse, fondu, type Fondu } from '../mouvement/geste'
 import { animerValeur, mouvementReduit, projeter, RESSORT_DOUX, type Anim } from '../mouvement/ressort'
 import { ajouterMois, joursDeLaSemaine, libellePeriode } from '../periode'
+import { BarreSelection } from '../selection/BarreSelection'
 import type { Disposition } from '../useDisposition'
 import { Grille } from './Grille'
 import { PX_HEURE_IPAD, PX_HEURE_IPHONE } from './geometrie'
@@ -58,7 +59,7 @@ type Doigt = { id: number; x: number; y: number; t: number; base: number; mode: 
  * ne garde que le défilement vertical, les mouvements horizontaux arrivent ici. La piste (le contenu de la vue)
  * suit le doigt 1:1 ; au relâchement, au-delà de 25 % de la largeur (position projetée par la vitesse), elle sort
  * par ressort, la période change et la nouvelle entre du côté opposé ; sinon elle revient. Un geste de la grille
- * (glisser un créneau, redimensionner, tracer) commencé après le `pointerdown` l'annule. Interruptible : un doigt
+ * (glisser un créneau, redimensionner, lasso) commencé après le `pointerdown` l'annule. Interruptible : un doigt
  * posé sur la piste en mouvement l'arrête et la reprend. Mouvement réduit : la piste ne bouge pas, la nouvelle
  * période apparaît en fondu de 150 ms.
  */
@@ -315,6 +316,7 @@ export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTap
         )}
       </div>
       <Corbeille />
+      {vue !== 'mois' && <BarreSelection />}
     </section>
   )
 }

@@ -6,6 +6,7 @@ import { memo, useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent, 
 import type { Creneau, Indispo, Item } from '../../domain/types'
 import { useVol } from '../dnd/glisse'
 import { animerValeur, RESSORT_RAPIDE, type Anim } from '../mouvement/ressort'
+import { useLasso, useSelection } from '../selection/useSelection'
 import { descriptionCreneau, etiquetteCreneau, heureCourte } from './etiquette'
 
 export { heureCourte }
@@ -54,6 +55,10 @@ export const BlocCreneau = memo(function BlocCreneau({
   const ref = useRef<HTMLDivElement>(null)
   useDecalage(ref, haut, decalage)
   const enVol = useVol((s) => s.caches.includes(creneau.id))
+  // Sélectionné (mode sélection) ou touché par le lasso en cours de tracé (spec §D.1, §D.2).
+  const selectionne = useSelection((s) => s.ids.has(creneau.id))
+  const touche = useLasso((s) => s.touches.includes(creneau.id))
+  const marque = selectionne || touche
   const { marques, lignes } = miseEnPageBloc(creneau, hauteur)
   const style = {
     top: haut,
@@ -73,14 +78,22 @@ export const BlocCreneau = memo(function BlocCreneau({
       data-marques={marques}
       data-source={source || undefined}
       data-vol={enVol || undefined}
+      data-selectionne={marque ? '' : undefined}
       style={style}
       role="group"
-      aria-label={descriptionCreneau(creneau, item)}
+      aria-label={marque ? `${descriptionCreneau(creneau, item)}, sélectionné` : descriptionCreneau(creneau, item)}
       tabIndex={onOuvrir ? 0 : undefined}
       onKeyDown={onOuvrir && ((ev) => ouvrirAuClavier(ev, () => onOuvrir(creneau.id)))}
       onClick={onOuvrir && (() => onOuvrir(creneau.id))}
     >
       <ContenuBloc creneau={creneau} item={item} hauteur={hauteur} />
+      {marque && (
+        <span className="bloc-selection" aria-hidden="true">
+          <svg viewBox="0 0 12 12" width="10" height="10" focusable="false">
+            <path d="M2 6.5 5 9.5 10.5 3" />
+          </svg>
+        </span>
+      )}
     </div>
   )
 })

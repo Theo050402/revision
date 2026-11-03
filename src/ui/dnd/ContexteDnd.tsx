@@ -28,7 +28,7 @@ import { toast } from '../Toast'
 import { trembler } from '../trembler'
 import { apercu, cibleMois, creneauFantome, deposer, type Apercu, type Source } from './apercu'
 import { cibleAtterrissage, oublierAtterrissages } from './Atterrissage'
-import { coteBord, periodeChangeable, useMaintienBord, vitesseDefilement } from './bords'
+import { coteBord, defilerAuxBords, periodeChangeable, useMaintienBord } from './bords'
 import { cleSurvol, lire } from './cibles'
 import {
   arreterCopie,
@@ -63,8 +63,6 @@ type Origine = { el: HTMLElement; r: { left: number; top: number; width: number;
 export type DonneesSource = { source: Source; prise: number; depuisFeuille: boolean; origine?: Origine | null }
 type Porteur = { courant: DonneesSource | null }
 
-/** Au-delà du bord haut / bas de la grille (px), le défilement continue à pleine vitesse puis cesse. */
-const DEBORD_DEFILEMENT = 64
 /** Pas d'une image au-delà duquel (onglet en veille) le défilement n'avance pas d'un bond (s). */
 const DT_MAX = 0.05
 /** Échantillons de `pointermove` gardés pour la vitesse au lâcher. */
@@ -158,29 +156,10 @@ export function ContexteDnd({ children, onDepose }: Props) {
     const defil = document.querySelector<HTMLElement>('.calendrier-defilement')
     let cote: -1 | 0 | 1 = 0
     if (defil && g.cle !== 'corbeille') {
+      const d = defilerAuxBords(defil, g.x, g.y, dt, g.reste)
+      g.reste = d.reste
+      if (d.bouge) g.sale = true
       const r = defil.getBoundingClientRect()
-      if (g.x >= r.left && g.x <= r.right) {
-        // Haut : le corps de la grille commence sous l'en-tête collant des jours ; bas : le bas visible de la zone.
-        const tete = defil.querySelector<HTMLElement>('.grille-tete, .mois-entete')
-        const haut = g.y - (tete?.getBoundingClientRect().bottom ?? r.top)
-        const bas = r.bottom - g.y
-        let v = 0
-        if (haut < bas && haut > -DEBORD_DEFILEMENT) v = -vitesseDefilement(haut)
-        else if (bas > -DEBORD_DEFILEMENT) v = vitesseDefilement(bas)
-        if (v !== 0) {
-          // Les pixels entiers seulement (WebKit arrondit `scrollTop`) ; le reste s'ajoute à l'image suivante.
-          const total = g.reste + v * dt
-          const pas = Math.trunc(total)
-          g.reste = total - pas
-          if (pas !== 0) {
-            const avant = defil.scrollTop
-            defil.scrollTop += pas
-            if (defil.scrollTop !== avant) g.sale = true
-          }
-        } else {
-          g.reste = 0
-        }
-      }
       // Gauche / droite : la période change après 600 ms contre le bord (colonnes seulement, pas la colonne des heures).
       const premiere = defil.querySelector<HTMLElement>('.jour-tete')
       if (premiere && g.y >= r.top && g.y <= r.bottom) cote = coteBord(g.x, premiere.getBoundingClientRect().left, r.right)

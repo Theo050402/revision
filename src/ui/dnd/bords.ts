@@ -20,6 +20,46 @@ export function vitesseDefilement(distanceAuBord: number, zone = ZONE, max = MAX
   return max * p * p
 }
 
+/** Au-delà du bord haut / bas (px), le défilement continue à pleine vitesse puis cesse. */
+const DEBORD = 64
+
+/**
+ * Vitesse verticale signée (px/s) pour un doigt à l'ordonnée `y` entre le bord `haut` et le bord `bas` de la zone qui
+ * défile : négative près du haut, positive près du bas (`vitesseDefilement`), pleine un peu au-delà, nulle plus loin.
+ */
+export function vitesseVerticale(y: number, haut: number, bas: number, debord = DEBORD): number {
+  const h = y - haut
+  const b = bas - y
+  if (h < b && h > -debord) return -vitesseDefilement(h)
+  if (b > -debord) return vitesseDefilement(b)
+  return 0
+}
+
+/**
+ * Une image de défilement automatique de la grille (`.calendrier-defilement`) pour un doigt en (`x`, `y`), pendant
+ * `dt` secondes. Le haut est le bas de l'en-tête collant des jours (ou du mois). Seuls les pixels entiers sont
+ * appliqués (WebKit arrondit `scrollTop`) ; renvoie le reste à reporter sur l'image suivante et si la grille a bougé.
+ */
+export function defilerAuxBords(
+  defil: HTMLElement,
+  x: number,
+  y: number,
+  dt: number,
+  reste: number,
+): { reste: number; bouge: boolean } {
+  const r = defil.getBoundingClientRect()
+  if (x < r.left || x > r.right) return { reste, bouge: false }
+  const tete = defil.querySelector<HTMLElement>('.grille-tete, .mois-entete')
+  const v = vitesseVerticale(y, tete?.getBoundingClientRect().bottom ?? r.top, r.bottom)
+  if (v === 0) return { reste: 0, bouge: false }
+  const total = reste + v * dt
+  const pas = Math.trunc(total)
+  if (pas === 0) return { reste: total, bouge: false }
+  const avant = defil.scrollTop
+  defil.scrollTop += pas
+  return { reste: total - pas, bouge: defil.scrollTop !== avant }
+}
+
 /**
  * Bord gauche (-1) ou droit (1) tenu par le doigt, 0 sinon. `gauche` est le bord gauche des colonnes (la colonne des
  * heures n'en fait pas partie), `droite` le bord droit visible de la grille ; la bande fait `bande` px de large.

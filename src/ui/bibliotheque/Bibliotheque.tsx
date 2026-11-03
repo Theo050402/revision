@@ -51,7 +51,7 @@ export function Bibliotheque({ onSelectionChange }: Props) {
   // bibliothèque suit dans un rendu de basse priorité, interruptible, qui ne bloque pas le fil principal (tâche 18).
   const etat = useDeferredValue(useStore((s) => s.etat))
   // Les dérivées ne dépendent que des créneaux, des items, des collèges et des réglages : un changement
-  // d'indisponibilité (tracé dans la grille) ne les recalcule pas.
+  // d'indisponibilité ne les recalcule pas.
   const base = useMemo(() => etat, [etat.creneaux, etat.items, etat.colleges, etat.reglages])
   const disposition = useDisposition()
   const aujourdhui = useAujourdhui()

@@ -1,4 +1,4 @@
-// État du geste en cours (glisser-déposer, redimensionnement, tracé d'indisponibilité), hors du store de
+// État du geste en cours (glisser-déposer, redimensionnement, lasso), hors du store de
 // l'application : rien ici n'est persisté ni annulable. La grille et la corbeille s'y abonnent ; seul l'aperçu
 // change pendant le geste, et uniquement quand la minute magnétisée, la cible ou la moitié changent.
 import { create } from 'zustand'
@@ -50,7 +50,7 @@ let gesteActif = false
 let dernierGeste = -Infinity
 
 /**
- * Un geste (glisser, redimensionnement, tracé) commence ou finit. Pendant qu'il dure, le défilement tactile
+ * Un geste (glisser, redimensionnement, lasso) commence ou finit. Pendant qu'il dure, le défilement tactile
  * est bloqué (voir `bloquerDefilement`) ; après, le balayage horizontal de la grille l'ignore.
  */
 export function marquerGeste(actif: boolean): void {

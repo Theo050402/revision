@@ -1,0 +1,104 @@
+/* Sélection par zone (spec §D.1, §D.2) : lasso, créneaux sélectionnés, barre flottante du mode sélection. */
+
+/* ---------- Lasso : accent à 12 %, bord accent, sur les colonnes de `--i` à `--i + --n - 1` ---------- */
+
+.lasso {
+  position: absolute;
+  z-index: 6;
+  left: calc(var(--largeur-heures) + (100% - var(--largeur-heures)) * var(--i) / var(--nb-jours));
+  width: calc((100% - var(--largeur-heures)) * var(--n) / var(--nb-jours));
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  pointer-events: none;
+}
+
+/* ---------- Créneau sélectionné : anneau d'accent et coche (les marques cèdent la place) ---------- */
+
+.bloc-creneau[data-selectionne] {
+  z-index: 3;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.bloc-creneau[data-selectionne] .bloc-marques {
+  visibility: hidden;
+}
+
+.bloc-creneau[data-selectionne] .bloc-titre {
+  padding-right: 18px;
+}
+
+.bloc-selection {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.bloc-selection svg {
+  fill: none;
+  stroke: var(--on-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Barre du mode sélection : flottante, translucide, au-dessus du bas de l'écran ---------- */
+
+.barre-selection-place {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 14;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.barre-selection {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 6px 6px 6px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: var(--ombre);
+  color: var(--ink);
+}
+
+.barre-selection-nombre {
+  margin-right: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Rouge (`--now`) comme `.btn-principal.btn-danger` : assombri de 12 % pour le contraste du texte. */
+.barre-selection .barre-selection-supprimer {
+  background: color-mix(in srgb, var(--now) 88%, #000);
+  color: var(--bg);
+}
+
+/* Les messages passent au-dessus de la barre tant qu'elle est là. */
+.racine:has(.barre-selection) .toasts {
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 72px);
+}
+
+.racine[data-dispo='iphone']:has(.barre-selection) .toasts {
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 144px);
+}

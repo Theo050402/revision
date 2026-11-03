@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { coteBord, creerMaintienBord, vitesseDefilement } from '../../src/ui/dnd/bords'
+import { coteBord, creerMaintienBord, vitesseDefilement, vitesseVerticale } from '../../src/ui/dnd/bords'
 
 describe('vitesseDefilement', () => {
   it('est nulle à la limite de la zone et au-delà (64 px par défaut)', () => {
@@ -127,5 +127,24 @@ describe('creerMaintienBord : signal pour la bande lumineuse', () => {
     m.arreter()
     m.arreter()
     expect(cotes).toEqual([-1, 1, 0])
+  })
+})
+
+describe('vitesseVerticale', () => {
+  // Bord haut à 100 px (sous l'en-tête des jours), bord bas à 700 px.
+  it('nulle au milieu de la grille', () => {
+    expect(vitesseVerticale(400, 100, 700)).toBe(0)
+  })
+
+  it('vers le haut (négative) près du bord haut, vers le bas (positive) près du bord bas', () => {
+    expect(vitesseVerticale(110, 100, 700)).toBe(-vitesseDefilement(10))
+    expect(vitesseVerticale(690, 100, 700)).toBe(vitesseDefilement(10))
+  })
+
+  it('pleine vitesse un peu au-delà des bords, puis plus rien loin dehors (64 px)', () => {
+    expect(vitesseVerticale(80, 100, 700)).toBe(-900)
+    expect(vitesseVerticale(740, 100, 700)).toBe(900)
+    expect(vitesseVerticale(20, 100, 700)).toBe(0)
+    expect(vitesseVerticale(800, 100, 700)).toBe(0)
   })
 })

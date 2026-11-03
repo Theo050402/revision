@@ -2,6 +2,7 @@
 // créneaux modifiés, suppressions à faire à la main), et ouverture de la feuille d'export.
 import { useEffect, useRef, useState } from 'react'
 import { changementsEnAttente, evenementsExport } from '../../domain/actions-etat'
+import { quitterSelection } from '../selection/useSelection'
 import { useStore } from '../store'
 import { FeuilleExport } from './FeuilleExport'
 import './export.css'
@@ -37,7 +38,10 @@ export function BoutonExport() {
         disabled={!exportable}
         aria-haspopup="dialog"
         aria-label={badge > 0 ? `Exporter, ${badge === 1 ? '1 changement' : `${badge} changements`} en attente` : undefined}
-        onClick={() => setOuvert(true)}
+        onClick={() => {
+          quitterSelection() // ouvrir l'export quitte le mode sélection (spec §D.2)
+          setOuvert(true)
+        }}
       >
         Exporter
         {badge > 0 && (
