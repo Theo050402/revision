@@ -107,7 +107,7 @@ function LigneCollege({ college }: { college: College }) {
       <div className="rangee-boutons">
         <button
           type="button"
-          className="btn-ajout"
+          className="btn-secondaire"
           disabled={importOuvert}
           aria-label={`Réimporter ${college.nom}`}
           onClick={() => ouvrirImport(college.id)}

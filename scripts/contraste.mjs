@@ -54,9 +54,90 @@ for (const [nom, t] of Object.entries(THEMES)) {
   ligneGraphique(`${nom} : bord du lasso (accent) sur le fond`, rapport(rgb(t.accent), rgb(t.bg)))
   ligneGraphique(`${nom} : bord du lasso sur son propre fond`, rapport(rgb(t.accent), fondLasso))
   ligne(`${nom} : coche (on-accent) sur la pastille d'accent`, rapport(rgb(t.onAccent), rgb(t.accent)))
-  const fondBarre = melange(rgb(t.panel), rgb(t.bg), 0.78)
-  ligne(`${nom} : texte de la barre de sélection (panel 78 %)`, rapport(rgb(t.ink), fondBarre))
-  const rouge = melange(rgb(t.now), [0, 0, 0], 0.88)
-  ligne(`${nom} : « Supprimer » (fond sur --now assombri 12 %)`, rapport(rgb(t.bg), rouge))
+}
+
+// ---------- Passe de design (tâche 15, audit-design.md) ----------
+// Jetons de theme/tokens.css. `rougeTexte` : clair = --now assombri de 12 % (color-mix vers le noir), sombre = --now.
+// `surRouge` : texte posé sur ce rouge. `surface` : --surface-haute (feuilles, cartes, barre de sélection) ; `champHaut`
+// et `carteHaute` : champs et cartes posés dessus.
+const DESIGN = {
+  clair: {
+    ...THEMES.clair,
+    muted: MUTED_CLAIR,
+    field: '#F1F4F9',
+    surface: '#FFFFFF',
+    champHaut: '#F1F4F9',
+    carteHaute: '#FFFFFF',
+    margin: '#F3B9B4',
+    rougeTexte: melange(rgb('#D9473F'), [0, 0, 0], 0.88),
+    surRouge: rgb('#FFFFFF'),
+    chargeEncre: '#1E2A5A',
+    chargeMax: 1,
+  },
+  sombre: {
+    ...THEMES.sombre,
+    muted: MUTED_SOMBRE,
+    field: '#3A2D53',
+    surface: '#33264A',
+    champHaut: '#1A1027',
+    carteHaute: '#241934',
+    margin: '#B86F6A',
+    rougeTexte: rgb('#F29E8E'),
+    surRouge: rgb('#2B1E3E'),
+    chargeEncre: '#A490C2',
+    chargeMax: 0.55,
+  },
+}
+/** Repère de surface (non normatif) : l'écart entre un champ ou une carte et la surface qui le porte. */
+const ligneRepere = (nom, r, seuil) => ligne(`${nom} (repère ≥ ${seuil})`, r, seuil)
+
+for (const [nom, t] of Object.entries(DESIGN)) {
+  // H1 : texte rouge (jour courant, erreurs en ligne, « Supprimer » texte) sur ses fonds.
+  for (const [fond, hex] of [['le fond', t.bg], ['le panneau', t.panel], ['la surface haute', t.surface], ['un champ', t.field]]) {
+    ligne(`${nom} : texte rouge (--rouge-texte) sur ${fond}`, rapport(t.rougeTexte, rgb(hex)))
+  }
+  // H1 : texte posé sur le rouge (badge « À placer », pastille du nombre glissé, « Supprimer » plein, ligne glissée).
+  ligne(`${nom} : --sur-rouge sur --rouge-texte (badges, boutons rouges)`, rapport(t.surRouge, t.rougeTexte))
+  // Barre de sélection : matériau épais (surface haute à 82 %) sur le fond.
+  const fondBarre = melange(rgb(t.surface), rgb(t.bg), 0.82)
+  ligne(`${nom} : texte de la barre de sélection (surface haute 82 %)`, rapport(rgb(t.ink), fondBarre))
+  ligne(`${nom} : muted sur la barre de sélection`, rapport(rgb(t.muted), fondBarre))
+  // H3 / M8 : texte sur la surface haute, champs et cartes posés dessus.
+  ligne(`${nom} : encre sur la surface haute`, rapport(rgb(t.ink), rgb(t.surface)))
+  ligne(`${nom} : muted sur la surface haute`, rapport(rgb(t.muted), rgb(t.surface)))
+  ligne(`${nom} : encre sur un champ d'une surface haute`, rapport(rgb(t.ink), rgb(t.champHaut)))
+  ligne(`${nom} : muted (indications) sur un champ d'une surface haute`, rapport(rgb(t.muted), rgb(t.champHaut)))
+  ligne(`${nom} : muted sur une carte d'une surface haute`, rapport(rgb(t.muted), rgb(t.carteHaute)))
+  if (nom === 'sombre') {
+    // En sombre, les champs s'encastrent dans la surface haute : au moins l'écart d'avant (champ sur panneau, 1,33:1).
+    ligneRepere('sombre : champ encastré / surface haute', rapport(rgb(t.champHaut), rgb(t.surface)), 1.3)
+    ligneRepere('sombre : carte intérieure / surface haute (+ bord)', rapport(rgb(t.carteHaute), rgb(t.surface)), 1.2)
+    // H3 : la feuille se détache de la page assombrie par le voile (rgb(10 6 22 / 0.6)).
+    const voile = melange([10, 6, 22], rgb(t.bg), 0.6)
+    ligneRepere('sombre : feuille / page sous le voile', rapport(rgb(t.surface), voile), 1.3)
+  }
+  // M9 : encarts (trait au ton, fond à 10 % du ton sur la surface haute). Texte à l'encre ; du texte secondaire
+  // (muted) n'est posé que dans l'encart info (bac « À placer », méta des cartes).
+  for (const [ton, hex] of [['info', t.margin], ['avertissement', '#FFB25C'], ['erreur', t.now]]) {
+    const fond = melange(rgb(hex), rgb(t.surface), 0.1)
+    ligne(`${nom} : encre sur l'encart ${ton}`, rapport(rgb(t.ink), fond))
+    if (ton === 'info') ligne(`${nom} : muted sur l'encart ${ton}`, rapport(rgb(t.muted), fond))
+  }
+  // M3 : en-tête des jours en matériau fin (fond à 82 %, --materiau-fin) au-dessus d'un bloc. Pire cas : le bloc plein sous le flou
+  // (clair : surligneur à 85 % sur le fond ; sombre : carte). Textes : nom du jour (muted, ou rouge aujourd'hui) et
+  // numéro (encre).
+  const sousEntete =
+    nom === 'clair'
+      ? Object.entries(surligneurs).map(([n, hex]) => [n, melange(rgb(hex), rgb(t.bg), 0.85)])
+      : [['carte', rgb('#33264A')], ['champ', rgb('#3A2D53')]]
+  for (const [n, dessous] of sousEntete) {
+    const fond = melange(rgb(t.bg), dessous, 0.82)
+    ligne(`${nom} : en-tête translucide sur ${n} : muted`, rapport(rgb(t.muted), fond))
+    ligne(`${nom} : en-tête translucide sur ${n} : rouge du jour`, rapport(t.rougeTexte, fond))
+  }
+  // H4 : vue Mois, carreau le plus chargé ; les pastilles (numéro, charge) restent pleines sur --panel, encre dessus.
+  const carreau = melange(rgb(t.chargeEncre), rgb(t.panel), t.chargeMax)
+  ligne(`${nom} : pastille du mois (encre sur panneau)`, rapport(rgb(t.ink), rgb(t.panel)))
+  ligneRepere(`${nom} : pastille / carreau le plus chargé`, rapport(rgb(t.panel), carreau), 1.5)
 }
 process.exit(echec ? 1 : 0)

@@ -21,5 +21,11 @@ export function Lasso({ jours, plage, pxHeure }: Props) {
     top: haut,
     height: minutesVersY(zone.fin, plage, pxHeure) - haut,
   } as CSSProperties
-  return <div className="lasso" data-lasso="" style={style} aria-hidden="true" />
+  // Le fond passe sous les blocs (la couleur des surligneurs reste nette), le bord au-dessus (B2).
+  return (
+    <>
+      <div className="lasso-fond" style={style} aria-hidden="true" />
+      <div className="lasso" data-lasso="" style={style} aria-hidden="true" />
+    </>
+  )
 }

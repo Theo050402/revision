@@ -97,10 +97,10 @@ button {
   box-sizing: border-box;
   height: 100%;
   overflow-y: auto;
-  padding: 18px 20px 18px 16px;
+  padding: 16px 20px 16px 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .panneau-titre {
@@ -129,12 +129,24 @@ button {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 16px;
-  padding-top: max(10px, env(safe-area-inset-top));
+  padding: 8px 16px;
+  padding-top: max(8px, env(safe-area-inset-top));
   padding-left: max(16px, env(safe-area-inset-left));
   padding-right: max(16px, env(safe-area-inset-right));
   background: var(--bg);
   border-bottom: 1px solid var(--line);
+}
+
+/* Calendrier : la barre du haut et la barre du calendrier forment un seul groupe de chrome opaque (rien ne défile
+   dessous), fermé par un seul filet, celui de la barre du calendrier (M3). */
+.barre[data-ecran='calendrier'] {
+  border-bottom-color: transparent;
+}
+
+/* Hors du calendrier, le titre du mois reste (identité) mais s'estompe : c'est le titre de l'écran qui dit où l'on
+   est (B15). */
+.barre:not([data-ecran='calendrier']) .barre-titre {
+  opacity: 0.55;
 }
 
 .barre-titre {
@@ -149,8 +161,9 @@ button {
 .mois {
   font-family: 'Bricolage Grotesque', system-ui, sans-serif;
   font-weight: 800;
-  font-size: var(--fs-5);
-  line-height: 1.2;
+  font-size: min(var(--fs-5), 26px);
+  line-height: var(--lh-5);
+  letter-spacing: var(--ls-5);
   white-space: nowrap;
 }
 
@@ -162,13 +175,14 @@ button {
   border-radius: 2px;
 }
 
+/* Sombre : même jaune, dosé à 50 % (à 40 %, il virait au kaki sur le violet, B1). */
 :root[data-theme='sombre'] .surligneur {
-  background: linear-gradient(transparent 58%, rgb(255 228 92 / 0.4) 58% 94%, transparent 94%);
+  background: linear-gradient(transparent 58%, rgb(255 228 92 / 0.5) 58% 94%, transparent 94%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme='auto'] .surligneur {
-    background: linear-gradient(transparent 58%, rgb(255 228 92 / 0.4) 58% 94%, transparent 94%);
+    background: linear-gradient(transparent 58%, rgb(255 228 92 / 0.5) 58% 94%, transparent 94%);
   }
 }
 
@@ -246,7 +260,7 @@ button {
 
 .btn-icone:disabled {
   color: var(--muted);
-  opacity: 0.45;
+  opacity: var(--opacite-inactif);
   cursor: default;
 }
 
@@ -269,7 +283,7 @@ button {
 }
 
 .btn-principal:disabled {
-  opacity: 0.4;
+  opacity: var(--opacite-inactif);
   cursor: default;
 }
 
@@ -286,6 +300,30 @@ button {
   text-decoration-thickness: 1.5px;
   text-underline-offset: 4px;
   cursor: pointer;
+}
+
+/* Rouge pour une action destructive (H2) : `.btn-texte` fixe l'encre, d'où la spécificité double. */
+.btn-texte.btn-danger-texte {
+  color: var(--rouge-texte);
+}
+
+/* Alignement optique (M17) : un bouton texte au bord d'une colonne ou d'une rangée garde sa cible de 44 px, mais son
+   texte s'aligne sur le bord du contenu (la marge intérieure de 12 px est compensée, pas retirée). Rangée par rangée :
+   seuls les boutons réellement au bord sont décalés. */
+.fiche-retour,
+.bib-effacer,
+.bib-plus,
+.fiche > .feuille-actions > .btn-texte:first-child {
+  margin-inline-start: -12px;
+}
+
+.import-actions > .btn-texte:only-child {
+  margin-inline-end: -12px;
+}
+
+/* Les petits boutons texte de la bibliothèque ont 8 px de marge intérieure. */
+.bib-titre-ligne > .bib-petit:last-child {
+  margin-inline-end: -8px;
 }
 
 /* Sélecteur segmenté (vues, apparence). */
@@ -342,17 +380,27 @@ button {
 }
 
 .ecran h1,
-.plein-ecran h1 {
+.plein-ecran h1,
+.import-carte h1 {
   margin: 0;
   font-size: var(--fs-5);
   font-weight: 800;
 }
 
 .carte {
-  background: var(--panel);
+  background: var(--surface-haute);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--r-4);
+  box-shadow: var(--ombre-1), var(--reflet);
   padding: 16px;
+}
+
+/* Sur une surface haute, champs et cartes intérieures prennent leurs variantes (en sombre : champs encastrés, plus
+   sombres que la surface ; cartes à l'ancien panneau). Les jetons sont redéfinis pour tout le contenu. */
+.carte,
+.feuille {
+  --field: var(--field-haut);
+  --card: var(--card-haut);
 }
 
 .carte h2 {
@@ -435,17 +483,39 @@ button {
   }
 }
 
-/* ---------- Bandeau d'erreur (persistant) ---------- */
+/* ---------- Encarts : info, avertissement, erreur (M9) ----------
+   Un seul code pour les retours qui restent affichés : trait gauche de 4 px au ton, fond teinté à 10 % sur la
+   surface haute, texte à l'encre. Info : la marge rouge du cahier ; avertissement : l'orange (--c3) ; erreur : le
+   rouge. La réussite, elle, passe par le toast. */
+.encart {
+  --ton: var(--margin);
+  margin: 0;
+  padding: 12px 16px;
+  border-left: 4px solid var(--ton);
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--ton) 10%, var(--surface-haute));
+  color: var(--ink);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+}
+
+.encart[data-ton='avertissement'] {
+  --ton: var(--c3);
+}
+
+.encart[data-ton='erreur'] {
+  --ton: var(--now);
+}
+
+.encart p {
+  margin: 0;
+}
+
+/* ---------- Bandeau d'erreur (persistant) : un encart d'erreur sur toute la largeur ---------- */
 
 .bandeau-erreur {
-  margin: 0;
-  padding: 10px 16px;
-  background: var(--field);
-  background: color-mix(in srgb, var(--now) 14%, var(--panel));
+  border-radius: 0;
   border-bottom: 1px solid var(--line);
-  border-left: 4px solid var(--now);
-  font-size: var(--fs-3);
-  line-height: 1.4;
 }
 
 .bandeau-action {
@@ -462,9 +532,8 @@ button {
 }
 
 .bandeau-seul {
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--now);
-  border-radius: 8px;
+  border-bottom: 0;
+  border-radius: var(--r-2);
   text-align: left;
 }
 
@@ -509,7 +578,7 @@ button {
 .feuille-voile {
   position: absolute;
   inset: 0;
-  background: rgb(20 14 40 / 0.4);
+  background: var(--voile);
 }
 
 .feuille {
@@ -519,11 +588,17 @@ button {
   max-height: 85dvh;
   display: flex;
   flex-direction: column;
-  background: var(--panel);
-  border-radius: 18px 18px 0 0;
+  /* Surface haute (H3) : en sombre, plus claire que la page assombrie par le voile ; ombre profonde et reflet. */
+  background: var(--surface-haute);
+  border-radius: var(--r-5) var(--r-5) 0 0;
   border-top: 3px solid var(--margin);
-  box-shadow: var(--ombre);
+  box-shadow: var(--ombre-3), var(--reflet);
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Feuille « Items » (iPhone) : hauteur fixe, la fiche d'un item s'y ouvre sans faire sauter la feuille (M14). */
+.feuille.feuille-items {
+  height: 85dvh;
 }
 
 /* Prolonge la feuille du bas sous l'écran : le ressort rebondit (amortissement 0,8) et la feuille peut monter de
@@ -535,7 +610,7 @@ button {
   right: 0;
   top: 100%;
   height: 80px;
-  background: var(--panel);
+  background: var(--surface-haute);
 }
 
 /* Pendant sa sortie, le corps de la feuille ne répond plus (il est aussi `inert` : clavier et lecteurs d'écran). */
@@ -599,6 +674,15 @@ button {
   bottom: calc(max(8px, env(safe-area-inset-bottom)) + 72px);
 }
 
+/* Une feuille ouverte (rendue dans `body`, hors de `.racine`) passe devant : les messages vont en haut de l'écran,
+   sans cacher ses actions (M10). Spécificité (0,4,0) et (0,5,0), placée après : elle l'emporte sur les règles iPhone
+   (0,3,0) et barre de sélection (selection.css : jusqu'à (0,4,0)). */
+:root:has(.feuille-fond) .racine .toasts,
+:root:has(.feuille-fond) .racine[data-dispo] .toasts {
+  top: max(16px, env(safe-area-inset-top));
+  bottom: auto;
+}
+
 .toast {
   pointer-events: auto;
   display: flex;
@@ -608,12 +692,22 @@ button {
   padding: 4px 4px 4px 16px;
   min-height: 48px;
   box-sizing: border-box;
-  border-radius: 12px;
+  border-radius: var(--r-4);
   background: var(--accent);
   color: var(--on-accent);
-  box-shadow: var(--ombre);
+  box-shadow: var(--ombre-2), var(--reflet);
   font-size: var(--fs-3);
   animation: monter-toast 180ms ease-out;
+}
+
+/* En sortie (Toast.tsx) : il ne répond plus. */
+.toast[data-sortie] {
+  pointer-events: none;
+}
+
+/* En haut (feuille ouverte) : il entre par le haut, et repart par où il est venu (Toast.tsx). */
+:root:has(.feuille-fond) .toast {
+  animation-name: descendre-toast;
 }
 
 .toast-fermer {
@@ -624,7 +718,7 @@ button {
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 10px;
+  border-radius: 10px; /* concentrique : 14 − 4 */
   background: transparent;
   cursor: pointer;
 }
@@ -640,6 +734,13 @@ button {
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+}
+
+@keyframes descendre-toast {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
   }
 }
 
@@ -675,5 +776,156 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .tremble {
     animation: none;
+  }
+}
+
+/* ---------- Dépliables : chevron des <details> (M19) ----------
+   `summary` en flex perd le marqueur natif : un chevron l'indique, tourné vers le bas quand c'est ouvert. */
+.export-alternative > summary,
+.detail-technique > summary {
+  list-style: none;
+}
+
+.export-alternative > summary::-webkit-details-marker,
+.detail-technique > summary::-webkit-details-marker {
+  display: none;
+}
+
+.export-alternative > summary::after,
+.detail-technique > summary::after {
+  content: '';
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  background: var(--ink);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 5 7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 5 7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: transform 150ms ease;
+}
+
+.export-alternative[open] > summary::after,
+.detail-technique[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+/* Réglages : « Retour au calendrier » au bord droit, aligné sur le contenu (M17). */
+.ecran-entete > .btn-texte:last-child {
+  margin-inline-end: -12px;
+}
+
+/* ---------- Matériaux (M3, M5, M6, M15 ; jetons dans tokens.css) ----------
+   En-têtes collants : opaques au repos, rien ne passe dessous ; matériau fin et ombre de bord dès que le contenu
+   défile dessous (`data-bord-haut`, bordHaut.ts). Barres d'actions flottantes : matériau épais. Jamais translucide sur
+   translucide : rien de ce qui passe sous ces surfaces n'est lui-même un matériau. */
+
+.ecran-reglages .ecran-entete {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: -20px -16px 0;
+  padding: 12px 16px;
+}
+
+.calendrier-defilement[data-bord-haut] .grille-tete,
+.calendrier-defilement[data-bord-haut] .mois-entete,
+.zone[data-bord-haut] .ecran-reglages .ecran-entete {
+  background: var(--materiau-fin);
+  -webkit-backdrop-filter: var(--flou-fin);
+  backdrop-filter: var(--flou-fin);
+  box-shadow: var(--bord-defilement);
+}
+
+.barre-selection,
+.verif-pied {
+  background: var(--materiau-epais);
+  -webkit-backdrop-filter: var(--flou-epais);
+  backdrop-filter: var(--flou-epais);
+}
+
+.verif-pied {
+  box-shadow: 0 -1px 0 var(--line);
+}
+
+/* Pendant un glisser, un redimensionnement ou un lasso (`data-geste` sur la racine, dnd/glisse.ts), l'en-tête des
+   jours redevient opaque et sans flou : la grille défile sous lui à chaque image, le flou y coûterait sur iPad. */
+:root[data-geste] .calendrier-defilement .grille-tete,
+:root[data-geste] .calendrier-defilement .mois-entete {
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Transparence réduite (M5) : barres et feuilles opaques, sans flou. Safari ne transmet pas encore ce réglage
+   d'iOS ; la règle sert aux navigateurs qui le font, et le repli `@supports` ci-dessous aux autres. */
+@media (prefers-reduced-transparency: reduce) {
+  .calendrier-defilement[data-bord-haut] .grille-tete,
+  .calendrier-defilement[data-bord-haut] .mois-entete,
+  .zone[data-bord-haut] .ecran-reglages .ecran-entete {
+    background: var(--bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .barre-selection,
+  .verif-pied,
+  .feuille {
+    background: var(--surface-haute);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Sans flou d'arrière-plan : un fond translucide sans flou serait illisible, il devient opaque. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .calendrier-defilement[data-bord-haut] .grille-tete,
+  .calendrier-defilement[data-bord-haut] .mois-entete,
+  .zone[data-bord-haut] .ecran-reglages .ecran-entete {
+    background: var(--bg);
+  }
+
+  .barre-selection,
+  .verif-pied {
+    background: var(--surface-haute);
+  }
+}
+
+/* Contraste augmenté (M5, « Augmenter le contraste » d'iOS) : fonds pleins et bords définis à l'encre. */
+@media (prefers-contrast: more) {
+  .calendrier-defilement[data-bord-haut] .grille-tete,
+  .calendrier-defilement[data-bord-haut] .mois-entete,
+  .zone[data-bord-haut] .ecran-reglages .ecran-entete {
+    background: var(--bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .grille-tete,
+  .mois-entete {
+    border-bottom: 1px solid var(--ink);
+  }
+
+  .barre-selection,
+  .verif-pied {
+    background: var(--surface-haute);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .barre-selection,
+  .feuille {
+    border: 1px solid var(--ink);
+  }
+
+  .feuille {
+    border-top: 3px solid var(--margin);
+  }
+
+  .verif-pied {
+    border-top: 1px solid var(--ink);
+  }
+
+  .carte {
+    border-color: var(--ink);
   }
 }

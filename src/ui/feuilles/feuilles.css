@@ -11,7 +11,7 @@
   .feuille.feuille-etroite {
     width: min(520px, calc(100% - 48px));
     margin: 0;
-    border-radius: 18px;
+    border-radius: var(--r-5);
     padding-bottom: 0;
   }
 
@@ -33,14 +33,17 @@
 .feuille-confirmation {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
+/* Le quand, sous le titre de la feuille : texte courant, chiffres tabulaires ; le titre garde la hiérarchie (M7). */
 .fiche-quand {
   margin: 0;
-  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
-  font-weight: 700;
-  font-size: var(--fs-4);
+  font-family: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .fiche-details {
@@ -71,7 +74,7 @@
 
 .pastille {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-pilule);
   background: var(--field);
   color: var(--muted);
   font-size: var(--fs-2);
@@ -91,6 +94,21 @@
 
 .fiche-ligne .champ {
   min-width: 0;
+}
+
+/* iPhone : le jour sur sa propre ligne, puis début – fin ; au tiers de la largeur, la date était tronquée (B16). */
+@media (max-width: 599px) {
+  .fiche-ligne {
+    flex-wrap: wrap;
+  }
+
+  .fiche-ligne > .champ[type='date'] {
+    flex: 1 0 100%;
+  }
+
+  .fiche-ligne > .champ[type='time'] {
+    flex: 1 1 0;
+  }
 }
 
 .champ-note {
@@ -132,15 +150,16 @@
   justify-content: flex-end;
 }
 
+/* Texte rouge d'une action destructive : `.btn-texte.btn-danger-texte` (ui.css) pour les boutons texte. */
 .btn-danger-texte {
-  color: var(--now);
+  color: var(--rouge-texte);
 }
 
-/* `.btn-principal.btn-danger` : même spécificité que `.btn-principal` (ui.css, chargé après) ne suffirait pas. */
+/* `.btn-principal.btn-danger` : même spécificité que `.btn-principal` (ui.css, chargé après) ne suffirait pas.
+   --rouge-texte (--now assombri de 12 % en clair, --now en sombre) et --sur-rouge : AA dans les deux thèmes (H1). */
 .btn-principal.btn-danger {
-  /* --now assombri de 12 % : le texte --bg y atteint 4,5:1 en clair (4,15:1 sur --now seul) ; en sombre, plus de 5,7:1. */
-  background: color-mix(in srgb, var(--now) 88%, #000);
-  color: var(--bg);
+  background: var(--rouge-texte);
+  color: var(--sur-rouge);
 }
 
 /* Lien dans une phrase. */

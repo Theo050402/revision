@@ -1,17 +1,27 @@
 /* Sélection par zone (spec §D.1, §D.2) : lasso, créneaux sélectionnés, barre flottante du mode sélection. */
 
-/* ---------- Lasso : accent à 12 %, bord accent, sur les colonnes de `--i` à `--i + --n - 1` ---------- */
+/* ---------- Lasso : accent à 12 %, bord accent, sur les colonnes de `--i` à `--i + --n - 1` ----------
+   Deux couches (B2) : le fond passe sous les colonnes et leurs blocs (un voile au-dessus faisait virer les surligneurs
+   au kaki), le bord passe au-dessus. Le fond est sous le contexte d'empilement de la zone qui défile (`contain`). */
 
-.lasso {
+.lasso,
+.lasso-fond {
   position: absolute;
-  z-index: 6;
   left: calc(var(--largeur-heures) + (100% - var(--largeur-heures)) * var(--i) / var(--nb-jours));
   width: calc((100% - var(--largeur-heures)) * var(--n) / var(--nb-jours));
   box-sizing: border-box;
-  border: 1.5px solid var(--accent);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--r-1);
   pointer-events: none;
+}
+
+.lasso-fond {
+  z-index: -1;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.lasso {
+  z-index: 6;
+  border: 1.5px solid var(--accent);
 }
 
 /* ---------- Créneau sélectionné : anneau d'accent et coche (les marques cèdent la place) ---------- */
@@ -74,12 +84,14 @@
   box-sizing: border-box;
   padding: 6px 6px 6px 18px;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--panel) 78%, transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
-  box-shadow: var(--ombre);
+  /* Rayons concentriques : 14 − 6 (marge) = 8 pour ses boutons. Matériau épais : ui.css, « Matériaux ». */
+  border-radius: var(--r-4);
+  box-shadow: var(--ombre-2), var(--reflet);
   color: var(--ink);
+}
+
+.barre-selection > button {
+  border-radius: var(--r-2);
 }
 
 .barre-selection-nombre {
@@ -88,10 +100,10 @@
   white-space: nowrap;
 }
 
-/* Rouge (`--now`) comme `.btn-principal.btn-danger` : assombri de 12 % pour le contraste du texte. */
+/* Rouge comme `.btn-principal.btn-danger` : --rouge-texte, texte --sur-rouge (H1). */
 .barre-selection .barre-selection-supprimer {
-  background: color-mix(in srgb, var(--now) 88%, #000);
-  color: var(--bg);
+  background: var(--rouge-texte);
+  color: var(--sur-rouge);
 }
 
 /* Les messages passent au-dessus de la barre tant qu'elle est là. */

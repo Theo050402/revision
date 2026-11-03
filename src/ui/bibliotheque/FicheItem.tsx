@@ -46,7 +46,7 @@ export function FicheItem({ itemId, etat, disposition, jourParDefaut, onRetour }
     return (
       <div className="fiche">
         <button ref={retour} type="button" className="btn-texte fiche-retour" onClick={onRetour}>
-          Retour
+          ‹ Tous les items
         </button>
         <p className="aide">Cet item n'existe plus.</p>
       </div>
@@ -92,7 +92,7 @@ export function FicheItem({ itemId, etat, disposition, jourParDefaut, onRetour }
   return (
     <div className="fiche">
       <button ref={retour} type="button" className="btn-texte fiche-retour" onClick={onRetour}>
-        ← Retour
+        ‹ Tous les items
       </button>
       <div className="fiche-entete">
         <span className="carte-pastille fiche-pastille" style={{ background: teinte }} aria-hidden="true">
@@ -104,7 +104,7 @@ export function FicheItem({ itemId, etat, disposition, jourParDefaut, onRetour }
         </h3>
       </div>
       {item.aVerifier && (
-        <p className="fiche-alerte">Cet item a une anomalie à vérifier (détectée à l'import).</p>
+        <p className="encart fiche-alerte" data-ton="avertissement">Cet item a une anomalie à vérifier (détectée à l'import).</p>
       )}
       <dl className="fiche-infos">
         <dt>Collège</dt>

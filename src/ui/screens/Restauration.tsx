@@ -43,7 +43,7 @@ export function Restauration() {
 
   return (
     <div className="restauration">
-      <button type="button" className="btn-ajout" onClick={() => champ.current?.click()}>
+      <button type="button" className="btn-secondaire" onClick={() => champ.current?.click()}>
         Restaurer une sauvegarde
       </button>
       <input

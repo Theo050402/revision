@@ -1,7 +1,9 @@
 // Réglages (spec §11) : Durées, Journée, Indisponibilités, Collèges, Export, Apparence, Données.
 // Les réglages, les collèges et la restauration ne sont pas annulables (spec §9.6) : `appliquerSansHistorique`.
+import { useRef } from 'react'
 import { modifierReglages } from '../../domain/actions-etat'
 import type { Reglages as ReglagesEtat } from '../../domain/types'
+import { useBordHaut } from '../bordHaut'
 import { sauvegarder } from '../sauvegarde'
 import { useStore } from '../store'
 import { Colleges } from './reglages/Colleges'
@@ -11,6 +13,8 @@ import { Restauration } from './Restauration'
 import { ViderPlanning } from './ViderPlanning'
 import { VERSION_APP } from '../../version'
 import './reglages.css'
+
+const zoneDe = (el: HTMLElement) => el.closest<HTMLElement>('.zone')
 
 const THEMES: ReadonlyArray<{ valeur: ReglagesEtat['theme']; libelle: string }> = [
   { valeur: 'auto', libelle: 'Auto' },
@@ -40,9 +44,12 @@ export function Reglages({ onRetour, recurrenceInitiale = null }: Props) {
   const appliquer = useStore((s) => s.appliquerSansHistorique)
 
   const choisir = (champs: Partial<ReglagesEtat>) => appliquer((e) => modifierReglages(e, champs))
+  // En-tête collant (M15) : c'est la zone principale (`main.zone`) qui défile.
+  const ecran = useRef<HTMLElement>(null)
+  useBordHaut(ecran, zoneDe)
 
   return (
-    <section className="ecran ecran-reglages" aria-labelledby="titre-reglages">
+    <section ref={ecran} className="ecran ecran-reglages" aria-labelledby="titre-reglages">
       <div className="ecran-entete">
         <h1 id="titre-reglages">Réglages</h1>
         <button type="button" className="btn-texte" onClick={onRetour}>
@@ -97,7 +104,7 @@ export function Reglages({ onRetour, recurrenceInitiale = null }: Props) {
           Tout reste sur cet appareil. Une sauvegarde est un fichier que tu peux ranger dans Fichiers ou t'envoyer par AirDrop.
         </p>
         {persistance === false && (
-          <p className="message-info" data-testid="rappel-persistance">
+          <p className="encart message-info" data-ton="info" data-testid="rappel-persistance">
             {MESSAGE_PERSISTANCE}
           </p>
         )}

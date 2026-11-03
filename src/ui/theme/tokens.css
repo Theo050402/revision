@@ -25,6 +25,23 @@
   --bloc-trait: 3px;
   --bloc-trait-teinte: 0%;
   --bloc-lueur: 0%;
+  /* Rouge en texte (H1) : --now assombri de 12 % pour atteindre AA en clair ; texte posé sur ce rouge. La ligne et le
+     point « maintenant », qui ne sont pas du texte, restent en --now. */
+  --rouge-texte: color-mix(in srgb, var(--now) 88%, #000);
+  --sur-rouge: #ffffff;
+  /* Élévation (H3) : feuilles, popovers, toasts, cartes d'écran. En clair, le panneau blanc. */
+  --surface-haute: var(--panel);
+  /* Champs et cartes posés sur une surface haute (valeurs littérales : elles remplacent --field / --card dedans). */
+  --field-haut: #f1f4f9;
+  --card-haut: #ffffff;
+  --voile: rgb(20 14 40 / 0.4);
+  --reflet: 0 0 #0000;
+  --ombre-1: 0 1px 2px rgb(30 42 90 / 0.08), 0 1px 1px rgb(30 42 90 / 0.04);
+  --ombre-2: 0 4px 14px -2px rgb(30 42 90 / 0.14), 0 1px 3px rgb(30 42 90 / 0.08);
+  --ombre-3: 0 20px 48px -12px rgb(30 42 90 / 0.3), 0 6px 16px -4px rgb(30 42 90 / 0.12);
+  /* Vue Mois (H4) : encre de charge des carreaux et opacité au maximum. */
+  --charge-encre: var(--ink);
+  --charge-max: 1;
   color-scheme: light;
 }
 
@@ -50,6 +67,20 @@
   --bloc-trait: 4px;
   --bloc-trait-teinte: 100%;
   --bloc-lueur: 100%;
+  --rouge-texte: var(--now);
+  --sur-rouge: var(--bg);
+  /* En sombre, l'élévation éclaircit : les surfaces hautes prennent la carte, les champs s'y encastrent (plus sombres)
+     et les cartes intérieures prennent l'ancien panneau (même écart qu'avant, carte sur panneau). */
+  --surface-haute: var(--card);
+  --field-haut: #1a1027;
+  --card-haut: #241934;
+  --voile: rgb(10 6 22 / 0.6);
+  --reflet: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --ombre-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --ombre-2: 0 4px 14px -2px rgb(0 0 0 / 0.45), 0 1px 3px rgb(0 0 0 / 0.3);
+  --ombre-3: 0 24px 56px -12px rgb(0 0 0 / 0.6), 0 6px 16px -4px rgb(0 0 0 / 0.35);
+  --charge-encre: var(--accent);
+  --charge-max: 0.55;
   color-scheme: dark;
 }
 
@@ -78,19 +109,78 @@
     --bloc-trait: 4px;
     --bloc-trait-teinte: 100%;
     --bloc-lueur: 100%;
+    --rouge-texte: var(--now);
+    --sur-rouge: var(--bg);
+    /* En sombre, l'élévation éclaircit : les surfaces hautes prennent la carte, les champs s'y encastrent (plus sombres)
+       et les cartes intérieures prennent l'ancien panneau (même écart qu'avant, carte sur panneau). */
+    --surface-haute: var(--card);
+    --field-haut: #1a1027;
+    --card-haut: #241934;
+    --voile: rgb(10 6 22 / 0.6);
+    --reflet: inset 0 1px 0 rgb(255 255 255 / 0.06);
+    --ombre-1: 0 1px 2px rgb(0 0 0 / 0.3);
+    --ombre-2: 0 4px 14px -2px rgb(0 0 0 / 0.45), 0 1px 3px rgb(0 0 0 / 0.3);
+    --ombre-3: 0 24px 56px -12px rgb(0 0 0 / 0.6), 0 6px 16px -4px rgb(0 0 0 / 0.35);
+    --charge-encre: var(--accent);
+    --charge-max: 0.55;
     color-scheme: dark;
   }
 }
 
-/* Échelle typographique (spec §13.3), rayons et ombre. */
+/* Échelle typographique (spec §13.3, audit M1–M2) : en rem, pour suivre la taille du texte choisie sur l'appareil.
+   Racine à 17 px : 1rem = corps d'iOS à la taille par défaut (les valeurs en px d'avant sont donc inchangées). Chaque
+   taille a son interligne et son approche : titres resserrés, petit texte légèrement espacé. */
+html {
+  font-size: 106.25%;
+}
+
+/* iOS / iPadOS : la racine suit « Taille du texte » (Dynamic Type). `font` réinitialise aussi la famille et
+   l'interligne de la racine : `body` les redéclare. */
+@supports (font: -apple-system-body) and (-webkit-touch-callout: none) {
+  html {
+    font: -apple-system-body;
+  }
+}
+
 :root {
-  --fs-1: 11px;
-  --fs-2: 12.5px;
-  --fs-3: 14px;
-  --fs-4: 17px;
-  --fs-5: 22px;
-  --rayon: 10px;
-  --ombre: 0 10px 28px rgba(30, 42, 90, 0.18);
+  --fs-1: calc(11 / 17 * 1rem); /* heures, méta des blocs, badges */
+  --fs-2: calc(12.5 / 17 * 1rem); /* étiquettes, pastilles, titres de bloc */
+  --fs-3: calc(14 / 17 * 1rem); /* corps, aide, boutons */
+  --fs-4: 1rem; /* titres de section et de feuille */
+  --fs-5: calc(22 / 17 * 1rem); /* titres d'écran, mois */
+  --lh-1: 1.25;
+  --lh-2: 1.3;
+  --lh-3: 1.45;
+  --lh-4: 1.3;
+  --lh-5: 1.2;
+  --ls-1: 0.02em;
+  --ls-2: 0.01em;
+  --ls-3: 0;
+  --ls-4: -0.01em;
+  --ls-5: -0.015em;
+
+  /* Rayons (M18) : plus la surface est grande, plus le rayon l'est ; rayons concentriques (intérieur = extérieur −
+     marge). Les blocs du calendrier restent à 3 px (exception assumée, ils sont denses). */
+  --r-1: 4px; /* lasso, emplacement d'atterrissage */
+  --r-2: 8px; /* pastilles, encarts, petits champs */
+  --r-3: 10px; /* boutons, champs, cartes d'item */
+  --r-4: 14px; /* cartes d'écran, barre de sélection, toast, corbeille */
+  --r-5: 18px; /* feuilles et popovers */
+  --r-pilule: 999px;
+  --rayon: var(--r-3);
+  /* Copie glissée : soulevée, la plus profonde (inchangée). */
+  --ombre-soulevee: 0 18px 36px -10px rgb(0 0 0 / 0.38), 0 4px 12px -2px rgb(0 0 0 / 0.2);
+  /* Boutons inactifs : une seule opacité (B9). */
+  --opacite-inactif: 0.4;
+
+  /* Matériaux (M3, M5, M6, M15) : un en-tête collant translucide (fin) et les barres d'actions flottantes (épais).
+     Jamais translucide sur translucide. Replis opaques : ui.css (« Matériaux »). */
+  --materiau-fin: color-mix(in srgb, var(--bg) 82%, transparent); /* 82 % : AA des libellés au-dessus du surligneur le plus foncé */
+  --materiau-epais: color-mix(in srgb, var(--surface-haute) 82%, transparent);
+  --flou-fin: blur(12px) saturate(160%);
+  --flou-epais: blur(20px) saturate(180%);
+  /* Ombre de bord d'un en-tête collant quand le contenu défile dessous. */
+  --bord-defilement: 0 1px 0 var(--line), 0 6px 12px -8px rgb(0 0 0 / 0.18);
 }
 
 /* Surligneurs des collèges : identiques dans les deux thèmes. */
@@ -108,13 +198,33 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: 'Atkinson Hyperlegible', system-ui, sans-serif;
-  font-size: 14px;
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
 }
 
 h1,
 h2,
 h3 {
   font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+}
+
+h1 {
+  line-height: var(--lh-5);
+  letter-spacing: var(--ls-5);
+}
+
+h2,
+h3 {
+  line-height: var(--lh-4);
+  letter-spacing: var(--ls-4);
+}
+
+/* Changement de thème en fondu (M20, App.tsx) : seulement si la transition de vue existe et que le mouvement n'est
+   pas réduit (sinon, changement direct). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 250ms;
+  animation-timing-function: ease;
 }
 
 :focus-visible {

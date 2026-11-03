@@ -79,6 +79,9 @@ let dernierGeste = -Infinity
 export function marquerGeste(actif: boolean): void {
   gesteActif = actif
   dernierGeste = performance.now()
+  // Repère pour la feuille de style : pendant le geste, l'en-tête des jours renonce au flou (ui.css, « Matériaux »).
+  // Posé une fois au début et retiré à la fin, jamais pendant le geste.
+  if (typeof document !== 'undefined') document.documentElement.toggleAttribute('data-geste', actif)
 }
 
 /** Vrai si un geste a eu lieu (ou dure encore) depuis l'instant `t` (`performance.now()`). */

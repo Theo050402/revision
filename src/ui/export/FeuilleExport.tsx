@@ -105,7 +105,7 @@ export function FeuilleExport({ onFermer }: { onFermer: () => void }) {
     <Feuille titre="Exporter vers Calendrier" onFermer={onFermer} className="feuille-etroite feuille-export">
       <div className="export">
         {!etat.premierExportFait && (
-          <p className="export-info">
+          <p className="encart export-info" data-ton="info">
             Crée d'abord un calendrier « Révisions » dans l'app Calendrier, puis choisis-le au moment de l'import.
           </p>
         )}

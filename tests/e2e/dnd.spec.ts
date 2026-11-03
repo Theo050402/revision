@@ -804,6 +804,30 @@ test.describe('iPhone', () => {
   })
 })
 
+// Vue Jour (audit de design M4) : l'en-tête de colonne est masqué, sa boîte reste en place (hauteur nulle). Le glisser
+// lit toujours la largeur des colonnes sur `.jour-tete` et le haut de la zone sur `.grille-tete` : il doit marcher.
+test.describe('vue Jour, en-tête masqué', () => {
+  test('appui long sur un créneau et glisser d’une heure, iPad et iPhone', async ({ page }) => {
+    await ouvrir(page)
+    await page.locator('.barre-vues').getByRole('button', { name: 'Jour' }).dispatchEvent('click')
+    await expect(page.locator('.grille')).toHaveAttribute('data-nb-jours', '1')
+    const tete = page.locator('.grille-tete')
+    await expect(tete).toHaveCSS('visibility', 'hidden')
+    expect((await tete.boundingBox())?.height ?? 0).toBe(0)
+    // Les colonnes gardent une largeur lisible par le glisser.
+    expect((await page.locator('.jour-tete').first().boundingBox())?.width ?? 0).toBeGreaterThan(100)
+
+    // Mercredi 4 (jour courant) : 292 de 13h30 à 15h30, glissé d'une heure.
+    const cr = bloc(page, 'cr-d')
+    await cr.scrollIntoViewIfNeeded()
+    const b = (await cr.boundingBox())!
+    const pxHeure = Number(await page.locator('.grille').getAttribute('data-px-heure'))
+    const de = { x: b.x + b.width / 2, y: b.y + 8 }
+    await glisser(page, de, { x: de.x, y: de.y + pxHeure })
+    await expect(cr).toHaveAttribute('data-debut', '2026-11-04T14:30')
+  })
+})
+
 // Captures d'écran pendant le geste (rapport de la tâche 18) : `CAPTURES=1 npx playwright test dnd --project=ipad`.
 test.describe('captures', () => {
   test.skip(!process.env.CAPTURES, 'captures à la demande')

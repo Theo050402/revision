@@ -482,3 +482,17 @@ test('balayage : une piste saisie en plein mouvement puis relâchée sur place s
   await page.evaluate(() => document.querySelector('.calendrier-defilement')!.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 7, pointerType: 'touch', isPrimary: true, bubbles: true })))
   await expect.poll(() => piste.evaluate((el) => [el.style.transform, el.style.willChange])).toEqual(['', ''])
 })
+
+// En-tête collant des Réglages (audit de design M15) : « Retour au calendrier » se touche sans remonter ; le calendrier
+// revient pourtant à sa place, barre de navigation comprise (la zone principale repart en haut à chaque écran).
+test('Réglages défilés puis « Retour au calendrier » : le calendrier n’est pas décalé', async ({ page }) => {
+  await ouvrirSemee(page)
+  const y = (await page.locator('.calendrier-barre').boundingBox())!.y
+  await page.getByRole('button', { name: 'Réglages' }).click()
+  await page.locator('main.zone').evaluate((el) => (el.scrollTop = 600))
+  await expect(page.locator('main.zone')).toHaveAttribute('data-bord-haut', '')
+  await page.getByRole('button', { name: 'Retour au calendrier' }).click()
+  await expect(page.locator('.calendrier-barre')).toBeVisible()
+  expect((await page.locator('.calendrier-barre').boundingBox())!.y).toBe(y)
+  await expect(page.locator('main.zone')).not.toHaveAttribute('data-bord-haut', '')
+})

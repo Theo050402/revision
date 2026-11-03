@@ -2,7 +2,7 @@
 
 - **Date :** 3 novembre 2026 (tâche 14 des améliorations, spec E)
 - **Base :** branche `feat/ameliorations` au commit `9711e96`
-- **Suite :** la tâche 15 applique les constats hauts et moyens (les bas s'ils ne touchent pas l'identité).
+- **Suite :** la tâche 15 a appliqué les constats hauts et moyens, et les bas qui ne touchent pas l'identité : voir la colonne « Statut » de la liste d'actions et la section « Tâche 15 : ce qui a été fait » en fin de document. La revue de l'audit (`task-14-review.md`, points R1 à R7) y est intégrée ; là où elle contredit le texte ci-dessous, c'est elle qui vaut.
 
 ## Méthode
 
@@ -213,60 +213,60 @@ Par priorité ; « Fichiers » = où corriger. Chaque ligne renvoie au constat d
 
 ### Haute (6)
 
-| # | Action | Fichiers |
-|---|---|---|
-| H1 | Jeton `--rouge-texte` (clair : `--now` assombri de 12 % ; sombre : `--now`) pour tout texte rouge et tout fond rouge portant du texte : `.jour-tete` du jour, `.message-erreur`, `.btn-danger-texte`, `.bib-badge`, `.ligne-glisse`, `.copie-nombre`, `.btn-danger`, `.barre-selection-supprimer`. Paires ajoutées à `contraste.mjs`. | `tokens.css`, `calendrier.css`, `reglages.css`, `feuilles.css`, `bibliotheque.css`, `import.css`, `dnd.css`, `selection.css`, `scripts/contraste.mjs` |
-| H2 | `.btn-texte.btn-danger-texte { color: var(--rouge-texte) }` ; ajouter `btn-danger-texte` au « Supprimer » d'un collège. | `feuilles.css`, `Colleges.tsx` |
-| H3 | Garde de nuit : `--surface-haute` (`--card` en sombre) pour feuilles, popovers, toasts et barre de sélection ; `--voile` à 0,6 en sombre ; ombres noires et reflet haut. | `tokens.css`, `ui.css`, `selection.css` |
-| H4 | Vue Mois : `--charge-encre` (accent en sombre) et `--charge-max` (0,55 en sombre). | `tokens.css`, `calendrier.css` |
-| H5 | Corriger la consigne des indisponibilités ponctuelles (« + Indisponibilité »). | `reglages/Indispos.tsx` |
-| H6 | `.export > .export-section:first-child` au lieu de `:first-child`. | `export.css` |
+| # | Action | Fichiers | Statut (tâche 15) |
+|---|---|---|---|
+| H1 | Jeton `--rouge-texte` (clair : `--now` assombri de 12 % ; sombre : `--now`) pour tout texte rouge et tout fond rouge portant du texte : `.jour-tete` du jour, `.message-erreur`, `.btn-danger-texte`, `.bib-badge`, `.ligne-glisse`, `.copie-nombre`, `.btn-danger`, `.barre-selection-supprimer`. Paires ajoutées à `contraste.mjs`. | `tokens.css`, `calendrier.css`, `reglages.css`, `feuilles.css`, `bibliotheque.css`, `import.css`, `dnd.css`, `selection.css`, `scripts/contraste.mjs` | fait (+ `--sur-rouge`, R2) |
+| H2 | `.btn-texte.btn-danger-texte { color: var(--rouge-texte) }` ; ajouter `btn-danger-texte` au « Supprimer » d'un collège. | `feuilles.css`, `Colleges.tsx` | fait (CSS seul, R4) |
+| H3 | Garde de nuit : `--surface-haute` (`--card` en sombre) pour feuilles, popovers, toasts et barre de sélection ; `--voile` à 0,6 en sombre ; ombres noires et reflet haut. | `tokens.css`, `ui.css`, `selection.css` | fait (+ champs encastrés, R3 ; toast non changé) |
+| H4 | Vue Mois : `--charge-encre` (accent en sombre) et `--charge-max` (0,55 en sombre). | `tokens.css`, `calendrier.css` | fait |
+| H5 | Corriger la consigne des indisponibilités ponctuelles (« + Indisponibilité »). | `reglages/Indispos.tsx` | fait |
+| H6 | `.export > .export-section:first-child` au lieu de `:first-child`. | `export.css` | fait |
 
 ### Moyenne (20)
 
-| # | Action | Fichiers |
-|---|---|---|
-| M1 | Échelle typographique en `rem` (base 17 px, `-apple-system-body` sur iOS), plafonds `min()` pour la grille, interlignage relatif des blocs (§ T1). | `tokens.css`, `calendrier.css` |
-| M2 | Interlignage et approche par taille (`--lh-*`, `--ls-*`), `body { line-height }`, titres resserrés (§ T1). | `tokens.css`, `ui.css` et feuilles de titres |
-| M3 | Un seul filet sous le chrome du calendrier ; `.grille-tete` / `.mois-entete` en matériau fin avec ombre de bord après défilement (`data-bord-haut`). | `ui.css`, `calendrier.css`, `Calendrier.tsx` |
-| M4 | Vue Jour : masquer `.grille-tete` (doublon de la période). | `calendrier.css` |
-| M5 | Replis `prefers-reduced-transparency`, `prefers-contrast: more` et `@supports not (backdrop-filter)` pour toutes les surfaces translucides (§ T3). | `tokens.css`, `selection.css`, `calendrier.css`, `import.css`, `reglages.css` |
-| M6 | `.verif-pied` en matériau épais, bord de défilement. | `import.css` |
-| M7 | `.fiche-quand` en Atkinson 400, `--fs-3`, chiffres tabulaires : titre et date hiérarchisés. | `feuilles.css` |
-| M8 | `.carte` sur `--surface-haute` (cartes plus claires que le papier en sombre). | `ui.css` |
-| M9 | `.encart[data-ton]` pour info, avertissement et erreur ; le bac « À placer » passe au ton avertissement. | `ui.css` + composants des six encarts |
-| M10 | Toasts en haut de l'écran quand une feuille est ouverte. | `ui.css` |
-| M11 | Ligne de vérification : lâcher par ressort avec vitesse, décision par le signe de la vitesse. | `import.css`, `Verification.tsx` |
-| M12 | Sortie symétrique du toast et de la barre de sélection (fondu et translation, ressort). | `Toast.tsx`, `BarreSelection.tsx`, `ui.css` |
-| M13 | « + Indisponibilité » teinté (iPad) et icône sans cadre (iPhone). | `calendrier.css`, `Calendrier.tsx` |
-| M14 | Feuille « Items » à hauteur fixe (85dvh) ; retour « ‹ Tous les items ». | `App.tsx`, `ui.css`, `FicheItem.tsx` |
-| M15 | En-tête des réglages collant, en matériau fin. | `reglages.css` |
-| M16 | État vide du calendrier (carte « Commence par un collège » + bouton) ; « + Collège » plein tant qu'aucun collège. | `Calendrier.tsx`, `Bibliotheque.tsx`, `ui.css` |
-| M17 | Alignement optique des boutons texte (marges négatives de 12 px). | `ui.css`, `bibliotheque.css`, `feuilles.css`, `import.css` |
-| M18 | Ombres `--ombre-1…3` et rayons `--r-1…5` hiérarchisés, rayons concentriques (§ T2). | `tokens.css` et toutes les feuilles CSS |
-| M19 | Chevron des `<details>` ; `.export-alternative` en trait plein. | `export.css`, `import.css` |
-| M20 | Transition de thème en fondu de 250 ms (`startViewTransition`), sauf mouvement réduit. | `App.tsx`, `tokens.css` |
+| # | Action | Fichiers | Statut (tâche 15) |
+|---|---|---|---|
+| M1 | Échelle typographique en `rem` (base 17 px, `-apple-system-body` sur iOS), plafonds `min()` pour la grille, interlignage relatif des blocs (§ T1). | `tokens.css`, `calendrier.css` | fait |
+| M2 | Interlignage et approche par taille (`--lh-*`, `--ls-*`), `body { line-height }`, titres resserrés (§ T1). | `tokens.css`, `ui.css` et feuilles de titres | fait |
+| M3 | Un seul filet sous le chrome du calendrier ; `.grille-tete` / `.mois-entete` en matériau fin avec ombre de bord après défilement (`data-bord-haut`). | `ui.css`, `calendrier.css`, `Calendrier.tsx` | fait (matériau à 82 %, flou coupé pendant un geste) |
+| M4 | Vue Jour : masquer `.grille-tete` (doublon de la période). | `calendrier.css` | fait (boîte gardée, R1) |
+| M5 | Replis `prefers-reduced-transparency`, `prefers-contrast: more` et `@supports not (backdrop-filter)` pour toutes les surfaces translucides (§ T3). | `tokens.css`, `selection.css`, `calendrier.css`, `import.css`, `reglages.css` | fait (e2e Chromium pour la transparence) |
+| M6 | `.verif-pied` en matériau épais, bord de défilement. | `import.css` | fait |
+| M7 | `.fiche-quand` en Atkinson 400, `--fs-3`, chiffres tabulaires : titre et date hiérarchisés. | `feuilles.css` | fait |
+| M8 | `.carte` sur `--surface-haute` (cartes plus claires que le papier en sombre). | `ui.css` | fait (R3) |
+| M9 | `.encart[data-ton]` pour info, avertissement et erreur ; le bac « À placer » passe au ton avertissement. | `ui.css` + composants des six encarts | fait (bac au ton info, R5 ; erreurs en ligne restées en texte) |
+| M10 | Toasts en haut de l'écran quand une feuille est ouverte. | `ui.css` | fait (R6, voir correction) |
+| M11 | Ligne de vérification : lâcher par ressort avec vitesse, décision par le signe de la vitesse. | `import.css`, `Verification.tsx` | fait (R7) |
+| M12 | Sortie symétrique du toast et de la barre de sélection (fondu et translation, ressort). | `Toast.tsx`, `BarreSelection.tsx`, `ui.css` | fait |
+| M13 | « + Indisponibilité » teinté (iPad) et icône sans cadre (iPhone). | `calendrier.css`, `Calendrier.tsx` | fait |
+| M14 | Feuille « Items » à hauteur fixe (85dvh) ; retour « ‹ Tous les items ». | `App.tsx`, `ui.css`, `FicheItem.tsx` | fait |
+| M15 | En-tête des réglages collant, en matériau fin. | `reglages.css` | fait (+ la zone repart en haut à chaque écran) |
+| M16 | État vide du calendrier (carte « Commence par un collège » + bouton) ; « + Collège » plein tant qu'aucun collège. | `Calendrier.tsx`, `Bibliotheque.tsx`, `ui.css` | fait (bouton « Importer un collège ») |
+| M17 | Alignement optique des boutons texte (marges négatives de 12 px). | `ui.css`, `bibliotheque.css`, `feuilles.css`, `import.css` | fait (rangée par rangée) |
+| M18 | Ombres `--ombre-1…3` et rayons `--r-1…5` hiérarchisés, rayons concentriques (§ T2). | `tokens.css` et toutes les feuilles CSS | fait |
+| M19 | Chevron des `<details>` ; `.export-alternative` en trait plein. | `export.css`, `import.css` | fait |
+| M20 | Transition de thème en fondu de 250 ms (`startViewTransition`), sauf mouvement réduit. | `App.tsx`, `tokens.css` | fait (changement dans Réglages seulement) |
 
 ### Basse (16)
 
-| # | Action | Fichiers |
-|---|---|---|
-| B1 | Surligneur du mois en sombre moins boueux (dosage à 45–50 %). | `ui.css` |
-| B2 | Fond du lasso sous les blocs, bord au-dessus. | `selection.css` |
-| B3 | Poignée de durée discrète au repos, masquée sur les blocs courts. | `dnd.css`, `Bloc.tsx` |
-| B4 | Pas de « Fermer » dans les feuilles qui ont « Annuler » (`sansFermer`). | `Feuille.tsx`, `FeuilleNouvelleIndispo.tsx`, `FeuilleConfirmation.tsx` |
-| B5 | Trait plein (`btn-secondaire`) pour Réimporter, Importer un fichier, Restaurer une sauvegarde. | `Colleges.tsx`, `Indispos.tsx`, `Restauration.tsx` |
-| B6 | Vue Mois : pas de « Novembre » deux fois. | `Calendrier.tsx` |
-| B7 | Espaces fines insécables dans les guillemets. | textes `*.tsx` |
-| B8 | Espacements sur la grille de 4 px (liste plus haut). | `ui.css`, `export.css`, `import.css`, `dnd.css` |
-| B9 | `--opacite-inactif: 0.4` pour tous les boutons inactifs. | `tokens.css` + boutons |
-| B10 | Repli du panneau iPad sans animation de mise en page (si simple). | `ui.css` |
-| B11 | Créneaux de la fiche d'item en liste groupée non interactive. | `bibliotheque.css` |
-| B12 | iPhone : pas de bords latéraux à `.verif-contenu`. | `import.css` |
-| B13 | Lecture impossible : pas de tirets dans des tirets. | `ui.css` / `Emplacements.tsx` |
-| B14 | `h1` d'import à `--fs-5`. | `ui.css` |
-| B15 | Titre du mois estompé hors du calendrier. | `BarreHaut.tsx`, `ui.css` |
-| B16 | iPhone : jour sur sa propre ligne dans « Quand » (à confirmer sur l'appareil). | `ChampQuand.tsx`, `feuilles.css` |
+| # | Action | Fichiers | Statut (tâche 15) |
+|---|---|---|---|
+| B1 | Surligneur du mois en sombre moins boueux (dosage à 45–50 %). | `ui.css` | fait (50 %) |
+| B2 | Fond du lasso sous les blocs, bord au-dessus. | `selection.css` | fait |
+| B3 | Poignée de durée discrète au repos, masquée sur les blocs courts. | `dnd.css`, `Bloc.tsx` | fait |
+| B4 | Pas de « Fermer » dans les feuilles qui ont « Annuler » (`sansFermer`). | `Feuille.tsx`, `FeuilleNouvelleIndispo.tsx`, `FeuilleConfirmation.tsx` | non retenu |
+| B5 | Trait plein (`btn-secondaire`) pour Réimporter, Importer un fichier, Restaurer une sauvegarde. | `Colleges.tsx`, `Indispos.tsx`, `Restauration.tsx` | fait |
+| B6 | Vue Mois : pas de « Novembre » deux fois. | `Calendrier.tsx` | non retenu |
+| B7 | Espaces fines insécables dans les guillemets. | textes `*.tsx` | partiel |
+| B8 | Espacements sur la grille de 4 px (liste plus haut). | `ui.css`, `export.css`, `import.css`, `dnd.css` | fait |
+| B9 | `--opacite-inactif: 0.4` pour tous les boutons inactifs. | `tokens.css` + boutons | fait |
+| B10 | Repli du panneau iPad sans animation de mise en page (si simple). | `ui.css` | non retenu |
+| B11 | Créneaux de la fiche d'item en liste groupée non interactive. | `bibliotheque.css` | fait |
+| B12 | iPhone : pas de bords latéraux à `.verif-contenu`. | `import.css` | fait |
+| B13 | Lecture impossible : pas de tirets dans des tirets. | `ui.css` / `Emplacements.tsx` | fait (par B5) |
+| B14 | `h1` d'import à `--fs-5`. | `ui.css` | fait |
+| B15 | Titre du mois estompé hors du calendrier. | `BarreHaut.tsx`, `ui.css` | fait |
+| B16 | iPhone : jour sur sa propre ligne dans « Quand » (à confirmer sur l'appareil). | `ChampQuand.tsx`, `feuilles.css` | fait (à confirmer sur l'appareil) |
 
 ---
 
@@ -380,3 +380,45 @@ h2, h3, .calendrier-periode, .jour-tete b { line-height: var(--lh-4); letter-spa
 - M3 et M15 touchent des zones qui défilent sous `contain: strict` (`dnd.css`) : vérifier la fluidité du glisser avec défilement automatique sur iPad avant de garder le flou ; sinon, repli opaque avec l'ombre de bord seule.
 - M4 et M14 changent des libellés ou des visibilités lus par les e2e (`calendrier.spec.ts:257`, `bibliotheque.spec.ts` « Retour »).
 - Captures après correction : mêmes noms, préfixe `apres-`, puis ajout d'une section avant / après à ce document (étape 3 de la tâche 15).
+
+---
+
+## Tâche 15 : ce qui a été fait
+
+### Corrections de la revue intégrées (R1 à R7)
+
+- **R1 · M4 sans casser le glisser.** `.grille-tete` n'est pas en `display: none` : en vue Jour, `height: 0; overflow: hidden; visibility: hidden`. La boîte reste en place : `dnd/cibles.ts` et `ContexteDnd.tsx` lisent toujours la largeur et la position des colonnes sur `.jour-tete`, `dnd/bords.ts` le haut de la zone sur le bas de `.grille-tete`. Nouvel e2e « vue Jour, en-tête masqué » (`dnd.spec.ts`, iPad et iPhone) : en-tête de hauteur nulle, glisser d'une heure réussi.
+- **R2 · `--sur-rouge`.** Clair `#fff`, sombre `var(--bg)`, pour tout texte posé sur le rouge : `.copie-nombre` (2,09:1 en sombre avant, 7,41:1 après), `.bib-badge`, `.ligne-glisse`, `.btn-principal.btn-danger`, `.barre-selection-supprimer`. Fond : `--rouge-texte`. Mesuré dans les deux thèmes par `contraste.mjs`.
+- **R3 · Champs sur la surface haute.** `.feuille` et `.carte` redéfinissent `--field` et `--card` pour leur contenu : `--field-haut` et `--card-haut` (clair : inchangés ; sombre : champs **encastrés** `#1a1027`, 1,32:1 contre la surface `#33264a`, soit l'écart d'avant entre champ et panneau, 1,33:1 ; cartes intérieures à l'ancien panneau `#241934`, 1,20:1 comme avant, plus leur bord). Muted reste à 7,1:1 sur ces champs. Paires dans `contraste.mjs` (repères non normatifs marqués « repère »).
+- **R4 · H2.** Seul le CSS `.btn-texte.btn-danger-texte { color: var(--rouge-texte) }` (dans `ui.css`, chargé en dernier) ; `Colleges.tsx` et `Indispos.tsx` portaient déjà la classe.
+- **R5 · M9.** Le bac « À placer » est un encart au ton **info** (`--margin`), le badge du nombre reste rouge.
+- **R6 · M10.** La revue avait vu le conflit de spécificité ; il y en avait un second : les feuilles sont rendues dans `body` (portail), hors de `.racine`, donc `.racine:has(.feuille-fond)` ne trouvait jamais rien. Sélecteurs retenus : `:root:has(.feuille-fond) .racine .toasts` (0,4,0) et `… .racine[data-dispo] .toasts` (0,5,0), placés après les règles iPhone (0,3,0) et sélection (jusqu'à (0,4,0)). e2e : les messages montent en haut avec une feuille ouverte, sur iPhone et même avec une barre de sélection présente.
+- **R7 · M11.** Le ressort (`animerValeur`, amortissement 1, réponse 0,3) est le seul à écrire le `transform` de `.ligne-contenu` (et `data-revele`) : pendant le geste, au relâché (avec la vitesse du doigt) et quand `ouverte` change sans geste. Le style React n'est plus posé, la transition CSS est retirée. Décision : un geste vif (> 300 px/s) et franc (≥ 32 px) décide par le **signe** de sa vitesse, sinon la position (au-delà de la moitié) ; ainsi un petit glissement revient toujours (e2e d'import inchangé).
+- **Mineurs.** M3/M5 : le flou n'est actif que sous `[data-bord-haut]` (au repos l'en-tête est opaque), l'attribut n'est écrit qu'au franchissement du seuil (`bordHaut.ts`) et le flou est coupé pendant un glisser, un redimensionnement ou un lasso (`:root[data-geste]`, posé par `marquerGeste`). M20 : l'attribut `data-theme` devient asynchrone dans la transition ; le thème lu au lancement est posé d'un coup (aucun fondu au démarrage) ; les e2e attendent déjà l'attribut. M17 : sélecteurs rangée par rangée (la confirmation, alignée à droite, n'est pas décalée). B3 : la zone d'appui de 24 px est gardée. M1 : `body` redéclare famille et interligne après `font: -apple-system-body`.
+
+### Écarts à l'audit
+
+- **Matériau fin à 82 % au lieu de 72 %.** À 72 %, les libellés gris de l'en-tête des jours passaient sous 4,5:1 au-dessus d'un bloc rose, orange ou violet (4,27:1 au pire), et le rouge du jour aussi (4,42:1). À 82 % : 4,52:1 et 4,67:1 au pire (bloc plein sous le flou).
+- **En-tête du mois.** `.mois-entete` garde son filet : les carreaux commencent juste dessous, sans ligne d'heure pour les séparer. Il prend le matériau et l'ombre de bord quand la vue défile, comme l'en-tête des jours.
+- **Toast.** Il reste plein, à l'accent (la réussite, M9) : il se distingue déjà du fond en sombre ; seules son ombre (`--ombre-2`, reflet) et son rayon changent.
+- **Erreurs en ligne.** `.message-erreur` (validation sous un champ) reste un texte rouge (`--rouge-texte`) : c'est la validation en ligne voulue par [§16]. Les erreurs en bloc (bandeau, import, retour d'import .ics) sont des encarts au ton erreur.
+- **Réglages collants (M15).** « Retour au calendrier » se touche désormais sans remonter : la zone principale, commune aux écrans, gardait son défilement et le calendrier revenait décalé (barre de navigation hors de l'écran, vu sur les captures). `App.tsx` remet la zone en haut à chaque changement d'écran ; e2e dans `coque.spec.ts`.
+- **État vide (M16).** Le bouton de la carte s'appelle « Importer un collège » : un second « + Collège » visible en même temps que celui de la bibliothèque (iPad) aurait été ambigu.
+- **Non retenus.** B4 : « Fermer » est dans l'en-tête de chaque feuille par la spec A, et de nombreux parcours le touchent ; le doublon avec « Annuler » est mineur. B6 : le libellé de période est fixé par la spec (§9) et annoncé par le lecteur d'écran à chaque changement ; garder le mois y est utile. B7 : seulement pour les textes cités (bibliothèque vide, consigne H5) ; une passe générale toucherait des textes repris mot pour mot de la spec. B10 : le repli du panneau par `translateX` obligerait à changer la grille du calendrier en deux temps ; pas simple, laissé en l'état.
+
+### Avant / après
+
+Captures : `shots/apres-<écran>-<ipad|iphone>-<clair|sombre>.png`, mêmes données et même parcours que `audit-*` (plus `apres-calendrier-semaine-defile-*`, grille défilée sous l'en-tête).
+
+| Écran | Avant (`audit-…`) | Après (`apres-…`) |
+|---|---|---|
+| Semaine, iPad clair | trois filets en tête ; « mer. » rouge à 4,15:1 ; « + Indisponibilité » au même trait qu'« Aujourd'hui » | un seul filet ; rouge du jour à 5,15:1 ; « + Indisponibilité » teinté ; poignées discrètes |
+| Semaine défilée | en-tête opaque, filet | en-tête translucide flouté, ombre de bord |
+| Jour, iPhone | en-tête de colonne qui répète la date ; « + » encadré | 48 px rendus à la grille ; icône « + » sans cadre, 44 × 44 |
+| Mois, sombre | jours chargés en carreaux presque blancs | carreaux à l'accent, 55 % au plus |
+| Fiche créneau / confirmation, sombre | feuille indiscernable du fond assombri ; « Supprimer » à l'encre | feuille plus claire que la page (voile à 0,6), reflet ; « Supprimer » rouge ; champs encastrés |
+| Réglages, sombre | cartes plus sombres que le papier | cartes au-dessus du papier ; en-tête collant |
+| Bibliothèque | bac « À placer » rouge comme une erreur ; « Plus de filtres » décalé de 12 px | bac au ton info, badge rouge ; textes alignés sur le bord |
+| Export | encart d'introduction rogné ; « Repartir… » sans chevron, en tirets | encart entier ; chevron, trait plein |
+| Vérification | pied opaque avec filet | pied en matériau épais |
+| États vides | grille muette | carte « Commence par un collège » |

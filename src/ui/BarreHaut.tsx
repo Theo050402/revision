@@ -38,7 +38,7 @@ type Props = {
 
 export function BarreHaut(p: Props) {
   return (
-    <header className="barre" data-dispo={p.disposition}>
+    <header className="barre" data-dispo={p.disposition} data-ecran={p.ecran}>
       {p.disposition === 'ipad' && (
         <button
           type="button"

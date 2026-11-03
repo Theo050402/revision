@@ -21,6 +21,7 @@ import { useGlisse } from './dnd/glisse'
 import { MESSAGE_QUOTA, useStore } from './store'
 import { Toasts } from './Toast'
 import { choisirTrou } from './trou'
+import { mouvementReduit } from './mouvement/ressort'
 import { useDisposition } from './useDisposition'
 import './ui.css'
 
@@ -48,10 +49,30 @@ export function App() {
     void useStore.getState().initialiser()
   }, [])
 
-  // Le thème suit les réglages (les jetons de couleur sont dans theme/tokens.css).
+  // Le thème suit les réglages (les jetons de couleur sont dans theme/tokens.css). Un changement en cours de route se
+  // fait en fondu de 250 ms (transition de vue, Safari 18+), sauf mouvement réduit ; sinon, d'un coup. La pose de
+  // l'attribut devient alors asynchrone (après la capture de l'ancien état). Le thème lu au lancement, lui, est posé
+  // d'un coup : seul un changement fait dans Réglages est animé.
+  const themeCharge = useRef(false)
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = theme
-  }, [theme])
+    const racine = document.documentElement
+    const avant = racine.dataset.theme
+    const anime = themeCharge.current
+    if (pret) themeCharge.current = true
+    const poser = () => {
+      racine.dataset.theme = theme
+    }
+    const doc = document as Document & { startViewTransition?: (maj: () => void) => unknown }
+    if (anime && avant !== theme && typeof doc.startViewTransition === 'function' && !mouvementReduit()) {
+      try {
+        doc.startViewTransition(poser)
+        return
+      } catch {
+        // Transition refusée (document caché…) : changement direct.
+      }
+    }
+    poser()
+  }, [theme, pret])
 
   // Page de diagnostic de l'export (tâche 12), indépendante de la base.
   if (hash === '#test-export') return <TestExport />
@@ -74,7 +95,7 @@ function EcranLectureImpossible({ message }: { message: string }) {
   return (
     <main className="plein-ecran plein-ecran-erreur">
       <h1>Révisions</h1>
-      <p className="bandeau-erreur bandeau-seul" role="alert">
+      <p className="encart bandeau-erreur bandeau-seul" data-ton="erreur" role="alert">
         {message}
       </p>
       <p className="aide">Tes données n'ont pas été modifiées.</p>
@@ -194,6 +215,14 @@ function Coque() {
   )
 
   const fermerFeuille = useCallback(() => setFeuilleOuverte(false), [])
+
+  // Chaque écran commence en haut. La zone principale est la même d'un écran à l'autre : son défilement (Réglages)
+  // resterait sinon acquis au retour au calendrier, qui ne défile pas lui-même (`overflow: clip`) et serait décalé.
+  // Depuis l'en-tête collant des Réglages, « Retour au calendrier » se touche sans remonter.
+  const zone = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    if (zone.current) zone.current.scrollTop = 0
+  }, [ecran])
   const { annuler, retablir } = useStore.getState()
 
   return (
@@ -243,7 +272,7 @@ function Coque() {
 
             {erreur !== null && (
               // Erreur d'écriture (quota…) : reste affichée tant que l'écriture suivante n'a pas réussi.
-              <div className="bandeau-erreur bandeau-action" role="alert">
+              <div className="encart bandeau-erreur bandeau-action" data-ton="erreur" role="alert">
                 <p>{erreur}</p>
                 {erreur === MESSAGE_QUOTA && (
                   <button type="button" className="btn-principal" onClick={() => void sauvegarder()}>
@@ -253,7 +282,7 @@ function Coque() {
               </div>
             )}
 
-            <main className={ecran === 'calendrier' ? 'zone zone-calendrier' : 'zone'}>
+            <main ref={zone} className={ecran === 'calendrier' ? 'zone zone-calendrier' : 'zone'}>
               {ecran === 'calendrier' && (
                 <Calendrier
                   vue={vue}
@@ -321,7 +350,7 @@ function Coque() {
         )}
         {fiche?.type === 'nouvelle-indispo' && <FeuilleNouvelleIndispo onFermer={fermerFiche} />}
         {feuilleVisible && (
-          <Feuille titre="Items" onFermer={fermerFeuille} efface={glisseDepuisFeuille}>
+          <Feuille titre="Items" className="feuille-items" onFermer={fermerFeuille} efface={glisseDepuisFeuille}>
             <Bibliotheque />
           </Feuille>
         )}

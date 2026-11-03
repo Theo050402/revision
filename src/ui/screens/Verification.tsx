@@ -1,10 +1,12 @@
 // Écran de vérification (§5.6) : Emma contrôle et corrige les items extraits avant l'enregistrement.
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react'
 import { dureeTour } from '../../domain/duration'
 import type { College } from '../../domain/types'
 import type { ItemExtrait } from '../../import/catalog'
 import { RechercheOfficielle } from '../components/RechercheOfficielle'
 import { formaterDuree } from '../duree'
+import { creerSuiviVitesse } from '../mouvement/geste'
+import { animerValeur, type Anim } from '../mouvement/ressort'
 import { useStore } from '../store'
 
 /** Texte de la §14 quand l'extraction ne trouve rien. */
@@ -49,6 +51,11 @@ function Icone({ children }: { children: ReactNode }) {
 
 /** Largeur du bouton « Supprimer » découvert par le glissement. */
 const LARGEUR_GLISSEMENT = 96
+/** Relâché, la ligne rejoint sa place par ressort (amortissement 1, réponse 0,3 s), avec la vitesse du doigt. */
+const RESSORT_LIGNE = { amortissement: 1, reponse: 0.3 }
+/** Au-delà de cette vitesse (px/s) et de ce déplacement (px), le sens du geste décide, pas la position. */
+const VITESSE_DECISIVE = 300
+const DISTANCE_DECISIVE = 32
 
 type PropsLigne = {
   ligne: Ligne
@@ -63,42 +70,94 @@ type PropsLigne = {
 }
 
 function LigneItem({ ligne, couleur, duree, ouverte, onOuvrir, onFermer, onPages, onPagesFin, onSupprimer }: PropsLigne) {
-  const [dx, setDx] = useState<number | null>(null)
-  const geste = useRef<{ x: number; base: number } | null>(null)
-  // Position courante du glissement, lue par fin() : l'état React peut être en retard sur les événements.
-  const courant = useRef<number | null>(null)
+  const li = useRef<HTMLLIElement>(null)
+  const contenu = useRef<HTMLDivElement>(null)
+  const [glisse, setGlisse] = useState(false)
+  const geste = useRef<{ x: number; base: number; actif: boolean } | null>(null)
+  // Décalage affiché (px) : une seule source, écrite par `ecrire` (doigt ou ressort), jamais par le style React (M11).
+  const pos = useRef(ouverte ? -LARGEUR_GLISSEMENT : 0)
+  const ouverteRef = useRef(ouverte)
+  ouverteRef.current = ouverte
+  const anim = useRef<Anim | null>(null)
+  const suivi = useRef(creerSuiviVitesse())
   const invalide = !PAGES_VALIDES.test(ligne.saisie.trim())
   const orange = aVerifier(ligne)
+
+  const ecrire = (x: number) => {
+    pos.current = x
+    const c = contenu.current
+    if (c) c.style.transform = x === 0 ? '' : `translateX(${x}px)`
+    // Le fond (« Supprimer ») n'est visible que si la ligne est décalée : sinon il dépasse aux coins arrondis.
+    li.current?.setAttribute('data-revele', String(x !== 0 || ouverteRef.current))
+  }
+
+  /** Ressort depuis la position affichée vers `cible`, avec la vitesse du doigt s'il y en a une. */
+  const vers = (cible: number, vitesse?: number) => {
+    if (!anim.current) anim.current = animerValeur(pos.current, RESSORT_LIGNE, ecrire)
+    anim.current.vers(cible, vitesse)
+  }
+
+  useLayoutEffect(() => {
+    ecrire(pos.current)
+    return () => anim.current?.arreter()
+    // Montage seulement : la suite passe par `vers`.
+  }, [])
+
+  // Ouverte ou fermée sans geste (une autre ligne s'ouvre, suppression…) : la ligne rejoint sa place par ressort.
+  useEffect(() => {
+    if (geste.current?.actif) return
+    const cible = ouverte ? -LARGEUR_GLISSEMENT : 0
+    if (pos.current !== cible || anim.current) vers(cible)
+  }, [ouverte])
 
   function debut(ev: PointerEvent<HTMLDivElement>) {
     if (ev.pointerType === 'mouse' && ev.button !== 0) return
     if ((ev.target as HTMLElement).closest('input,button')) return
-    geste.current = { x: ev.clientX, base: ouverte ? -LARGEUR_GLISSEMENT : 0 }
+    // Un doigt posé sur une ligne en mouvement la reprend là où elle est.
+    anim.current?.arreter()
+    anim.current = null
+    geste.current = { x: ev.clientX, base: pos.current, actif: false }
+    suivi.current.effacer()
+    suivi.current.ajouter(ev.clientX, performance.now())
   }
   function bouge(ev: PointerEvent<HTMLDivElement>) {
     const g = geste.current
     if (!g) return
     const delta = ev.clientX - g.x
-    if (courant.current === null) {
+    if (!g.actif) {
       if (Math.abs(delta) < 6) return
+      g.actif = true
       ev.currentTarget.setPointerCapture(ev.pointerId)
+      setGlisse(true)
     }
-    courant.current = Math.max(-LARGEUR_GLISSEMENT - 24, Math.min(0, g.base + delta))
-    setDx(courant.current)
+    suivi.current.ajouter(ev.clientX, performance.now())
+    ecrire(Math.max(-LARGEUR_GLISSEMENT - 24, Math.min(0, g.base + delta)))
   }
-  function fin() {
-    if (geste.current && courant.current !== null) {
-      if (courant.current < -LARGEUR_GLISSEMENT / 2) onOuvrir()
-      else onFermer()
-    }
+  function fin(ev: PointerEvent<HTMLDivElement>) {
+    const g = geste.current
     geste.current = null
-    courant.current = null
-    setDx(null)
+    if (!g?.actif) return
+    setGlisse(false)
+    const maintenant = performance.now()
+    suivi.current.ajouter(ev.clientX, maintenant)
+    const v = suivi.current.vitesse(maintenant)
+    // Un geste vif et franc décide par le sens de sa vitesse ; sinon, par la position (au-delà de la moitié).
+    const vif = Math.abs(v) > VITESSE_DECISIVE && Math.abs(pos.current - g.base) >= DISTANCE_DECISIVE
+    const ouvrir = vif ? v < 0 : pos.current < -LARGEUR_GLISSEMENT / 2
+    if (ouvrir) onOuvrir()
+    else onFermer()
+    vers(ouvrir ? -LARGEUR_GLISSEMENT : 0, v)
+  }
+  function annule() {
+    const g = geste.current
+    geste.current = null
+    if (!g?.actif) return
+    setGlisse(false)
+    vers(ouverteRef.current ? -LARGEUR_GLISSEMENT : 0)
   }
 
-  const decalage = dx ?? (ouverte ? -LARGEUR_GLISSEMENT : 0)
   return (
-    <li className="ligne" data-a-verifier={orange} data-numero={ligne.numero} data-revele={ouverte || dx !== null}>
+    <li ref={li} className="ligne" data-a-verifier={orange} data-numero={ligne.numero}>
       <div className="ligne-fond">
         {/* Doublon tactile du bouton « Supprimer » ci-dessous : hors arbre d'accessibilité et de tabulation. */}
         <button type="button" className="ligne-glisse" aria-hidden="true" tabIndex={-1} onClick={onSupprimer}>
@@ -106,13 +165,13 @@ function LigneItem({ ligne, couleur, duree, ouverte, onOuvrir, onFermer, onPages
         </button>
       </div>
       <div
+        ref={contenu}
         className="ligne-contenu"
-        data-glisse={dx !== null}
-        style={{ transform: decalage === 0 ? undefined : `translateX(${decalage}px)` }}
+        data-glisse={glisse}
         onPointerDown={debut}
         onPointerMove={bouge}
         onPointerUp={fin}
-        onPointerCancel={fin}
+        onPointerCancel={annule}
       >
         <span className={`pastille c${couleur}`} aria-label={`Item ${ligne.numero}`}>
           {ligne.numero}

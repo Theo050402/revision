@@ -70,7 +70,7 @@ test('parcours complet : importer, placer 3 items, marquer fait, exporter, recha
       await biblio.locator('.fiche-form select').selectOption({ label: `${HEURES[i]}h` })
       await biblio.getByRole('button', { name: 'Placer' }).click()
       await expect(biblio.locator('.fiche-creneaux li')).toHaveCount(1)
-      await biblio.getByRole('button', { name: /Retour/ }).click()
+      await biblio.getByRole('button', { name: /Tous les items/ }).click()
     }
     await fermerFeuilleItems(page, info)
   } else {

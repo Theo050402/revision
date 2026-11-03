@@ -1,4 +1,4 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import { chromium, expect, test, type Browser, type Page, type TestInfo } from '@playwright/test'
 import { MAINTENANT, semer } from './graine-calendrier'
 import { centre, deplacer, images, pointGrille, pointeur, saisir } from './gestes'
 
@@ -298,4 +298,144 @@ test.describe('mouvement réduit', () => {
     expect(vus.length).toBeGreaterThan(3)
     expect(vus[vus.length - 1]).toBe('translateY(36px)')
   })
+})
+
+// ---------- Matériaux et préférences d'affichage (tâche 15, audit de design M3, M5, M10) ----------
+
+const LUNDI = '2026-11-02'
+const MERCREDI = '2026-11-04'
+
+/** Fond opaque (alpha 1) et pas de flou d'arrière-plan. */
+async function opaque(l: ReturnType<Page['locator']>): Promise<{ flou: string; alpha: number }> {
+  return l.evaluate((el) => {
+    const cs = getComputedStyle(el)
+    const flou = cs.backdropFilter || (cs as unknown as { webkitBackdropFilter?: string }).webkitBackdropFilter || 'none'
+    // rgb(), rgba() ou color(srgb … / a), selon le navigateur et `color-mix`.
+    const fond = cs.backgroundColor
+    const barre = fond.match(/\/\s*([\d.]+)\s*\)$/)
+    const virgules = fond.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/)
+    const alpha = fond === 'transparent' ? 0 : barre ? Number(barre[1]) : virgules ? Number(virgules[1]) : 1
+    return { flou, alpha }
+  })
+}
+
+/** Fait défiler la grille : l'en-tête des jours passe au matériau (`data-bord-haut`). */
+async function defilerGrille(page: Page): Promise<void> {
+  await page.locator('.calendrier-defilement').evaluate((el) => (el.scrollTop = 120))
+  await expect(page.locator('.calendrier-defilement')).toHaveAttribute('data-bord-haut', '')
+}
+
+test('matériau : l’en-tête des jours est opaque au repos, translucide et flouté quand la grille défile dessous', async ({ page }, info) => {
+  test.skip(iphone(info), 'vue Semaine de l’iPad (en vue Jour, l’en-tête est masqué)')
+  await ouvrir(page)
+  await page.locator('.calendrier-defilement').evaluate((el) => (el.scrollTop = 0))
+  await expect(page.locator('.calendrier-defilement')).not.toHaveAttribute('data-bord-haut', '')
+  expect((await opaque(page.locator('.grille-tete'))).alpha).toBe(1)
+  await defilerGrille(page)
+  const r = await opaque(page.locator('.grille-tete'))
+  expect(r.alpha).toBeLessThan(1)
+  expect(r.flou).toContain('blur')
+})
+
+test('contraste augmenté : bords définis à l’encre, en-têtes et barres opaques', async ({ page }, info) => {
+  await page.emulateMedia({ contrast: 'more' })
+  await ouvrir(page)
+  const encre = await page.evaluate(() => {
+    const p = document.createElement('p')
+    p.style.color = 'var(--ink)'
+    document.body.append(p)
+    const c = getComputedStyle(p).color
+    p.remove()
+    return c
+  })
+  if (!iphone(info)) {
+    const tete = page.locator('.grille-tete')
+    await expect(tete).toHaveCSS('border-bottom-style', 'solid')
+    await expect(tete).toHaveCSS('border-bottom-width', '1px')
+    await expect(tete).toHaveCSS('border-bottom-color', encre)
+    await defilerGrille(page)
+    expect(await opaque(tete)).toEqual({ flou: 'none', alpha: 1 })
+  }
+  await page.getByRole('button', { name: /^Exporter/ }).click()
+  const feuille = page.locator('.feuille')
+  await expect(feuille).toBeVisible()
+  await expect(feuille).toHaveCSS('border-left-width', '1px')
+  await expect(feuille).toHaveCSS('border-left-color', encre)
+  // Sans la préférence, la feuille n'a pas ce bord.
+  await page.emulateMedia({ contrast: 'no-preference' })
+  await expect(feuille).toHaveCSS('border-left-width', '0px')
+})
+
+test('une feuille ouverte envoie les messages en haut de l’écran, iPhone et barre de sélection compris', async ({ page }) => {
+  await ouvrir(page)
+  const toasts = page.locator('.toasts')
+  const hauteur = page.viewportSize()!.height
+  expect((await toasts.boundingBox())!.y).toBeGreaterThan(hauteur / 2)
+  await page.getByRole('button', { name: /^Exporter/ }).click()
+  await expect(page.locator('.feuille-fond')).toBeVisible()
+  expect((await toasts.boundingBox())!.y).toBeLessThan(80)
+  // Barre de sélection présente (encore en sortie, par exemple) : la règle de la feuille l'emporte toujours.
+  await page.evaluate(() => {
+    const b = document.createElement('div')
+    b.className = 'barre-selection'
+    b.dataset.factice = ''
+    document.querySelector('.racine')!.append(b)
+  })
+  expect((await toasts.boundingBox())!.y).toBeLessThan(80)
+  await page.evaluate(() => document.querySelector('[data-factice]')?.remove())
+})
+
+test('transparence réduite : barres et feuilles opaques, sans flou (Chromium : WebKit ne l’émule pas)', async ({}, info) => {
+  test.skip(iphone(info), 'une fois suffit (iPad)')
+  // Le WebKit de Playwright et Safari ignorent `prefers-reduced-transparency` : la règle est vérifiée dans le Chrome
+  // ou l'Edge installés (aucun téléchargement), par l'émulation de média du protocole DevTools.
+  let navigateur: Browser | null = null
+  for (const channel of ['chrome', 'msedge']) {
+    try {
+      navigateur = await chromium.launch({ channel })
+      break
+    } catch {
+      // canal absent : on essaie le suivant
+    }
+  }
+  test.skip(navigateur === null, 'ni Chrome ni Edge installés')
+  const contexte = await navigateur!.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true, baseURL: info.project.use.baseURL })
+  try {
+    const page = await contexte.newPage()
+    const cdp = await contexte.newCDPSession(page)
+    await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] })
+    await ouvrir(page)
+    expect(await page.evaluate(() => matchMedia('(prefers-reduced-transparency: reduce)').matches)).toBe(true)
+
+    // En-tête des jours, grille défilée dessous.
+    await defilerGrille(page)
+    expect(await opaque(page.locator('.grille-tete'))).toEqual({ flou: 'none', alpha: 1 })
+
+    // Barre de sélection (lasso de lundi 15 h à mercredi 14 h).
+    const de = await pointGrille(page, LUNDI, 15, 0, 6)
+    const vers = await pointGrille(page, MERCREDI, 14, 0, 0)
+    await saisir(page, de, vers)
+    await pointeur(page, 'pointerup', vers)
+    const barre = page.getByRole('toolbar', { name: 'Sélection' })
+    await expect(barre).toBeVisible()
+    expect(await opaque(barre)).toEqual({ flou: 'none', alpha: 1 })
+    await page.keyboard.press('Escape')
+    await expect(barre).toHaveCount(0)
+
+    // Feuille.
+    await page.getByRole('button', { name: /^Exporter/ }).click()
+    await expect(page.locator('.feuille')).toBeVisible()
+    expect(await opaque(page.locator('.feuille'))).toEqual({ flou: 'none', alpha: 1 })
+
+    // Contrôle : sans la préférence, l'en-tête défilé est bien translucide (la règle fait la différence).
+    await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'no-preference' }] })
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.feuille')).toHaveCount(0)
+    const r = await opaque(page.locator('.grille-tete'))
+    expect(r.alpha).toBeLessThan(1)
+    expect(r.flou).toContain('blur')
+  } finally {
+    await contexte.close()
+    await navigateur!.close()
+  }
 })

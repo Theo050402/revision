@@ -79,7 +79,7 @@ export function Indispos({ recurrenceInitiale }: { recurrenceInitiale: string | 
     <section className="carte reglage" aria-labelledby="titre-indispos">
       <h2 id="titre-indispos">Indisponibilités</h2>
       <p className="aide">
-        Les ponctuelles se tracent dans le calendrier (appui long sur un emplacement libre, puis étirer).
+        Les ponctuelles s'ajoutent avec « + Indisponibilité », dans la barre du calendrier.
       </p>
 
       {liste.length > 0 && (
@@ -114,7 +114,7 @@ export function Indispos({ recurrenceInitiale }: { recurrenceInitiale: string | 
         <button type="button" className="btn-ajout" onClick={() => setEdition('nouvelle')}>
           + Récurrence
         </button>
-        <button type="button" className="btn-ajout" onClick={() => champIcs.current?.click()}>
+        <button type="button" className="btn-secondaire" onClick={() => champIcs.current?.click()}>
           Importer un fichier
         </button>
         <input
@@ -131,7 +131,11 @@ export function Indispos({ recurrenceInitiale }: { recurrenceInitiale: string | 
       </p>
 
       {retourIcs && (
-        <div className={retourIcs.erreur ? 'message-erreur' : 'message-info'} role={retourIcs.erreur ? 'alert' : 'status'}>
+        <div
+          className={retourIcs.erreur ? 'encart message-erreur-bloc' : 'encart message-info'}
+          data-ton={retourIcs.erreur ? 'erreur' : 'info'}
+          role={retourIcs.erreur ? 'alert' : 'status'}
+        >
           {retourIcs.lignes.map((l) => (
             <p key={l}>{l}</p>
           ))}
@@ -139,7 +143,7 @@ export function Indispos({ recurrenceInitiale }: { recurrenceInitiale: string | 
       )}
 
       {conflits.length > 0 && (
-        <div className="conflits" role="status" data-testid="conflits">
+        <div className="encart conflits" data-ton="avertissement" role="status" data-testid="conflits">
           {conflits.map((c) => (
             <div key={c.titre} className="conflit">
               <b>{libelleConflit(c)}</b>

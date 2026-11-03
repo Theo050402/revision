@@ -306,6 +306,7 @@ const ColonneJour = memo(function ColonneJour({
             className="poignee-redim"
             data-poignee={c.id}
             data-active={redim.id === c.id || undefined}
+            data-court={hauteurDe(debut, duree) < 40 || undefined}
             style={{ top: bas - dedans }}
             aria-hidden="true"
             onPointerDown={(e) => redimensionner(e, c.id, c.duree)}

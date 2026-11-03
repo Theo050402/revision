@@ -84,6 +84,9 @@ test.describe('Indisponibilité par bouton', () => {
     await ouvrir(page)
     await bouton(page).click()
     const f = feuille(page)
+    // La feuille place elle-même le focus sur « Titre » à l'image suivante : on l'attend, sinon la saisie suivante
+    // (« Fin ») pourrait se faire voler le focus par cette mise au point tardive.
+    await expect(f.getByRole('textbox', { name: 'Titre' })).toBeFocused()
     await f.getByRole('textbox', { name: 'Titre' }).fill('Sport')
     await expect(f.getByRole('button', { name: 'Ajouter' })).toBeEnabled()
     await f.getByLabel('Fin').fill('10:00')
@@ -99,6 +102,9 @@ test.describe('Indisponibilité par bouton', () => {
     await expect(blocs(page)).toHaveCount(0)
     await bouton(page).click()
     const f = feuille(page)
+    // La feuille place elle-même le focus sur « Titre » à l'image suivante : on l'attend, sinon la saisie suivante
+    // (« Fin ») pourrait se faire voler le focus par cette mise au point tardive.
+    await expect(f.getByRole('textbox', { name: 'Titre' })).toBeFocused()
     await f.getByRole('textbox', { name: 'Titre' }).fill('Sport')
     await f.getByRole('button', { name: 'Ajouter' }).click()
     await expect(feuille(page)).toHaveCount(0)

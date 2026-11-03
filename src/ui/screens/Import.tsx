@@ -171,7 +171,7 @@ export function Import({ onTermine }: { onTermine: (enregistre: boolean) => void
           <>
             {phase.type === 'erreur' ? (
               <>
-                <p className="bandeau-erreur bandeau-seul" role="alert">
+                <p className="encart bandeau-erreur bandeau-seul" data-ton="erreur" role="alert">
                   {phase.message}
                 </p>
                 <details className="detail-technique">

@@ -4,14 +4,17 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore, type PointerEvent, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { ajouterJours } from '../../domain/temps'
+import { useBordHaut } from '../bordHaut'
 import { abonnerHalo, enregistrerChangementPeriode, lireHalo } from '../dnd/bords'
 import { Corbeille } from '../dnd/Corbeille'
 import { gesteDepuis } from '../dnd/glisse'
 import type { Vue } from '../ecran'
+import { ouvrirImport, useDemandeImport } from '../importDemande'
 import { creerSuiviVitesse, fondu, type Fondu } from '../mouvement/geste'
 import { animerValeur, mouvementReduit, projeter, RESSORT_DOUX, type Anim } from '../mouvement/ressort'
 import { ajouterMois, joursDeLaSemaine, libellePeriode } from '../periode'
 import { BarreSelection } from '../selection/BarreSelection'
+import { useStore } from '../store'
 import type { Disposition } from '../useDisposition'
 import { Grille } from './Grille'
 import { PX_HEURE_IPAD, PX_HEURE_IPHONE } from './geometrie'
@@ -251,7 +254,12 @@ export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTap
   const precedent = () => decaler(-1)
   const suivant = () => decaler(1)
   const piste = useRef<HTMLDivElement>(null)
+  const defilement = useRef<HTMLDivElement>(null)
   const balayage = useBalayage(piste, decaler)
+  useBordHaut(defilement)
+  // Premier lancement : aucun collège, la grille vide dit par où commencer (M16).
+  const sansCollege = useStore((s) => Object.keys(s.etat.colleges).length === 0)
+  const importOuvert = useDemandeImport((s) => s.ouvert)
   // Bord gauche ou droit tenu pendant un glisser : la bande lumineuse se remplit jusqu'au changement (bords.ts).
   const halo = useSyncExternalStore(abonnerHalo, lireHalo)
 
@@ -282,9 +290,10 @@ export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTap
           </svg>
         </button>
         <button type="button" className="btn-nouvelle-indispo" aria-label="+ Indisponibilité" onClick={onNouvelleIndispo}>
-          <span aria-hidden="true">+</span>
+          <svg className="icone" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
           <span className="btn-nouvelle-indispo-texte" aria-hidden="true">
-            {' '}
             Indisponibilité
           </span>
         </button>
@@ -294,7 +303,7 @@ export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTap
       </div>
 
       <div className="calendrier-vue">
-        <div className="calendrier-defilement" {...balayage}>
+        <div className="calendrier-defilement" ref={defilement} {...balayage}>
           <div className="calendrier-piste" ref={piste}>
             {vue === 'mois' ? (
               <VueMois mois={jour.slice(0, 7)} onOuvrirJour={onOuvrirJour} />
@@ -311,6 +320,17 @@ export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTap
             )}
           </div>
         </div>
+        {sansCollege && (
+          <div className="calendrier-vide">
+            <section className="carte carte-vide" aria-labelledby="titre-calendrier-vide">
+              <h2 id="titre-calendrier-vide">Commence par un collège</h2>
+              <p>Importe le PDF d'un collège : ses items arrivent dans la bibliothèque.</p>
+              <button type="button" className="btn-principal" disabled={importOuvert} onClick={() => ouvrirImport()}>
+                Importer un collège
+              </button>
+            </section>
+          </div>
+        )}
         {halo && vue !== 'mois' && (
           <div key={halo.id} className="bord-halo" data-bord-halo={halo.cote < 0 ? 'gauche' : 'droite'} aria-hidden="true" />
         )}

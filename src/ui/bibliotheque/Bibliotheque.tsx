@@ -212,7 +212,13 @@ export function Bibliotheque({ onSelectionChange }: Props) {
 
   return (
     <SourceGlisse className="bibliotheque" trouver={trouverCarte}>
-      <button type="button" className="btn-ajout" disabled={importOuvert} onClick={() => ouvrirImport()}>
+      {/* Tant qu'aucun collège n'existe, c'est la seule chose à faire : bouton plein (M16). */}
+      <button
+        type="button"
+        className={colleges.length === 0 ? 'btn-principal' : 'btn-ajout'}
+        disabled={importOuvert}
+        onClick={() => ouvrirImport()}
+      >
         + Collège
       </button>
 
@@ -241,7 +247,7 @@ export function Bibliotheque({ onSelectionChange }: Props) {
       </div>
 
       {bac.length > 0 && (
-        <section className="bib-section bib-bac" aria-labelledby="bib-bac-titre">
+        <section className="bib-section encart bib-bac" data-ton="info" aria-labelledby="bib-bac-titre">
           <h3 id="bib-bac-titre" className="bib-titre">
             À placer{' '}
             <span className="bib-badge" data-testid="badge-bac">
@@ -258,7 +264,7 @@ export function Bibliotheque({ onSelectionChange }: Props) {
       )}
 
       {colleges.length === 0 ? (
-        <p className="aide bib-vide">Aucun collège pour l'instant. Importe un livre avec « + Collège ».</p>
+        <p className="aide bib-vide">Aucun collège pour l'instant. Importe un livre avec « + Collège ».</p>
       ) : (
         <>
           <div className="bib-recherche">

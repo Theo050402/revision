@@ -93,7 +93,7 @@
 }
 
 .btn-ajout:disabled {
-  opacity: 0.4;
+  opacity: var(--opacite-inactif);
   cursor: default;
 }
 
@@ -107,9 +107,10 @@
   line-height: 1.4;
 }
 
+/* Message d'erreur en ligne (validation) : texte rouge AA (H1). Les erreurs en bloc sont des encarts (ui.css). */
 .message-erreur {
   margin: 0;
-  color: var(--now);
+  color: var(--rouge-texte);
   font-size: var(--fs-2);
   font-weight: 700;
   line-height: 1.4;
@@ -119,19 +120,7 @@ div.message-erreur p {
   margin: 0;
 }
 
-.message-info {
-  margin: 0;
-  padding: 10px 12px;
-  border-left: 4px solid var(--margin);
-  border-radius: 8px;
-  background: var(--field);
-  font-size: var(--fs-3);
-  line-height: 1.4;
-}
-
-div.message-info p {
-  margin: 0;
-}
+/* `.message-info` : un encart au ton info (ui.css, M9). */
 
 /* ---------- Listes ---------- */
 
@@ -168,17 +157,11 @@ div.message-info p {
   gap: 4px;
 }
 
-/* Conflits : en orange, jamais bloquants (spec §10). */
+/* Conflits : un encart au ton avertissement (orange), jamais bloquants (spec §10, M9). */
 .conflits {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px;
-  border-left: 4px solid var(--c3);
-  border-radius: 8px;
-  background: var(--field);
-  background: color-mix(in srgb, var(--c3) 22%, var(--panel));
-  color: var(--ink);
 }
 
 .conflit ul {
@@ -231,7 +214,7 @@ div.message-info p {
 
 .pastille-couleur[aria-pressed='true'] {
   border-color: var(--ink);
-  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--ink);
+  box-shadow: 0 0 0 2px var(--surface-haute), 0 0 0 4px var(--ink);
 }
 
 /* ---------- Récurrence ---------- */

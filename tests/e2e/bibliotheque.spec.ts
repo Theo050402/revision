@@ -136,7 +136,7 @@ test('fiche d\'item : pages, collège, créneaux datés, retour', async ({ page 
   await expect(b.locator('.fiche-creneaux li')).toHaveCount(3) // trois créneaux T1 dans la graine
   await expect(b.locator('.fiche-creneaux li', { hasText: 'T1 · mardi 3 nov. 14h' })).toHaveCount(1)
   // Retour : la liste revient, le focus est sur la carte ouverte.
-  await b.getByRole('button', { name: /Retour/ }).click()
+  await b.getByRole('button', { name: /Tous les items/ }).click()
   await expect(b.getByTestId('progression')).toBeVisible()
   await expect(liste(b).locator('[data-item-id="c2:300"] .carte-corps')).toBeFocused()
 
@@ -263,21 +263,27 @@ test('thème sombre : cartes, titres et pastilles prennent les jetons de « Gard
     )
 
   // §13.2 : cartes #33264A, texte #E6E6FA. Les couleurs s'animent en 120 ms : on attend qu'elles aient fini.
+  // iPhone : la bibliothèque est dans une feuille, surface haute (#33264A) ; ses cartes y prennent l'ancien panneau
+  // #241934 pour rester distinctes (audit de design H3, revue R3).
+  const iphone = info.project.name === 'iphone'
   expect(await jeton('background-color', '--card')).toBe('rgb(51, 38, 74)')
   expect(await jeton('color', '--ink')).toBe('rgb(230, 230, 250)')
   const carte = liste(b).locator('.carte-item').first()
-  await expect.poll(() => carte.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(51, 38, 74)')
+  await expect
+    .poll(() => carte.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .toBe(iphone ? 'rgb(36, 25, 52)' : 'rgb(51, 38, 74)')
   await expect(carte.locator('.carte-titre')).toHaveCSS('color', 'rgb(230, 230, 250)')
   await expect(b.getByRole('button', { name: 'Hépato-gastro', exact: true })).toHaveCSS('color', 'rgb(230, 230, 250)')
   // La pastille de numéro garde l'encre sombre sur le surligneur, dans les deux thèmes.
   await expect(carte.locator('.carte-pastille')).toHaveCSS('color', 'rgb(30, 42, 90)')
 
   // iPhone : les champs de « Planifier… » sont aussi thémés (fond des champs, texte).
-  if (info.project.name === 'iphone') {
+  if (iphone) {
     await carte.locator('.carte-corps').click()
     await b.getByRole('button', { name: 'Planifier…' }).click()
     for (const champ of [b.getByLabel('Jour', { exact: true }), b.locator('.fiche-form select')]) {
-      await expect(champ).toHaveCSS('background-color', await jeton('background-color', '--field'))
+      // Champs encastrés dans la surface haute (--field-haut, #1A1027 en sombre).
+      await expect(champ).toHaveCSS('background-color', await jeton('background-color', '--field-haut'))
       await expect(champ).toHaveCSS('color', 'rgb(230, 230, 250)')
     }
   }

@@ -8,13 +8,13 @@ describe('toast', () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  it('affiche le message puis le retire seul', () => {
+  it('affiche le message puis demande seul sa sortie (le composant le retire après son animation)', () => {
     toast('Fait')
     expect(useToasts.getState().liste.map((t) => t.texte)).toEqual(['Fait'])
     vi.advanceTimersByTime(DUREE_TOAST_MS - 1)
-    expect(useToasts.getState().liste).toHaveLength(1)
+    expect(useToasts.getState().liste.map((t) => t.sortie ?? false)).toEqual([false])
     vi.advanceTimersByTime(1)
-    expect(useToasts.getState().liste).toHaveLength(0)
+    expect(useToasts.getState().liste.map((t) => t.sortie ?? false)).toEqual([true])
   })
 
   it('garde au plus 3 messages, les plus récents', () => {
