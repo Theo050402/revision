@@ -857,59 +857,31 @@ button {
 }
 
 /* Transparence réduite (M5) : barres et feuilles opaques, sans flou. Safari ne transmet pas encore ce réglage
-   d'iOS ; la règle sert aux navigateurs qui le font, et le repli `@supports` ci-dessous aux autres. */
-@media (prefers-reduced-transparency: reduce) {
-  .calendrier-defilement[data-bord-haut] .grille-tete,
-  .calendrier-defilement[data-bord-haut] .mois-entete,
-  .zone[data-bord-haut] .ecran-reglages .ecran-entete {
-    background: var(--bg);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
-  .barre-selection,
-  .verif-pied,
-  .feuille {
-    background: var(--surface-haute);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+   d'iOS ; la règle sert aux navigateurs qui le font, et le repli `@supports` ci-dessous aux autres. Les jetons de
+   matériau sont redéfinis ici et dans les deux blocs suivants : un seul jeu de règles (plus haut) les lit. La feuille,
+   elle, est déjà opaque (`--surface-haute`). */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root {
+    --materiau-fin: var(--bg);
+    --materiau-epais: var(--surface-haute);
+    --flou-fin: none;
+    --flou-epais: none;
   }
 }
 
 /* Sans flou d'arrière-plan : un fond translucide sans flou serait illisible, il devient opaque. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .calendrier-defilement[data-bord-haut] .grille-tete,
-  .calendrier-defilement[data-bord-haut] .mois-entete,
-  .zone[data-bord-haut] .ecran-reglages .ecran-entete {
-    background: var(--bg);
-  }
-
-  .barre-selection,
-  .verif-pied {
-    background: var(--surface-haute);
+  :root {
+    --materiau-fin: var(--bg);
+    --materiau-epais: var(--surface-haute);
   }
 }
 
-/* Contraste augmenté (M5, « Augmenter le contraste » d'iOS) : fonds pleins et bords définis à l'encre. */
+/* Contraste augmenté (M5, « Augmenter le contraste » d'iOS) : fonds pleins (jetons ci-dessus) et bords définis à l'encre. */
 @media (prefers-contrast: more) {
-  .calendrier-defilement[data-bord-haut] .grille-tete,
-  .calendrier-defilement[data-bord-haut] .mois-entete,
-  .zone[data-bord-haut] .ecran-reglages .ecran-entete {
-    background: var(--bg);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
   .grille-tete,
   .mois-entete {
     border-bottom: 1px solid var(--ink);
-  }
-
-  .barre-selection,
-  .verif-pied {
-    background: var(--surface-haute);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 
   .barre-selection,
@@ -927,5 +899,10 @@ button {
 
   .carte {
     border-color: var(--ink);
+  }
+
+  .encart {
+    border: 1px solid var(--ink);
+    border-left: 4px solid var(--ton);
   }
 }

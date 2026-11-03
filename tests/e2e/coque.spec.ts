@@ -496,3 +496,40 @@ test('Réglages défilés puis « Retour au calendrier » : le calendrier n’es
   expect((await page.locator('.calendrier-barre').boundingBox())!.y).toBe(y)
   await expect(page.locator('main.zone')).not.toHaveAttribute('data-bord-haut', '')
 })
+
+// Carte « Commence par un collège » (M16) : seul son bouton capte le toucher ; la grille reste touchable dessous.
+// Le tap est vu par le préremplissage de « + Indisponibilité » : il reprend le dernier emplacement libre touché.
+test('sans collège, un tap sous la carte atteint la grille', async ({ page }, info) => {
+  await page.clock.setFixedTime(MAINTENANT)
+  await page.goto('./')
+  const carte = page.locator('.carte-vide')
+  await expect(carte).toBeVisible()
+  const sous = (p: { x: number; y: number }) =>
+    page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.calendrier-vide'), p)
+  // Son bouton reste touchable ; le titre de la carte, non : le toucher passe à la grille dessous.
+  expect(await sous(await centre(carte.getByRole('button', { name: 'Importer un collège' }), false))).toBe(true)
+  const p = await centre(carte.getByRole('heading'), false)
+  expect(await sous(p)).toBe(false)
+  // Jour et minute de la grille sous le doigt.
+  const vise = await page.evaluate(({ x, y }) => {
+    const col = document.elementFromPoint(x, y)?.closest<HTMLElement>('.colonne[data-jour]')
+    const grille = col?.closest<HTMLElement>('.grille')
+    if (!col || !grille) return null
+    const minutes = Number(grille.dataset.plageDebut) + ((y - col.getBoundingClientRect().top) / Number(grille.dataset.pxHeure)) * 60
+    return { jour: col.dataset.jour as string, minutes }
+  }, p)
+  expect(vise).not.toBeNull()
+
+  await pointeur(page, 'pointerdown', p)
+  await pointeur(page, 'pointerup', p)
+  if (info.project.name === 'iphone') {
+    // « Pour combler ce trou » s'ouvre dans la feuille « Items » : on la referme.
+    await page.getByRole('dialog', { name: 'Items' }).getByRole('button', { name: 'Fermer' }).click()
+  }
+  await page.getByRole('button', { name: '+ Indisponibilité' }).click()
+  const f = page.getByRole('dialog', { name: 'Nouvelle indisponibilité' })
+  await expect(f).toBeVisible()
+  await expect(f.getByLabel('Jour')).toHaveValue(vise!.jour)
+  const [h, m] = (await f.getByLabel('Début').inputValue()).split(':').map(Number)
+  expect(Math.abs(h * 60 + m - vise!.minutes)).toBeLessThanOrEqual(30)
+})

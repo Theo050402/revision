@@ -334,13 +334,9 @@
   height: 3px;
   margin-left: -11px;
   border-radius: 2px;
-  /* Discrète au repos (B3) ; pleine encre à l'appui et pendant le redimensionnement. */
+  /* Discrète au repos (B3) ; pleine encre dès l'appui : le redimensionnement démarre au `pointerdown`, `data-active` suffit. */
   background: color-mix(in srgb, var(--ink) 22%, transparent);
   transition: background-color 120ms ease, width 120ms ease;
-}
-
-.poignee-redim[data-presse]::after {
-  background: var(--ink);
 }
 
 /* Bloc de moins de 40 px : le trait chevaucherait sa méta ; il est masqué, la zone d'appui de 24 px reste. */

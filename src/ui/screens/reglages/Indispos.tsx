@@ -132,7 +132,7 @@ export function Indispos({ recurrenceInitiale }: { recurrenceInitiale: string | 
 
       {retourIcs && (
         <div
-          className={retourIcs.erreur ? 'encart message-erreur-bloc' : 'encart message-info'}
+          className={retourIcs.erreur ? 'encart' : 'encart message-info'}
           data-ton={retourIcs.erreur ? 'erreur' : 'info'}
           role={retourIcs.erreur ? 'alert' : 'status'}
         >

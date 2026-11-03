@@ -133,10 +133,18 @@ function LigneItem({ ligne, couleur, duree, ouverte, onOuvrir, onFermer, onPages
     suivi.current.ajouter(ev.clientX, performance.now())
     ecrire(Math.max(-LARGEUR_GLISSEMENT - 24, Math.min(0, g.base + delta)))
   }
+  /** Un doigt posé sur la ligne pendant son ressort l'a figée ; sans glissement, elle rejoint sa place de repos. */
+  function reprendreRepos() {
+    const cible = ouverteRef.current ? -LARGEUR_GLISSEMENT : 0
+    if (pos.current !== cible) vers(cible)
+  }
   function fin(ev: PointerEvent<HTMLDivElement>) {
     const g = geste.current
     geste.current = null
-    if (!g?.actif) return
+    if (!g?.actif) {
+      if (g) reprendreRepos()
+      return
+    }
     setGlisse(false)
     const maintenant = performance.now()
     suivi.current.ajouter(ev.clientX, maintenant)
@@ -151,7 +159,10 @@ function LigneItem({ ligne, couleur, duree, ouverte, onOuvrir, onFermer, onPages
   function annule() {
     const g = geste.current
     geste.current = null
-    if (!g?.actif) return
+    if (!g?.actif) {
+      if (g) reprendreRepos()
+      return
+    }
     setGlisse(false)
     vers(ouverteRef.current ? -LARGEUR_GLISSEMENT : 0)
   }

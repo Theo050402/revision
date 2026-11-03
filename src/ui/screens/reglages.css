@@ -116,10 +116,6 @@
   line-height: 1.4;
 }
 
-div.message-erreur p {
-  margin: 0;
-}
-
 /* `.message-info` : un encart au ton info (ui.css, M9). */
 
 /* ---------- Listes ---------- */

@@ -422,7 +422,18 @@ test('transparence réduite : barres et feuilles opaques, sans flou (Chromium : 
     await page.keyboard.press('Escape')
     await expect(barre).toHaveCount(0)
 
-    // Feuille.
+    // Jetons de matériau : redéfinis à plein et sans flou (ce que lisent les en-têtes, la barre et le pied de vérification).
+    const jetons = () =>
+      page.evaluate(() => {
+        const c = getComputedStyle(document.documentElement)
+        return ['--materiau-fin', '--materiau-epais', '--flou-fin', '--flou-epais'].map((k) => c.getPropertyValue(k).trim())
+      })
+    const [fin, epais, flouFin, flouEpais] = await jetons()
+    expect(fin).not.toContain('transparent')
+    expect(epais).not.toContain('transparent')
+    expect([flouFin, flouEpais]).toEqual(['none', 'none'])
+
+    // Feuille : opaque par construction (surface haute), jamais translucide ni floutée dans ce mode.
     await page.getByRole('button', { name: /^Exporter/ }).click()
     await expect(page.locator('.feuille')).toBeVisible()
     expect(await opaque(page.locator('.feuille'))).toEqual({ flou: 'none', alpha: 1 })
@@ -434,6 +445,7 @@ test('transparence réduite : barres et feuilles opaques, sans flou (Chromium : 
     const r = await opaque(page.locator('.grille-tete'))
     expect(r.alpha).toBeLessThan(1)
     expect(r.flou).toContain('blur')
+    expect((await jetons())[0]).toContain('transparent')
   } finally {
     await contexte.close()
     await navigateur!.close()

@@ -177,6 +177,30 @@ test('glisser une ligne vers la gauche découvre « Supprimer » ; Annuler n\'en
   expect(await lireTable(page, 'items')).toHaveLength(0)
 })
 
+test('toucher une ligne pendant son ressort ne la fige pas à mi-course', async ({ page }, info) => {
+  await ouvrirImport(page, info)
+  await choisir(page, await pdfSommaire())
+  await expect(page.locator('.ligne')).toHaveCount(4)
+
+  const li = ligne(page, 290)
+  const contenu = li.locator('.ligne-contenu')
+  const boite = (await contenu.boundingBox())!
+  const y = boite.y + 20
+  const x = boite.x + 90
+  // Tirée de 60 px (au-delà de la moitié) puis relâchée : elle s'ouvre par ressort vers −96 px…
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x - 30, y, { steps: 3 })
+  await page.mouse.move(x - 60, y, { steps: 3 })
+  await page.mouse.up()
+  // … et un tap sur son titre, tout de suite, reprend la ligne en plein ressort.
+  await page.mouse.move(x - 60, y)
+  await page.mouse.down()
+  await page.mouse.up()
+  await expect(contenu).toHaveCSS('transform', 'matrix(1, 0, 0, 1, -96, 0)')
+  await expect(li).toHaveAttribute('data-revele', 'true')
+})
+
 test('PDF sans texte : message de la §14, liste vide, ajout à la main', async ({ page }, info) => {
   await ouvrirImport(page, info)
   await choisir(page, await pdfSansTexte())

@@ -96,6 +96,13 @@
   }
 }
 
+/* Contraste augmenté : sans teinte distincte, le bouton garde son affordance par un bord défini. */
+@media (prefers-contrast: more) {
+  .btn-nouvelle-indispo {
+    border: 1px solid var(--ink);
+  }
+}
+
 @media (hover: hover) {
   .btn-nouvelle-indispo:hover {
     background: color-mix(in srgb, var(--accent) 10%, var(--field));
@@ -154,8 +161,8 @@
   flex: 1;
 }
 
-/* Premier lancement, aucun collège : une carte centrée sur la grille dit par où commencer (M16). Seule la carte
-   capte le toucher ; la grille reste visible et défile. */
+/* Premier lancement, aucun collège : une carte centrée sur la grille dit par où commencer (M16). Seul son bouton
+   capte le toucher : la grille reste visible, défile et se touche dessous, même sous la carte. */
 .calendrier-vide {
   position: absolute;
   inset: 0;
@@ -167,7 +174,6 @@
 }
 
 .calendrier-vide .carte {
-  pointer-events: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -183,6 +189,7 @@
 }
 
 .calendrier-vide .btn-principal {
+  pointer-events: auto;
   margin-top: 8px;
 }
 
