@@ -39,7 +39,26 @@ export const enSelection = (): boolean => useSelection.getState().ids.size > 0
 /** Quitte le mode sélection (autre écran, feuille, vue). */
 export const quitterSelection = (): void => useSelection.getState().vider()
 
-export const texteSelection = (n: number): string => (n > 1 ? `${n} sélectionnés` : `${n} sélectionné`)
+/** « N sélectionnés », suivi de « · M hors de la vue » quand des sélectionnés sont hors des jours affichés. */
+export function texteSelection(n: number, horsVue = 0): string {
+  const base = n > 1 ? `${n} sélectionnés` : `${n} sélectionné`
+  return horsVue > 0 ? `${base} · ${horsVue} hors de la vue` : base
+}
+
+/** Sélectionnés placés hors des jours affichés (`YYYY-MM-DD`). */
+export function horsDeLaVue(
+  ids: readonly string[],
+  creneaux: Readonly<Record<string, { debut: string | null }>>,
+  jours: readonly string[],
+): number {
+  const affiches = new Set(jours)
+  let n = 0
+  for (const id of ids) {
+    const debut = creneaux[id]?.debut
+    if (debut != null && !affiches.has(debut.slice(0, 10))) n++
+  }
+  return n
+}
 
 export const texteSuppression = (n: number): string => (n > 1 ? `${n} créneaux supprimés` : `${n} créneau supprimé`)
 

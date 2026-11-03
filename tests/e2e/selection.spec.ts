@@ -28,6 +28,21 @@ async function ouvrir(page: Page, extra: Parameters<typeof semer>[1] = {}): Prom
   await expect(page.locator('.bloc-creneau').first()).toBeAttached()
 }
 
+/** Attend que les colonnes ne bougent plus (le panneau des items se replie avec une animation). */
+async function colonnesPosees(page: Page): Promise<void> {
+  const x = () => page.locator(`.colonne[data-jour="${SAMEDI}"]`).evaluate((el) => el.getBoundingClientRect().left)
+  let avant = await x()
+  await expect
+    .poll(async () => {
+      await images(page)
+      const maintenant = await x()
+      const pose = maintenant === avant
+      avant = maintenant
+      return pose
+    })
+    .toBe(true)
+}
+
 /** Appui long sur `de` (vide), glisser jusqu'à `vers`, lâcher. */
 async function tracer(page: Page, de: Point, vers: Point): Promise<void> {
   await saisir(page, de, vers)
@@ -121,8 +136,6 @@ test.describe('Sélection par zone', () => {
     await lacher(page, vide)
     await expect(barre(page)).toHaveCount(0)
     await expect(selectionnes(page)).toHaveCount(0)
-    // Le toucher a servi à quitter : « Pour combler ce trou » ne s'ouvre pas.
-    await expect(page.getByRole('heading', { name: 'Pour combler ce trou' })).toHaveCount(0)
 
     await lassoLundiMercredi(page)
     await barre(page).getByRole('button', { name: 'Quitter la sélection' }).tap()
@@ -137,6 +150,49 @@ test.describe('Sélection par zone', () => {
     // Hors du mode, toucher un créneau ouvre de nouveau sa fiche.
     await bloc(page, 'cr-a').tap()
     await expect(page.getByRole('dialog')).toBeVisible()
+  })
+
+  test('toucher le vide pour quitter garde l’emplacement (préremplissage) sans ouvrir la bibliothèque', async ({ page }) => {
+    await ouvrir(page)
+    await lassoLundiMercredi(page)
+    // Panneau des items replié (le replier ne quitte pas le mode) : le toucher ne doit pas le rouvrir.
+    await page.getByRole('button', { name: 'Items' }).tap()
+    await expect(page.locator('.coque')).toHaveAttribute('data-replie', 'true')
+    await expect(barre(page)).toBeVisible()
+    await colonnesPosees(page)
+    const vide = await pointGrille(page, SAMEDI, 10, 0, 10)
+    await pointeur(page, 'pointerdown', vide)
+    await lacher(page, vide)
+    await expect(barre(page)).toHaveCount(0)
+    await expect(page.locator('.coque')).toHaveAttribute('data-replie', 'true')
+    // « + Indisponibilité » part de l'emplacement touché : samedi 10 h, pendant 1 h.
+    await page.getByRole('button', { name: '+ Indisponibilité' }).tap()
+    const f = page.getByRole('dialog', { name: 'Nouvelle indisponibilité' })
+    await expect(f).toBeVisible()
+    await expect(f.getByLabel('Jour')).toHaveValue(SAMEDI)
+    await expect(f.getByLabel('Début')).toHaveValue('10:00')
+    await expect(f.getByLabel('Fin')).toHaveValue('11:00')
+  })
+
+  test('hors de la vue : la sélection survit à la semaine suivante, la barre le dit, Supprimer et ↶ portent sur tout', async ({ page }) => {
+    await ouvrir(page)
+    await lassoLundiMercredi(page)
+    await expect(barre(page)).not.toContainText('hors de la vue')
+    await page.getByRole('button', { name: 'Semaine suivante' }).tap()
+    await expect(page.locator('.calendrier-periode')).toContainText('9')
+    await expect(barre(page)).toContainText('2 sélectionnés · 2 hors de la vue')
+
+    await barre(page).getByRole('button', { name: 'Supprimer' }).tap()
+    await expect(page.getByText('2 créneaux supprimés')).toBeVisible()
+    await expect(barre(page)).toHaveCount(0)
+    await page.getByRole('button', { name: 'Semaine précédente' }).tap()
+    await expect(bloc(page, 'cr-a')).toHaveCount(0)
+    await expect(bloc(page, 'cr-d')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Annuler' }).tap()
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', '2026-11-03T14:00')
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-debut', '2026-11-04T13:30')
+    await expect(page.getByRole('button', { name: 'Annuler' })).toBeDisabled()
   })
 
   test('un deuxième lasso ajoute à la sélection', async ({ page }) => {

@@ -316,7 +316,7 @@ export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTap
         )}
       </div>
       <Corbeille />
-      {vue !== 'mois' && <BarreSelection />}
+      {vue !== 'mois' && <BarreSelection jours={jours} />}
     </section>
   )
 }

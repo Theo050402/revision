@@ -59,6 +59,8 @@ export function useAppuiVide(jour: string, g: Geometrie, onTap: (jour: string, t
       let lasso: ControleLasso | null = null
 
       const minuterie = setTimeout(() => {
+        // La colonne a quitté le DOM pendant l'appui (changement de vue, import…) : plus de geste.
+        if (!col.isConnected) return arreter()
         lasso = commencerLasso(col, x0, y0, id)
       }, DELAI_APPUI_LONG)
 

@@ -1,6 +1,7 @@
 // Barre du mode sélection (spec §D.2, §D.4) : flottante et translucide en bas du calendrier, « N sélectionnés »,
 // « Supprimer » (immédiat, annulable en un pas par ↶) et ✕. Échap quitte aussi. Elle entre par ressort (fondu court
-// en mouvement réduit). Un créneau sélectionné qui disparaît (↶, autre appareil) sort de la sélection.
+// en mouvement réduit). Un créneau sélectionné qui disparaît (↶, autre appareil) sort de la sélection. La sélection
+// survit au changement de semaine : la barre dit alors combien de sélectionnés sont hors des jours affichés.
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { supprimerGroupe } from '../../domain/selection'
 import { useGlisse } from '../dnd/glisse'
@@ -8,13 +9,14 @@ import { fondu } from '../mouvement/geste'
 import { animerValeur, mouvementReduit, RESSORT_DOUX } from '../mouvement/ressort'
 import { useStore } from '../store'
 import { toast } from '../Toast'
-import { quitterSelection, texteSelection, texteSuppression, useSelection } from './useSelection'
+import { horsDeLaVue, quitterSelection, texteSelection, texteSuppression, useSelection } from './useSelection'
 import './selection.css'
 
 /** Course (px) de l'entrée par le bas. */
 const ENTREE = 24
 
-export function BarreSelection() {
+/** `jours` : jours affichés par la grille (`YYYY-MM-DD`). */
+export function BarreSelection({ jours }: { jours: readonly string[] }) {
   const ids = useSelection((s) => s.ids)
   const creneaux = useStore((s) => s.etat.creneaux)
   const valides = useMemo(() => [...ids].filter((id) => creneaux[id]?.debut != null), [ids, creneaux])
@@ -24,10 +26,10 @@ export function BarreSelection() {
   }, [valides, ids])
 
   if (valides.length === 0) return null
-  return <Barre ids={valides} />
+  return <Barre ids={valides} horsVue={horsDeLaVue(valides, creneaux, jours)} />
 }
 
-function Barre({ ids }: { ids: string[] }) {
+function Barre({ ids, horsVue }: { ids: string[]; horsVue: number }) {
   const ref = useRef<HTMLDivElement>(null)
 
   // Entrée : de 24 px plus bas et transparente, vers sa place, par ressort ; fondu de 150 ms en mouvement réduit.
@@ -59,16 +61,17 @@ function Barre({ ids }: { ids: string[] }) {
 
   const supprimer = () => {
     const liste = ids
-    const ok = useStore.getState().appliquer((e) => supprimerGroupe(e, liste))
+    // Écriture refusée (store pas prêt…) : le mode reste ouvert, rien n'est perdu.
+    if (!useStore.getState().appliquer((e) => supprimerGroupe(e, liste))) return
     quitterSelection()
-    if (ok) toast(texteSuppression(liste.length))
+    toast(texteSuppression(liste.length))
   }
 
   return (
     <div className="barre-selection-place">
       <div ref={ref} className="barre-selection" role="toolbar" aria-label="Sélection">
         <span className="barre-selection-nombre" aria-live="polite">
-          {texteSelection(ids.length)}
+          {texteSelection(ids.length, horsVue)}
         </span>
         <button type="button" className="btn-principal barre-selection-supprimer" onClick={supprimer}>
           Supprimer

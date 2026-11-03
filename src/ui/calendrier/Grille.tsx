@@ -4,7 +4,8 @@
 // Gestes : appui long sur un créneau puis glisser (dnd-kit, délégué au corps de la grille), poignée du bord bas
 // (durée), tap sur un emplacement libre (« Pour combler ce trou »), appui long sur un emplacement libre puis glisser
 // (lasso de sélection, spec §D.1). En mode sélection (§D.2), toucher un créneau l'ajoute ou le retire au lieu
-// d'ouvrir sa fiche, et toucher un emplacement libre quitte le mode. Pendant un glisser, les créneaux poussés s'écartent par `translateY` (aperçu, ressort),
+// d'ouvrir sa fiche ; toucher un emplacement libre quitte le mode et retient l'emplacement sans ouvrir la
+// bibliothèque. Pendant un glisser, les créneaux poussés s'écartent par `translateY` (aperçu, ressort),
 // l'emplacement d'atterrissage se pose dans la colonne visée et celle-ci s'éclaire avec son en-tête (`data-visee`).
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, type CSSProperties, type PointerEvent } from 'react'
 import type { Intervalle } from '../../domain/cascade'
@@ -17,6 +18,7 @@ import { libelleJourCourt } from '../periode'
 import { Lasso } from '../selection/Lasso'
 import { enSelection, quitterSelection, useSelection } from '../selection/useSelection'
 import { useStore } from '../store'
+import { choisirTrou } from '../trou'
 import { BlocCreneau, BlocIndispo } from './Bloc'
 import { blocsDesJours, minutesVersY, plageDesJours, PX_HEURE_IPAD, type BlocsDuJour } from './geometrie'
 import { useAppuiVide, useRedimension } from './gestes'
@@ -100,7 +102,13 @@ export function Grille({ jours, pxHeure = PX_HEURE_IPAD, onTapTrou, onOuvrirCren
 
   // Mode sélection lu au moment du toucher : les blocs mémoïsés gardent des rappels fixes. Une indisponibilité n'est
   // jamais sélectionnable : en mode sélection, la toucher ne fait rien.
-  const tapTrou = useStable((j: string, t: number) => (enSelection() ? quitterSelection() : onTapTrou?.(j, t)))
+  const tapTrou = useStable((j: string, t: number) => {
+    if (!enSelection()) return onTapTrou?.(j, t)
+    // Le toucher sert à quitter : l'emplacement est retenu (préremplissage de « + Indisponibilité »), sans ouvrir la
+    // bibliothèque.
+    quitterSelection()
+    choisirTrou(j, t)
+  })
   const ouvrirCreneau = useStable((id: string) => (enSelection() ? useSelection.getState().basculer(id) : onOuvrirCreneau?.(id)))
   const ouvrirIndispo = useStable((id: string) => (enSelection() ? undefined : onOuvrirIndispo?.(id)))
 

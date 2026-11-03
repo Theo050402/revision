@@ -94,14 +94,19 @@ export function commencerLasso(col: HTMLElement, x: number, y: number, pointeur:
   let image = 0
   let fini = false
 
-  /** Zone sous le doigt et créneaux touchés ; écrit seulement si la zone change. Retour haptique à chaque ajout. */
-  const evaluer = () => {
+  /**
+   * Zone sous le doigt et créneaux touchés ; écrit seulement si la zone change. Retour haptique à chaque ajout, sauf
+   * à l'activation (`silencieux`), qui a déjà le sien.
+   */
+  const evaluer = (silencieux = false) => {
     const zone = zoneEntre(ancre, lire(doigt.x, doigt.y))
     const k = `${zone.jourDebut}|${zone.jourFin}|${zone.debut}|${zone.fin}`
     if (k === cle) return
     cle = k
     const touches = creneauxDansZone(useStore.getState().etat, zone)
-    if (ajoutes(useLasso.getState().touches, touches, useSelection.getState().ids).length > 0) haptique('leger')
+    if (!silencieux && ajoutes(useLasso.getState().touches, touches, useSelection.getState().ids).length > 0) {
+      haptique('leger')
+    }
     useLasso.setState({ zone, touches })
   }
 
@@ -143,7 +148,8 @@ export function commencerLasso(col: HTMLElement, x: number, y: number, pointeur:
   marquerGeste(true)
   saisirPointeur(pointeur)
   window.addEventListener('keydown', clavier, true)
-  evaluer()
+  haptique('leger') // l'appui long a pris (spec §C.1, §C.5)
+  evaluer(true)
   image = requestAnimationFrame(boucle)
 
   return {

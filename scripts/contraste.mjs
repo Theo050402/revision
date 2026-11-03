@@ -15,11 +15,13 @@ const rapport = (a, b) => {
 const melange = (dessus, dessous, alpha) => dessus.map((v, i) => v * alpha + dessous[i] * (1 - alpha))
 
 let echec = false
-const ligne = (nom, r) => {
-  const ok = r >= 4.5
+const ligne = (nom, r, seuil = 4.5) => {
+  const ok = r >= seuil
   if (!ok) echec = true
   console.log(`${ok ? 'OK    ' : 'ECHEC '} ${nom.padEnd(52)} ${r.toFixed(2)}:1`)
 }
+/** Élément graphique (bord, anneau) : 3:1. */
+const ligneGraphique = (nom, r) => ligne(nom, r, 3)
 
 for (const [nom, hex] of Object.entries(surligneurs)) {
   ligne(`encre ${ENCRE} sur ${nom} ${hex}`, rapport(rgb(ENCRE), rgb(hex)))
@@ -38,5 +40,23 @@ for (const [nom, fond] of [['le fond', FOND_CLAIR], ['la carte', '#FFFFFF'], ['u
 }
 for (const [nom, fond] of [['la carte', '#33264A'], ['le fond', '#2B1E3E'], ['un champ', '#3A2D53'], ['le panneau', '#241934']]) {
   ligne(`sombre : muted ${MUTED_SOMBRE} sur ${nom} ${fond}`, rapport(rgb(MUTED_SOMBRE), rgb(fond)))
+}
+// Sélection par zone (tâche 11 des améliorations, selection.css). Les fonds translucides sont composés sur le fond de
+// la page (`color-mix` en sRGB = mélange linéaire des composantes).
+const THEMES = {
+  clair: { bg: '#FCFCFA', panel: '#FFFFFF', ink: '#1E2A5A', accent: '#1E2A5A', onAccent: '#FFFFFF', now: '#D9473F' },
+  sombre: { bg: '#2B1E3E', panel: '#241934', ink: '#E6E6FA', accent: '#A490C2', onAccent: '#241934', now: '#F29E8E' },
+}
+for (const [nom, t] of Object.entries(THEMES)) {
+  const fondLasso = melange(rgb(t.accent), rgb(t.bg), 0.12)
+  ligne(`${nom} : encre sous le lasso (accent 12 % sur le fond)`, rapport(rgb(t.ink), fondLasso))
+  // Bord du lasso et anneau de sélection : élément graphique, 3:1 suffit (WCAG 1.4.11).
+  ligneGraphique(`${nom} : bord du lasso (accent) sur le fond`, rapport(rgb(t.accent), rgb(t.bg)))
+  ligneGraphique(`${nom} : bord du lasso sur son propre fond`, rapport(rgb(t.accent), fondLasso))
+  ligne(`${nom} : coche (on-accent) sur la pastille d'accent`, rapport(rgb(t.onAccent), rgb(t.accent)))
+  const fondBarre = melange(rgb(t.panel), rgb(t.bg), 0.78)
+  ligne(`${nom} : texte de la barre de sélection (panel 78 %)`, rapport(rgb(t.ink), fondBarre))
+  const rouge = melange(rgb(t.now), [0, 0, 0], 0.88)
+  ligne(`${nom} : « Supprimer » (fond sur --now assombri 12 %)`, rapport(rgb(t.bg), rouge))
 }
 process.exit(echec ? 1 : 0)

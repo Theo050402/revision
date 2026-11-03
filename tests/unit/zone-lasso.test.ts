@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ajoutes, pointSousDoigt, zoneEntre, type ColonneEcran } from '../../src/ui/selection/zoneLasso'
-import { texteSelection, texteSuppression, useSelection } from '../../src/ui/selection/useSelection'
+import { horsDeLaVue, texteSelection, texteSuppression, useSelection } from '../../src/ui/selection/useSelection'
 
 // Trois colonnes de 100 px à partir de x = 50 ; plage 7 h – 23 h, 48 px par heure.
 const COLONNES: ColonneEcran[] = [
@@ -52,6 +52,13 @@ describe('textes', () => {
   it('« N sélectionnés », au singulier pour un', () => {
     expect(texteSelection(1)).toBe('1 sélectionné')
     expect(texteSelection(2)).toBe('2 sélectionnés')
+    expect(texteSelection(2, 0)).toBe('2 sélectionnés')
+  })
+
+  it('« N sélectionnés · M hors de la vue » quand des sélectionnés sont hors des jours affichés', () => {
+    expect(texteSelection(3, 2)).toBe('3 sélectionnés · 2 hors de la vue')
+    expect(texteSelection(2, 1)).toBe('2 sélectionnés · 1 hors de la vue')
+    expect(texteSelection(1, 1)).toBe('1 sélectionné · 1 hors de la vue')
   })
 
   it('« N créneaux supprimés », au singulier pour un', () => {
@@ -81,5 +88,18 @@ describe('useSelection', () => {
     useSelection.getState().vider()
     useSelection.getState().ajouter([])
     expect(useSelection.getState().ids).toBe(avant)
+  })
+})
+
+describe('horsDeLaVue', () => {
+  const creneaux = {
+    a: { debut: '2026-11-03T14:00' },
+    b: { debut: '2026-11-10T09:00' },
+    c: { debut: null },
+  }
+  it('compte les sélectionnés placés hors des jours affichés', () => {
+    expect(horsDeLaVue(['a', 'b'], creneaux, ['2026-11-02', '2026-11-03'])).toBe(1)
+    expect(horsDeLaVue(['a'], creneaux, ['2026-11-03'])).toBe(0)
+    expect(horsDeLaVue(['b'], creneaux, [])).toBe(1)
   })
 })
