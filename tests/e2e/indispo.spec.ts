@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { AUJOURDHUI, MAINTENANT, semer } from './graine-calendrier'
-import { lacher, pointGrille, pointeur } from './gestes'
+import { feuillePosee, lacher, pointGrille, pointeur } from './gestes'
 
 // « + Indisponibilité » (spec §D.5) : un bouton de la barre de navigation ouvre une feuille (Titre, Jour, Début, Fin)
 // préremplie avec l'emplacement libre touché en dernier, sinon avec aujourd'hui de l'heure suivante pendant 1 h.
@@ -27,6 +27,7 @@ async function toucherTrou(page: Page): Promise<void> {
   if (await items.isVisible().catch(() => false)) {
     await items.getByRole('button', { name: 'Fermer' }).click()
     await expect(items).toHaveCount(0)
+    await feuillePosee(page)
   }
 }
 
@@ -59,6 +60,7 @@ test.describe('Indisponibilité par bouton', () => {
   test('sans emplacement touché : aujourd’hui de l’heure suivante, pendant 1 h', async ({ page }) => {
     await ouvrir(page)
     await bouton(page).click()
+    await feuillePosee(page)
     const f = feuille(page)
     await expect(f).toBeVisible()
     await expect(f.getByRole('textbox', { name: 'Titre' })).toHaveValue('')
@@ -73,6 +75,7 @@ test.describe('Indisponibilité par bouton', () => {
     await ouvrir(page)
     await toucherTrou(page)
     await bouton(page).click()
+    await feuillePosee(page)
     const f = feuille(page)
     await expect(f).toBeVisible()
     await expect(f.getByLabel('Jour')).toHaveValue(AUJOURDHUI)
@@ -83,6 +86,7 @@ test.describe('Indisponibilité par bouton', () => {
   test('fin avant début : message en ligne et « Ajouter » désactivé', async ({ page }) => {
     await ouvrir(page)
     await bouton(page).click()
+    await feuillePosee(page)
     const f = feuille(page)
     // La feuille place elle-même le focus sur « Titre » à l'image suivante : on l'attend, sinon la saisie suivante
     // (« Fin ») pourrait se faire voler le focus par cette mise au point tardive.
@@ -101,6 +105,7 @@ test.describe('Indisponibilité par bouton', () => {
     await ouvrir(page)
     await expect(blocs(page)).toHaveCount(0)
     await bouton(page).click()
+    await feuillePosee(page)
     const f = feuille(page)
     // La feuille place elle-même le focus sur « Titre » à l'image suivante : on l'attend, sinon la saisie suivante
     // (« Fin ») pourrait se faire voler le focus par cette mise au point tardive.
@@ -116,4 +121,5 @@ test.describe('Indisponibilité par bouton', () => {
     await page.getByRole('button', { name: 'Annuler' }).click()
     await expect(blocs(page)).toHaveCount(0)
   })
+
 })

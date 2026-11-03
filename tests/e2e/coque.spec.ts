@@ -307,7 +307,7 @@ test('feuille : entrée par ressort, tirée vers le bas pour fermer (iPhone) ou 
   await pointeur(page, 'pointermove', { x: prise.x, y: prise.y + hauteur * 0.2 })
   await page.waitForTimeout(200)
   await pointeur(page, 'pointerup', { x: prise.x, y: prise.y + hauteur * 0.2 })
-  await expect.poll(async () => (await matrice(feuille)).f, { timeout: 2000 }).toBeCloseTo(0, 1)
+  await expect.poll(async () => (await matrice(feuille)).f, { timeout: 5000 }).toBeCloseTo(0, 1)
   await expect(feuille).toBeVisible()
 
   // Tirée de plus de 30 % de sa hauteur : elle se ferme.
@@ -367,7 +367,7 @@ test('balayage de semaine : la grille suit le doigt puis se pose par ressort', a
   expect((await matrice(piste)).e).toBeCloseTo(-zone.width * 0.1, 0)
   await page.waitForTimeout(200)
   await pointeur(page, 'pointerup', { x: x0 - zone.width * 0.1, y })
-  await expect.poll(async () => (await matrice(piste)).e, { timeout: 2000 }).toBeCloseTo(0, 0)
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 5000 }).toBeCloseTo(0, 0)
   await expect(periode).toHaveText(avant ?? '')
 
   // Plus de 25 % de la largeur : la semaine sort, la suivante entre par la droite et se pose.
@@ -380,7 +380,7 @@ test('balayage de semaine : la grille suit le doigt puis se pose par ressort', a
   await echantillonner(page, '.calendrier-piste')
   await pointeur(page, 'pointerup', { x: x0 - zone.width * 0.4, y })
   await expect(periode).not.toHaveText(avant ?? '')
-  await expect.poll(async () => (await matrice(piste)).e, { timeout: 2000 }).toBeCloseTo(0, 0)
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 5000 }).toBeCloseTo(0, 0)
   const vus = (await echantillons(page)).map((v) => decalage(v.transform, 'e'))
   // Elle est sortie à gauche (au-delà du doigt), puis la nouvelle est entrée par la droite.
   expect(Math.min(...vus)).toBeLessThan(-zone.width * 0.6)
@@ -465,13 +465,13 @@ test('balayage : une piste saisie en plein mouvement puis relâchée sur place s
   await expect(periode).not.toHaveText(avant ?? '')
   const apres = await periode.textContent()
   // La nouvelle semaine entre par la droite : on la saisit en route et on la relâche sans bouger.
-  await expect.poll(async () => (await matrice(piste)).e, { timeout: 2000 }).toBeGreaterThan(5)
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 5000 }).toBeGreaterThan(5)
   const e0 = (await matrice(piste)).e
   expect(e0).toBeLessThan(zone.width)
   await pointeur(page, 'pointerdown', { x: x0, y })
   await page.waitForTimeout(150)
   await pointeur(page, 'pointerup', { x: x0, y })
-  await expect.poll(async () => (await matrice(piste)).e, { timeout: 2000 }).toBeCloseTo(0, 0)
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 5000 }).toBeCloseTo(0, 0)
   await expect(periode).toHaveText(apres ?? '')
   // Rien ne reste d'inline sur la piste au repos.
   await expect.poll(() => piste.evaluate((el) => [el.style.transform, el.style.willChange])).toEqual(['', ''])

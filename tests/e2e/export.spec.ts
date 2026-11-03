@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { MAINTENANT, creneau, semer } from './graine-calendrier'
+import { attendreSaisie, feuillePosee } from './gestes'
 
 // Export vers Calendrier (tâche 20, spec §12). Livraison par téléchargement (test sur iPad, 28/10/2026) : chaque
 // action de la feuille produit un fichier .ics. Les créneaux sont semés dans IndexedDB, tous le mercredi 4 nov. 2026
@@ -16,6 +17,7 @@ const feuille = (page: Page) => page.getByRole('dialog')
 async function fermerFeuille(page: Page): Promise<void> {
   await feuille(page).getByRole('button', { name: 'Fermer' }).click()
   await expect(feuille(page)).toHaveCount(0)
+  await feuillePosee(page)
 }
 const bloc = (page: Page, id: string) => page.locator(`[data-creneau="${id}"]`)
 
@@ -31,6 +33,7 @@ async function ouvrir(page: Page, creneaux: ReturnType<typeof creneau>[]): Promi
 async function ouvrirFeuille(page: Page): Promise<void> {
   await bouton(page).click()
   await expect(feuille(page)).toBeVisible()
+  await feuillePosee(page) // ses boutons à leur place avant d'y toucher
 }
 
 /** Clique `nom` et lit le fichier téléchargé. */
@@ -134,6 +137,7 @@ test('modifier un créneau exporté : « Créneaux modifiés (1) », SEQUENCE:2,
 
   // Une note change `version` (§12.3).
   await bloc(page, 'e-a').click()
+  await feuillePosee(page)
   await page.getByLabel('Note').fill('Revoir le schéma')
   await page.getByRole('button', { name: 'Fermer' }).click()
   await expect(badge(page)).toHaveText('1')
@@ -174,9 +178,11 @@ test('supprimer un créneau exporté : liste à supprimer à la main, « C\'est 
 
   // Un créneau jamais exporté s'efface sans laisser de trace ; un créneau exporté laisse une suppression.
   await bloc(page, 'n-c').click()
+  await feuillePosee(page)
   await page.getByRole('button', { name: 'Supprimer' }).click()
   await expect(badge(page)).toHaveCount(0)
   await bloc(page, 'e-a').click()
+  await feuillePosee(page)
   await page.getByRole('button', { name: 'Supprimer' }).click()
   await expect(badge(page)).toHaveText('1')
 
@@ -204,6 +210,7 @@ test('plus de 10 créneaux modifiés : procédure « Tout réexporter »', async
   await expect(badge(page)).toHaveText('11')
   // Un créneau exporté supprimé : une suppression à faire à la main s'ajoute au badge.
   await bloc(page, 'e-x').click()
+  await feuillePosee(page)
   await page.getByRole('button', { name: 'Supprimer' }).click()
   await expect(badge(page)).toHaveText('12')
 
@@ -297,6 +304,7 @@ test("« Repartir d'un calendrier vide » : la question porte sur tout le planni
     creneau('e-x', 'c1:292', `${JOUR}T14:00`, 60, { versionExportee: 1 }),
   ])
   await bloc(page, 'e-x').click()
+  await feuillePosee(page)
   await page.getByRole('button', { name: 'Supprimer' }).click()
   await ouvrirFeuille(page)
   await feuille(page).locator('details.export-alternative > summary').click()
@@ -447,7 +455,7 @@ const images = (page: Page) =>
 
 async function glisser(page: Page, de: Point, vers: Point): Promise<void> {
   await pointeur(page, 'pointerdown', de)
-  await page.waitForTimeout(200) // appui long (150 ms)
+  await attendreSaisie(page) // appui long (150 ms) : attendu à l'état de la page, pas à la montre de Node
   for (let i = 1; i <= 8; i++) {
     await pointeur(page, 'pointermove', { x: de.x + ((vers.x - de.x) * i) / 8, y: de.y + ((vers.y - de.y) * i) / 8 })
   }

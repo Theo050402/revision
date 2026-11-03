@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { MAINTENANT, creneau, item, semer } from './graine-calendrier'
+import { feuillePosee } from './gestes'
 
 // Bibliothèque d'items (tâche 17). Données : celles du calendrier (collèges Cancérologie c1, Gynécologie c2,
 // Hépato-gastro c3, items 290–292, 300, 301, 304) plus des items 293–305 et quelques créneaux (voir EXTRA).
@@ -37,6 +38,7 @@ async function ouvrir(page: Page, info: TestInfo): Promise<Locator> {
     await page.getByRole('button', { name: 'Items', exact: true }).click()
     const feuille = page.getByRole('dialog', { name: 'Items' })
     await expect(feuille).toBeVisible()
+    await feuillePosee(page) // tailles et positions mesurées sur la feuille posée, pas en pleine entrée
     return feuille
   }
   return page.locator('#panneau-bibliotheque')

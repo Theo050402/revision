@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { MAINTENANT } from './graine-calendrier'
-import { centre, glisser, pointGrille } from './gestes'
+import { centre, feuillePosee, glisser, pointGrille } from './gestes'
 import { pdfSommaire } from './pdfs'
 
 // Recette automatisée (tâche 21, spec §1) : le parcours complet d'Emma, sur les deux appareils.
@@ -26,6 +26,7 @@ async function bibliotheque(page: Page, info: TestInfo) {
   }
   const feuille = page.getByRole('dialog', { name: 'Items' })
   await expect(feuille).toBeVisible()
+  await feuillePosee(page)
   return feuille
 }
 
@@ -33,6 +34,7 @@ async function fermerFeuilleItems(page: Page, info: TestInfo) {
   if (info.project.name !== 'iphone') return
   await page.getByRole('dialog', { name: 'Items' }).getByRole('button', { name: 'Fermer' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
+  await feuillePosee(page)
 }
 
 test('parcours complet : importer, placer 3 items, marquer fait, exporter, recharger', async ({ page }, info) => {
@@ -99,9 +101,11 @@ test('parcours complet : importer, placer 3 items, marquer fait, exporter, recha
   const fait = poses[1].id
   await page.locator(`[data-creneau="${fait}"]`).click()
   const fiche = page.getByRole('dialog')
+  await feuillePosee(page)
   await fiche.getByRole('button', { name: /Fait/ }).click()
   await expect(fiche.getByRole('button', { name: /Fait/ })).toHaveAttribute('aria-pressed', 'true')
   await fiche.getByRole('button', { name: 'Fermer' }).click()
+  await feuillePosee(page)
   await expect(page.locator(`[data-creneau="${fait}"]`)).toHaveAttribute('data-fait', 'true')
 
   // ── Exporter vers Calendrier : 3 nouveaux créneaux, un fichier .ics de 3 événements.
@@ -109,6 +113,7 @@ test('parcours complet : importer, placer 3 items, marquer fait, exporter, recha
   await page.getByRole('button', { name: /^Exporter/ }).click()
   const feuille = page.getByRole('dialog')
   await expect(feuille.getByRole('heading', { name: 'Nouveaux créneaux (3)' })).toBeVisible()
+  await feuillePosee(page)
   const [telechargement] = await Promise.all([
     page.waitForEvent('download'),
     feuille.getByRole('button', { name: 'Ajouter au Calendrier' }).click(),
