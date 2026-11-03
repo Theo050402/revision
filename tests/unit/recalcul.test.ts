@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { changementsEnAttente } from '../../src/domain/actions-etat'
 import { etatVide } from '../../src/domain/defaults'
 import { messageRecalcul, recalculerCreneaux } from '../../src/domain/recalcul'
 import type { Creneau, Etat, Indispo, Item } from '../../src/domain/types'
@@ -102,6 +103,48 @@ describe('recalculerCreneaux', () => {
     expect(etat.creneaux.b.debut).toBe(`${J}T18:00`)
   })
 
+  it('indisponibilités accolées : B saute 17:00–18:00 puis 18:00–19:00 → 19:00', () => {
+    const e = base(
+      [
+        creneau('a', { debut: `${J}T14:00` }),
+        creneau('b', { debut: `${J}T15:30`, duree: 60, dureePerso: true }),
+      ],
+      [indispo('i1', `${J}T17:00`, `${J}T18:00`), indispo('i2', `${J}T18:00`, `${J}T19:00`)],
+    )
+    expect(recalculerCreneaux(e, AUJ).etat.creneaux.b.debut).toBe(`${J}T19:00`)
+  })
+
+  it("fin à la minute où commence l'indisponibilité : pas de saut (intervalles semi-ouverts)", () => {
+    const e = base(
+      [
+        creneau('a', { debut: `${J}T14:00` }),
+        creneau('b', { debut: `${J}T15:30`, duree: 30, dureePerso: true }),
+      ],
+      [indispo('i', `${J}T17:00`, `${J}T18:00`)],
+    )
+    expect(recalculerCreneaux(e, AUJ).etat.creneaux.b.debut).toBe(`${J}T16:30`)
+  })
+
+  it("indisponibilité jusqu'à minuit : B poussé dedans part dans À placer", () => {
+    const e = base(
+      [
+        creneau('a', { debut: `${J}T19:00` }),
+        creneau('b', { debut: `${J}T21:00`, duree: 60, dureePerso: true }),
+      ],
+      [indispo('i', `${J}T22:00`, '2026-11-06T00:00')],
+    )
+    const { etat, bilan } = recalculerCreneaux(e, AUJ)
+    expect(etat.creneaux.b.debut).toBeNull()
+    expect(bilan.versBac).toBe(1)
+  })
+
+  it('bac hors portée : intact', () => {
+    const e = base([creneau('x', { itemId: 'neuro:20', debut: null }), creneau('a', { debut: null })])
+    const { etat } = recalculerCreneaux(e, AUJ, { collegeId: 'canc' })
+    expect(etat.creneaux.x).toBe(e.creneaux.x)
+    expect(etat.creneaux.a.duree).toBe(150)
+  })
+
   it('créneau inchangé déjà dans une indisponibilité : il ne bouge pas', () => {
     const e = base(
       [
@@ -127,6 +170,33 @@ describe('recalculerCreneaux', () => {
     expect(etat.creneaux.b.duree).toBe(60)
     expect(etat.creneaux.b.version).toBe(2)
     expect(bilan).toEqual({ recalcules: 1, deplaces: 0, versBac: 1 })
+  })
+
+  it("exporté envoyé dans À placer : suppression en attente à l'ancienne heure, versionExportee gardée", () => {
+    const e = base([
+      creneau('a', { debut: `${J}T20:00` }),
+      creneau('b', { debut: `${J}T21:00`, duree: 60, dureePerso: true, version: 3, versionExportee: 3 }),
+    ])
+    const { etat, bilan } = recalculerCreneaux(e, AUJ)
+    expect(etat.creneaux.b).toMatchObject({ debut: null, version: 4, versionExportee: 3 })
+    expect(etat.suppressions).toEqual({ b: { creneauId: 'b', libelle: '20 · T1 · jeudi 5 nov. 21h' } })
+    expect(bilan.versBac).toBe(1)
+    // Badge : `a` (nouveau, jamais exporté) + la suppression de `b` ; `b` lui-même, au bac, n'est pas exporté.
+    const ch = changementsEnAttente(etat)
+    expect(ch.nouveaux.map((c) => c.id)).toEqual(['a'])
+    expect(ch.modifies).toEqual([])
+    expect(ch.suppressions.map((s) => s.creneauId)).toEqual(['b'])
+    expect(e.suppressions).toEqual({}) // l'entrée n'est pas mutée
+  })
+
+  it('jamais exporté envoyé dans À placer : pas de suppression en attente', () => {
+    const e = base([
+      creneau('a', { debut: `${J}T20:00` }),
+      creneau('b', { debut: `${J}T21:00`, duree: 60, dureePerso: true }),
+    ])
+    const { etat } = recalculerCreneaux(e, AUJ)
+    expect(etat.creneaux.b.debut).toBeNull()
+    expect(etat.suppressions).toBe(e.suppressions)
   })
 
   it('intacts : « Fait », durée manuelle et créneau passé gardent la même référence', () => {

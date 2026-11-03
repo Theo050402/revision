@@ -2,7 +2,8 @@ import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { etatVide } from '../../src/domain/defaults'
 import type { Creneau, Etat } from '../../src/domain/types'
-import { modifierNote, supprimerCreneau, viderPlanning } from '../../src/domain/actions-creneaux'
+import { deplacerCreneau, modifierNote, supprimerCreneau, viderPlanning } from '../../src/domain/actions-creneaux'
+import { recalculerCreneaux } from '../../src/domain/recalcul'
 import { ajouterCollege, changementsEnAttente, marquerExporte, viderSuppressions } from '../../src/domain/actions-etat'
 import { lireSauvegarde } from '../../src/storage/backup'
 import { chargerTout, db } from '../../src/storage/db'
@@ -240,6 +241,42 @@ describe('store : annuler / rétablir et suivi de l’export', () => {
     s().annuler()
     expect(s().etat.creneaux.a.versionExportee).toBeNull()
     expect(changementsEnAttente(s().etat).nouveaux.map((c) => c.id)).toEqual(['a'])
+  })
+
+  it('recalcul vers le bac, replacement, annuler, rétablir : la suppression suit le créneau', async () => {
+    s().appliquer(ajoute(creneau('p', { debut: '2026-11-05T21:00', duree: 60 })))
+    s().appliquer(ajoute(creneau('a', { debut: '2026-11-05T22:00', duree: 30, dureePerso: true })))
+    exporter('a', 'p')
+    // Durée minimale portée à 120 : `p` finit à 23:00, `a` poussé au-delà de la fin de journée part au bac.
+    s().appliquerSansHistorique(
+      (e) => recalculerCreneaux({ ...e, reglages: { ...e.reglages, dureeMin: 120 } }, '2026-11-02').etat,
+      { viderHistorique: true },
+    )
+    expect(s().etat.creneaux.a.debut).toBeNull()
+    expect(Object.keys(s().etat.suppressions)).toEqual(['a'])
+    const badge = (): number => {
+      const ch = changementsEnAttente(s().etat)
+      return ch.nouveaux.length + ch.modifies.length + ch.suppressions.length
+    }
+    expect(badge()).toBe(2) // `p` modifié + suppression de `a`
+
+    const replacer = (e: Etat): Etat | null => {
+      const r = deplacerCreneau(e, 'a', { jour: '2026-11-06', t: 9 * 60, cibleId: null, moitie: 'haute' })
+      return r.ok ? r.etat : null
+    }
+    expect(s().appliquer(replacer)).toBe(true)
+    expect(s().etat.suppressions).toEqual({})
+    expect(changementsEnAttente(s().etat).modifies.map((c) => c.id).sort()).toEqual(['a', 'p'])
+
+    s().annuler()
+    expect(s().etat.creneaux.a.debut).toBeNull()
+    expect(Object.keys(s().etat.suppressions)).toEqual(['a'])
+    expect(badge()).toBe(2)
+
+    s().retablir()
+    expect(s().etat.creneaux.a.debut).toBe('2026-11-06T09:00')
+    expect(s().etat.suppressions).toEqual({})
+    await attendreEcritures()
   })
 
   it('supprimer un exporté puis annuler avant « C’est fait » : plus de suppression, rien à réexporter', () => {

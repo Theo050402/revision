@@ -399,6 +399,19 @@ describe('export', () => {
     expect(changementsEnAttente(viderSuppressions(e)).suppressions).toEqual([])
   })
 
+  it("viderSuppressions : un exporté du bac dont la suppression est faite n'est plus dans Calendrier", () => {
+    let e = avec(
+      base(),
+      creneau('bac', 'c1:300', { debut: null, version: 3, versionExportee: 2 }),
+      creneau('ok', 'c1:300', { version: 2, versionExportee: 2 }),
+    )
+    e = { ...e, suppressions: { bac: { creneauId: 'bac', libelle: 'x' }, x: { creneauId: 'x', libelle: 'x' } } }
+    const r = viderSuppressions(e)
+    expect(r.suppressions).toEqual({})
+    expect(r.creneaux.bac.versionExportee).toBeNull()
+    expect(r.creneaux.ok).toBe(e.creneaux.ok)
+  })
+
   it("marquerExporte : seules les versions réellement écrites sont marquées", () => {
     let e = avec(
       base(),
@@ -524,6 +537,54 @@ describe('reconcilierExport (annuler / rétablir)', () => {
     const r = reconcilierExport(instantane, courant)
     expect(r.creneaux.k1).toMatchObject({ version: 2, versionExportee: 2 })
     expect(changementsEnAttente(r).modifies).toEqual([])
+  })
+
+  // Créneau exporté que le recalcul a mis dans À placer : son événement reste dans Calendrier, sa suppression est en
+  // attente et `versionExportee` est gardée tant qu'elle l'est.
+  const auBac = (p: Partial<Creneau> = {}) =>
+    creneau('k1', 'c1:300', { debut: null, version: 3, versionExportee: 2, ...p })
+  const place = (p: Partial<Creneau> = {}) =>
+    creneau('k1', 'c1:300', { debut: '2026-11-03T10:00', version: 4, versionExportee: 2, ...p })
+
+  it('annuler un placement depuis le bac : la suppression en attente revient, avec son libellé', () => {
+    const instantane: Etat = { ...avec(base(), auBac()), suppressions: { k1: sup('k1', '300 · T1 · mardi 3 nov. 21h') } }
+    const courant = avec(base(), place())
+    const r = reconcilierExport(instantane, courant)
+    expect(r.creneaux.k1).toMatchObject({ debut: null, versionExportee: 2 })
+    expect(r.suppressions).toEqual({ k1: sup('k1', '300 · T1 · mardi 3 nov. 21h') })
+  })
+
+  it('annuler un placement depuis le bac après le réexport : suppression au libellé de la nouvelle heure', () => {
+    const instantane: Etat = { ...avec(base(), auBac()), suppressions: { k1: sup('k1', 'ancien') } }
+    const courant = avec(base(), place({ versionExportee: 4 }))
+    const r = reconcilierExport(instantane, courant)
+    expect(r.creneaux.k1).toMatchObject({ debut: null, versionExportee: 4, version: 5 })
+    expect(r.suppressions).toEqual({ k1: sup('k1', '300 · T1 · mardi 3 nov. 10h') })
+  })
+
+  it('rétablir le placement : la suppression en attente tombe', () => {
+    const instantane = avec(base(), place())
+    const courant: Etat = { ...avec(base(), auBac()), suppressions: { k1: sup('k1'), z: sup('z') } }
+    const r = reconcilierExport(instantane, courant)
+    expect(r.creneaux.k1).toMatchObject({ debut: '2026-11-03T10:00', versionExportee: 2 })
+    expect(r.suppressions).toEqual({ z: sup('z') })
+    expect(changementsEnAttente(r).modifies.map((c) => c.id)).toEqual(['k1'])
+  })
+
+  it("au bac, « C'est fait » confirmé, puis annulation : ni suppression ni versionExportee ne reviennent", () => {
+    const instantane: Etat = { ...avec(base(), auBac()), suppressions: { k1: sup('k1') } }
+    const courant = avec(base(), auBac({ versionExportee: null }))
+    const r = reconcilierExport(instantane, courant)
+    expect(r.creneaux.k1.versionExportee).toBeNull()
+    expect(r.suppressions).toEqual({})
+  })
+
+  it('supprimer un exporté du bac puis annuler : il revient au bac, sa suppression reste en attente', () => {
+    const instantane: Etat = { ...avec(base(), auBac()), suppressions: { k1: sup('k1', 'ancien') } }
+    const courant: Etat = { ...base(), suppressions: { k1: sup('k1', 'ancien') } }
+    const r = reconcilierExport(instantane, courant)
+    expect(r.creneaux.k1).toMatchObject({ debut: null, versionExportee: 2 })
+    expect(r.suppressions).toEqual({ k1: sup('k1', 'ancien') })
   })
 
   it('les suppressions en attente sans rapport avec l’instantané sont conservées', () => {

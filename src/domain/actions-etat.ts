@@ -115,7 +115,8 @@ export function supprimerCollege(e: Etat, collegeId: string): Etat {
 
   const suppressions = { ...e.suppressions }
   for (const c of Object.values(e.creneaux)) {
-    if (appartient(c.itemId) && c.versionExportee !== null) {
+    // Un exporté du bac a déjà sa suppression, au libellé de l'heure de son événement.
+    if (appartient(c.itemId) && c.versionExportee !== null && !(c.id in suppressions)) {
       suppressions[c.id] = { creneauId: c.id, libelle: libelleSuppression(e, c) }
     }
   }
@@ -326,13 +327,17 @@ export function marquerExporte(e: Etat, envoyes: Envoye[]): Etat {
 
 /**
  * Annuler / rétablir : l'instantané rejoué donne les créneaux, mais le suivi de l'export (hors historique) doit
- * survivre. Ce qui est déjà parti dans Calendrier ne repart pas, et ce qui y est resté est signalé :
- * - créneau présent dans les deux états : la `versionExportee` la plus récente l'emporte, et `version` ne descend jamais
- *   sous elle (sinon `versionExportee + 1`) ;
- * - créneau ressuscité dont la suppression est encore en attente : la suppression est retirée (l'événement est
- *   toujours dans Calendrier), `versionExportee` est gardée ;
- * - créneau ressuscité sans suppression en attente (« C'est fait » confirmé : l'événement a été effacé de Calendrier) :
+ * survivre. Ce que Calendrier contient se lit dans l'état courant seul : les créneaux à `versionExportee` non nulle
+ * (placés, ou mis au bac par un recalcul avec leur suppression en attente) et les suppressions en attente. Ce qui est
+ * déjà parti dans Calendrier ne repart pas, et ce qui y est resté est signalé :
+ * - créneau présent dans les deux états et dans Calendrier : la `versionExportee` la plus récente l'emporte, et
+ *   `version` ne descend jamais sous elle (sinon `versionExportee + 1`) ;
+ * - créneau ressuscité dont la suppression est encore en attente : `versionExportee` est gardée (l'événement est
+ *   toujours dans Calendrier) ;
+ * - créneau absent de Calendrier (jamais exporté, ou « C'est fait » confirmé : l'événement a été effacé) :
  *   `versionExportee = null`, il repartira comme nouveau ;
+ * - créneau présent dans Calendrier : placé, pas de suppression en attente (le réexport, même UID, met l'événement à
+ *   jour) ; au bac, une suppression en attente (le bac n'est jamais exporté) ;
  * - créneau exporté que l'annulation retire : une suppression est ajoutée (comme `supprimerCreneau`).
  */
 export function reconcilierExport(instantane: Etat, courant: Etat): Etat {
@@ -340,32 +345,60 @@ export function reconcilierExport(instantane: Etat, courant: Etat): Etat {
   const suppressions = { ...courant.suppressions }
   for (const c of Object.values(instantane.creneaux)) {
     const actuel = courant.creneaux[c.id]
-    if (actuel) {
-      const v = Math.max(c.versionExportee ?? -1, actuel.versionExportee ?? -1)
-      const versionExportee = v < 0 ? null : v
-      // Annulé sous la version déjà envoyée : Calendrier garde un `SEQUENCE` plus haut, un réexport en version plus
-      // basse serait ignoré, et revenir ensuite à la version exportée passerait pour « non modifié ». On repart au-dessus.
-      const version = versionExportee !== null && c.version < versionExportee ? versionExportee + 1 : c.version
-      creneaux[c.id] =
-        versionExportee === c.versionExportee && version === c.version ? c : { ...c, versionExportee, version }
-    } else if (c.id in suppressions) {
-      delete suppressions[c.id]
-      creneaux[c.id] = c
+    let versionExportee: number | null = null
+    if (actuel && actuel.versionExportee !== null) {
+      versionExportee = Math.max(c.versionExportee ?? -1, actuel.versionExportee)
+    } else if (c.id in courant.suppressions) {
+      versionExportee = c.versionExportee ?? actuel?.versionExportee ?? null
+    }
+    // Annulé sous la version déjà envoyée : Calendrier garde un `SEQUENCE` plus haut, un réexport en version plus
+    // basse serait ignoré, et revenir ensuite à la version exportée passerait pour « non modifié ». On repart au-dessus.
+    const version = versionExportee !== null && c.version < versionExportee ? versionExportee + 1 : c.version
+    creneaux[c.id] =
+      versionExportee === c.versionExportee && version === c.version ? c : { ...c, versionExportee, version }
+
+    if (versionExportee !== null && c.debut === null) {
+      suppressions[c.id] = suppressions[c.id] ?? suppressionAuBac(instantane, courant, c, actuel, versionExportee)
     } else {
-      creneaux[c.id] = c.versionExportee === null ? c : { ...c, versionExportee: null }
+      delete suppressions[c.id]
     }
   }
   for (const actuel of Object.values(courant.creneaux)) {
-    if (!(actuel.id in instantane.creneaux) && actuel.versionExportee !== null) {
+    if (!(actuel.id in instantane.creneaux) && actuel.versionExportee !== null && !(actuel.id in suppressions)) {
       suppressions[actuel.id] = { creneauId: actuel.id, libelle: libelleSuppression(courant, actuel) }
     }
   }
   return { ...instantane, creneaux, suppressions }
 }
 
-/** « C'est fait » : la liste des suppressions à faire à la main est vidée. */
+/**
+ * Suppression d'un exporté que l'annulation ramène au bac, libellée à l'heure de son événement : celle où il a été
+ * exporté en dernier s'il l'a été depuis l'instantané, sinon celle que l'instantané avait déjà en attente.
+ */
+function suppressionAuBac(
+  instantane: Etat,
+  courant: Etat,
+  c: Creneau,
+  actuel: Creneau | undefined,
+  versionExportee: number,
+): SuppressionEnAttente {
+  const deja = instantane.suppressions[c.id]
+  if (deja && versionExportee === c.versionExportee) return deja
+  const place = actuel !== undefined && actuel.debut !== null ? actuel : c
+  return { creneauId: c.id, libelle: libelleSuppression(courant, place) }
+}
+
+/**
+ * « C'est fait » : la liste des suppressions à faire à la main est vidée. Un exporté du bac dont la suppression vient
+ * d'être faite n'est plus dans Calendrier : sa `versionExportee` repasse à null (replacé, il repartira comme nouveau).
+ */
 export function viderSuppressions(e: Etat): Etat {
-  return { ...e, suppressions: {} }
+  let creneaux = e.creneaux
+  for (const id of Object.keys(e.suppressions)) {
+    const c = e.creneaux[id]
+    if (c && c.versionExportee !== null) creneaux = { ...creneaux, [id]: { ...c, versionExportee: null } }
+  }
+  return { ...e, creneaux, suppressions: {} }
 }
 
 /** Fusion superficielle ; la validation se fait dans l'écran des réglages. */

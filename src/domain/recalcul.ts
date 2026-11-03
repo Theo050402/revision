@@ -1,5 +1,6 @@
 // Recalcul des créneaux à venir après un changement de réglage de durée, puis
 // replacement jour par jour (spec « Améliorations après recette », B.2 et B.3).
+import { libelleSuppression } from './actions-creneaux'
 import { arrondiPas, dureeTour } from './duration'
 import { jourDe, local, minutesDe } from './temps'
 import type { Creneau, Etat } from './types'
@@ -16,6 +17,8 @@ type Patch = { debut: string | null; duree: number }
  * Recalcule les durées des créneaux concernés, puis replace chaque jour touché :
  * curseur à minuit, chaque créneau à `max(son heure, curseur)`, saut des
  * indisponibilités, et « À placer » pour un créneau changé qui dépasse la fin de journée.
+ * Un créneau déjà exporté mis « À placer » laisse son événement dans Calendrier : sa suppression est mise en attente
+ * (libellé à son ancienne heure) et il garde sa `versionExportee` ; `deplacerCreneau` la retire s'il est replacé.
  * Renvoie le même état si rien ne change ; seuls les créneaux changés sont de nouveaux objets.
  */
 export function recalculerCreneaux(
@@ -93,10 +96,15 @@ export function recalculerCreneaux(
   if (patchs.size === 0) return { etat: e, bilan }
 
   const creneaux = { ...e.creneaux }
+  let suppressions = e.suppressions
   for (const [id, p] of patchs) {
-    creneaux[id] = { ...e.creneaux[id], debut: p.debut, duree: p.duree, version: e.creneaux[id].version + 1 }
+    const c = e.creneaux[id]
+    creneaux[id] = { ...c, debut: p.debut, duree: p.duree, version: c.version + 1 }
+    if (p.debut === null && c.debut !== null && c.versionExportee !== null) {
+      suppressions = { ...suppressions, [id]: { creneauId: id, libelle: libelleSuppression(e, c) } }
+    }
   }
-  return { etat: { ...e, creneaux }, bilan }
+  return { etat: { ...e, creneaux, suppressions }, bilan }
 }
 
 /** Résumé affiché après un recalcul ; `null` si rien n'a changé. */

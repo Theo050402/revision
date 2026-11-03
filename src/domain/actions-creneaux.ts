@@ -137,7 +137,15 @@ export function deplacerCreneau(e: Etat, creneauId: string, c: Cible): Res {
   const maj = pousses(e, c.jour, r.debuts, creneauId)
   const debut = local(c.jour, r.debuts[creneauId])
   if (debut !== cr.debut) maj[creneauId] = { ...cr, debut, version: cr.version + 1 }
-  return { ok: true, etat: Object.keys(maj).length ? avecCreneaux(e, maj) : e, versBac: 0 }
+  const etat = Object.keys(maj).length ? avecCreneaux(e, maj) : e
+  // Exporté mis au bac par un recalcul : son événement est encore dans Calendrier. Replacé, il garde son UID et sa
+  // `versionExportee` (il est « modifié ») : le réexport met l'événement à jour, il n'y a plus rien à supprimer.
+  if (cr.debut === null && creneauId in e.suppressions) {
+    const suppressions = { ...e.suppressions }
+    delete suppressions[creneauId]
+    return { ok: true, etat: { ...etat, suppressions }, versBac: 0 }
+  }
+  return { ok: true, etat, versBac: 0 }
 }
 
 /** Dépôt multiple (§9.5) : numéros croissants, sans jamais pousser l'existant. */
@@ -219,10 +227,13 @@ export function redimensionner(e: Etat, creneauId: string, duree: number): Etat 
   return avecCreneaux(e, { [c.id]: { ...c, duree: nouvelle, dureePerso: true, version } })
 }
 
-/** Retire un créneau de `etat` (muté : copie locale) ; exporté, sa suppression est mise en attente (§12.1). */
+/**
+ * Retire un créneau de `etat` (muté : copie locale) ; exporté, sa suppression est mise en attente (§12.1). Un exporté
+ * du bac a déjà la sienne, au libellé de l'heure de son événement : elle est gardée.
+ */
 export function retirer(etat: Etat, ancien: Etat, c: Creneau): void {
   delete etat.creneaux[c.id]
-  if (c.versionExportee !== null) {
+  if (c.versionExportee !== null && !(c.id in etat.suppressions)) {
     etat.suppressions = {
       ...etat.suppressions,
       [c.id]: { creneauId: c.id, libelle: libelleSuppression(ancien, c) },

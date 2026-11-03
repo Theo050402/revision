@@ -202,6 +202,21 @@ describe('deplacerCreneau', () => {
     expect(r.etat.items).toBe(e.items)
   })
 
+  it('sort du bac un exporté dont la suppression est en attente : la suppression tombe, il redevient « modifié »', () => {
+    // Recalcul : exporté en version 2, mis dans À placer (version 3), suppression en attente.
+    const A = creneau('A', { debut: null, version: 3, versionExportee: 2 })
+    const e = base([A])
+    e.suppressions = {
+      A: { creneauId: 'A', libelle: '300 · T1 · mardi 5 nov. 21h' },
+      Z: { creneauId: 'Z', libelle: 'autre' },
+    }
+    const r = deplacerCreneau(e, 'A', cible(h(10)))
+    if (!r.ok) throw new Error('refus')
+    expect(r.etat.creneaux.A).toMatchObject({ debut: `${J}T10:00`, version: 4, versionExportee: 2 })
+    expect(Object.keys(r.etat.suppressions)).toEqual(['Z']) // même UID : le réexport met l'événement à jour
+    expect(Object.keys(e.suppressions)).toEqual(['A', 'Z'])
+  })
+
   it('déplace un créneau posé sans tenir compte de sa position d\'origine', () => {
     const A = creneau('A', { debut: `${J}T14:00`, duree: 60 })
     const e = base([A])
@@ -347,6 +362,12 @@ describe('supprimerCreneau', () => {
     const apres = supprimerCreneau(e, 'A')
     expect(apres.creneaux.A).toBeUndefined()
     expect(apres.suppressions).toBe(e.suppressions)
+  })
+
+  it("un exporté du bac garde le libellé de sa suppression déjà en attente (heure de l'événement)", () => {
+    const e = base([creneau('A', { debut: null, version: 3, versionExportee: 2 })])
+    e.suppressions = { A: { creneauId: 'A', libelle: '300 · T1 · mardi 5 nov. 21h' } }
+    expect(supprimerCreneau(e, 'A').suppressions).toEqual(e.suppressions)
   })
 
   it('ne renumérote pas les autres tours', () => {
