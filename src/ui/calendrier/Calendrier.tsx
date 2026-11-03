@@ -31,6 +31,8 @@ type Props = {
   /** Tap sur un créneau ou une indisponibilité (fiches : tâche 19). */
   onOuvrirCreneau?: (id: string) => void
   onOuvrirIndispo?: (id: string) => void
+  /** Bouton « + Indisponibilité » de la barre : ouvre la feuille de création (spec §D.5). */
+  onNouvelleIndispo?: () => void
 }
 
 /** iPhone en paysage : la vue Jour montre trois jours (spec §9.1). */
@@ -231,7 +233,7 @@ function useBalayage(piste: RefObject<HTMLDivElement | null>, aller: (sens: -1 |
   }
 }
 
-export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTapTrou, onOuvrirCreneau, onOuvrirIndispo }: Props) {
+export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTapTrou, onOuvrirCreneau, onOuvrirIndispo, onNouvelleIndispo }: Props) {
   const aujourdhui = useAujourdhui()
   const paysage = useSyncExternalStore(abonnerPaysage, () => window.matchMedia(requetePaysage).matches)
 
@@ -277,6 +279,13 @@ export function Calendrier({ vue, jour, disposition, onJour, onOuvrirJour, onTap
           <svg className="icone" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
             <path d="m9 5 7 7-7 7" />
           </svg>
+        </button>
+        <button type="button" className="btn-nouvelle-indispo" aria-label="+ Indisponibilité" onClick={onNouvelleIndispo}>
+          <span aria-hidden="true">+</span>
+          <span className="btn-nouvelle-indispo-texte" aria-hidden="true">
+            {' '}
+            Indisponibilité
+          </span>
         </button>
         <p className="calendrier-periode" aria-live="polite">
           {libellePeriode(vue, jours)}

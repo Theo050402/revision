@@ -227,8 +227,9 @@ test('vue Mois : charge par jour, teinte d\'encre, tap ouvre le jour', async ({ 
 test('les boutons de navigation font au moins 44 px et prennent le focus', async ({ page }) => {
   await ouvrir(page)
   const boutons = page.locator('.calendrier-barre button')
-  expect(await boutons.count()).toBe(3)
-  for (let i = 0; i < 3; i++) {
+  // Précédent, Aujourd'hui, suivant, « + Indisponibilité ».
+  expect(await boutons.count()).toBe(4)
+  for (let i = 0; i < 4; i++) {
     const boite = await boutons.nth(i).boundingBox()
     expect(boite!.width, `largeur ${i}`).toBeGreaterThanOrEqual(44)
     expect(boite!.height, `hauteur ${i}`).toBeGreaterThanOrEqual(44)

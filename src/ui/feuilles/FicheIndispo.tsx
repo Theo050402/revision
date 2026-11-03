@@ -8,6 +8,7 @@ import { validerIndispo } from '../../domain/validation'
 import { Feuille } from '../Feuille'
 import { useStore } from '../store'
 import { toast } from '../Toast'
+import { ChampQuand } from './ChampQuand'
 import { plageLisible } from './format'
 import './feuilles.css'
 
@@ -86,36 +87,15 @@ export function FicheIndispo({ id, onFermer, onModifierRecurrence }: Props) {
         </div>
 
         {ponctuelle ? (
-          <div className="fiche-champ">
-            <span className="etiquette" id="indispo-quand">
-              Quand
-            </span>
-            <div className="fiche-ligne" role="group" aria-labelledby="indispo-quand">
-              <input
-                type="date"
-                className="champ"
-                aria-label="Jour"
-                value={jour}
-                onChange={(e) => setJour(e.target.value)}
-              />
-              <input
-                type="time"
-                className="champ"
-                aria-label="Début"
-                value={debut}
-                onChange={(e) => setDebut(e.target.value)}
-              />
-              <span aria-hidden="true">–</span>
-              <input
-                type="time"
-                className="champ"
-                aria-label="Fin"
-                value={fin}
-                onChange={(e) => setFin(e.target.value)}
-              />
-            </div>
-            {erreurs.heures && <p className="message-erreur">{erreurs.heures}</p>}
-          </div>
+          <ChampQuand
+            jour={jour}
+            debut={debut}
+            fin={fin}
+            onJour={setJour}
+            onDebut={setDebut}
+            onFin={setFin}
+            erreur={erreurs.heures}
+          />
         ) : (
           <p className="fiche-quand">{plageLisible(indispo.debut, indispo.fin)}</p>
         )}

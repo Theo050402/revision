@@ -8,6 +8,7 @@ import { EmplacementRestauration } from './Emplacements'
 import { BoutonExport } from './export/BoutonExport'
 import { Feuille } from './Feuille'
 import { FicheCreneau } from './feuilles/FicheCreneau'
+import { FeuilleNouvelleIndispo } from './feuilles/FeuilleNouvelleIndispo'
 import { FicheIndispo } from './feuilles/FicheIndispo'
 import { sauvegarder } from './sauvegarde'
 import { fermerImport, useDemandeImport } from './importDemande'
@@ -106,11 +107,13 @@ function Coque() {
     setJour((j) => (j === precedent ? aujourdhui : j))
   }, [aujourdhui])
 
-  // Fiche ouverte par un tap sur un bloc (créneau ou indisponibilité), et récurrence à modifier dans Réglages.
-  const [fiche, setFiche] = useState<{ type: 'creneau' | 'indispo'; id: string } | null>(null)
+  // Fiche ouverte par un tap sur un bloc (créneau ou indisponibilité) ou feuille « + Indisponibilité » (sans bloc),
+  // et récurrence à modifier dans Réglages.
+  const [fiche, setFiche] = useState<{ type: 'creneau' | 'indispo'; id: string } | { type: 'nouvelle-indispo' } | null>(null)
   const [recurrenceCible, setRecurrenceCible] = useState<string | null>(null)
   const ouvrirCreneau = useCallback((id: string) => setFiche({ type: 'creneau', id }), [])
   const ouvrirIndispo = useCallback((id: string) => setFiche({ type: 'indispo', id }), [])
+  const nouvelleIndispo = useCallback(() => setFiche({ type: 'nouvelle-indispo' }), [])
   const fermerFiche = useCallback(() => setFiche(null), [])
   useEffect(() => {
     if (ecran !== 'reglages') setRecurrenceCible(null)
@@ -145,7 +148,11 @@ function Coque() {
       if (sel !== null) requestAnimationFrame(() => document.querySelector<HTMLElement>(sel)?.focus({ preventScroll: true }))
       return
     }
-    blocOuvert.current = `[data-${fiche.type === 'creneau' ? 'creneau' : 'indispo'}="${CSS.escape(fiche.id)}"]`
+    // Le focus retourne au bloc touché ; la feuille « + Indisponibilité » le rend, elle, au bouton qui l'a ouverte.
+    blocOuvert.current =
+      fiche.type === 'nouvelle-indispo'
+        ? null
+        : `[data-${fiche.type === 'creneau' ? 'creneau' : 'indispo'}="${CSS.escape(fiche.id)}"]`
     el?.setAttribute('inert', '')
     return () => {
       if (!feuilleVisibleRef.current) el?.removeAttribute('inert')
@@ -249,6 +256,7 @@ function Coque() {
                   onTapTrou={tapTrou}
                   onOuvrirCreneau={ouvrirCreneau}
                   onOuvrirIndispo={ouvrirIndispo}
+                  onNouvelleIndispo={nouvelleIndispo}
                 />
               )}
               {ecran === 'reglages' && (
@@ -300,6 +308,7 @@ function Coque() {
             }}
           />
         )}
+        {fiche?.type === 'nouvelle-indispo' && <FeuilleNouvelleIndispo onFermer={fermerFiche} />}
         {feuilleVisible && (
           <Feuille titre="Items" onFermer={fermerFeuille} efface={glisseDepuisFeuille}>
             <Bibliotheque />
