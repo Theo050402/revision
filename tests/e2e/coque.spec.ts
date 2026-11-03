@@ -483,6 +483,42 @@ test('balayage : une piste saisie en plein mouvement puis relâchée sur place s
   await expect.poll(() => piste.evaluate((el) => [el.style.transform, el.style.willChange])).toEqual(['', ''])
 })
 
+// Une paume ou un deuxième doigt qui se lève (ou qu'iOS annule) pendant un balayage ne doit pas faire oublier le doigt
+// du geste : sinon son vrai relâchement est ignoré et la piste reste translatée à mi-chemin.
+test('balayage : un deuxième doigt levé ou annulé ne fige pas la piste', async ({ page }) => {
+  await ouvrirSemee(page)
+  const zone = (await page.locator('.calendrier-defilement').boundingBox())!
+  const periode = page.locator('.calendrier-periode')
+  const piste = page.locator('.calendrier-piste')
+  const y = zone.y + 280
+  const x0 = zone.x + zone.width * 0.8
+  const avant = await periode.textContent()
+
+  // Trop court : la piste revient à sa place malgré le doigt 8 levé et le doigt 9 annulé en route.
+  await pointeur(page, 'pointerdown', { x: x0, y })
+  await pointeur(page, 'pointermove', { x: x0 - 20, y })
+  await pointeur(page, 'pointermove', { x: x0 - zone.width * 0.1, y })
+  await pointeur(page, 'pointerup', { x: x0 - 200, y: y + 100 }, 8)
+  await page.locator('.calendrier-defilement').dispatchEvent('pointercancel', { pointerId: 9, pointerType: 'touch', isPrimary: false })
+  await pointeur(page, 'pointermove', { x: x0 - zone.width * 0.12, y })
+  await images(page)
+  expect((await matrice(piste)).e).toBeCloseTo(-zone.width * 0.12, 0)
+  await page.waitForTimeout(200) // doigt immobile : aucune vitesse au relâchement
+  await pointeur(page, 'pointerup', { x: x0 - zone.width * 0.12, y })
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 5000 }).toBeCloseTo(0, 0)
+  await expect(periode).toHaveText(avant ?? '')
+
+  // Assez long : le vrai relâchement change de semaine, et la piste se pose.
+  await pointeur(page, 'pointerdown', { x: x0, y })
+  await pointeur(page, 'pointermove', { x: x0 - 30, y })
+  await pointeur(page, 'pointermove', { x: x0 - zone.width * 0.4, y })
+  await pointeur(page, 'pointerup', { x: x0 - 200, y: y + 100 }, 8)
+  await pointeur(page, 'pointerup', { x: x0 - zone.width * 0.4, y })
+  await expect(periode).not.toHaveText(avant ?? '')
+  await expect.poll(async () => (await matrice(piste)).e, { timeout: 5000 }).toBeCloseTo(0, 0)
+  await expect.poll(() => piste.evaluate((el) => [el.style.transform, el.style.willChange])).toEqual(['', ''])
+})
+
 // En-tête collant des Réglages (audit de design M15) : « Retour au calendrier » se touche sans remonter ; le calendrier
 // revient pourtant à sa place, barre de navigation comprise (la zone principale repart en haut à chaque écran).
 test('Réglages défilés puis « Retour au calendrier » : le calendrier n’est pas décalé', async ({ page }) => {

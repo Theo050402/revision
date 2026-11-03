@@ -174,9 +174,10 @@ function creerBalayage(piste: () => HTMLElement | null, aller: (sens: -1 | 1) =>
       if (!mouvementReduit()) ecrire(doigt.base + dx)
     },
     onPointerUp(e: PointerEvent) {
+      // Seul le doigt du geste le termine : une paume ou un deuxième doigt qui se lève ne l'efface pas.
       const d = doigt
-      doigt = null
       if (!d || d.id !== e.pointerId) return
+      doigt = null
       if (gesteDepuis(d.t) || d.mode === 'abandon') {
         if (x !== 0) revenir(0)
         else nettoyer()
@@ -212,7 +213,8 @@ function creerBalayage(piste: () => HTMLElement | null, aller: (sens: -1 | 1) =>
       if (change) changer(sens, v)
       else revenir(v)
     },
-    onPointerCancel() {
+    onPointerCancel(e: PointerEvent) {
+      if (!doigt || doigt.id !== e.pointerId) return
       doigt = null
       if (x !== 0) revenir(0)
       else nettoyer()
