@@ -43,4 +43,25 @@ describe('prefillIndispo', () => {
     expect(p.fin > p.debut).toBe(true)
     expect(p.fin <= '23:59').toBe(true)
   })
+
+  it('borné à 23:59, les deux bornes restent au pas (15 min)', () => {
+    expect(prefillIndispo(null, '2026-11-04T23:40', 15, journee)).toEqual({ jour: '2026-11-04', debut: '23:30', fin: '23:45' })
+    expect(prefillIndispo({ jour: '2026-11-07', t: 23 * 60 + 50 }, '2026-11-04T10:30', 15, journee)).toEqual({
+      jour: '2026-11-07',
+      debut: '23:30',
+      fin: '23:45',
+    })
+  })
+
+  it('borné à 23:59, les deux bornes restent au pas (60 min)', () => {
+    expect(prefillIndispo(null, '2026-11-04T23:40', 60, journee)).toEqual({ jour: '2026-11-04', debut: '22:00', fin: '23:00' })
+  })
+
+  it('fin de journée hors du pas : la fin recule au dernier pas', () => {
+    expect(prefillIndispo({ jour: '2026-11-07', t: 22 * 60 + 40 }, '2026-11-04T10:30', 15, { debut: '07:00', fin: '22:50' })).toEqual({
+      jour: '2026-11-07',
+      debut: '22:30',
+      fin: '22:45',
+    })
+  })
 })
