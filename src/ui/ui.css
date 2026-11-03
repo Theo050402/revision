@@ -677,8 +677,8 @@ button {
 /* Une feuille ouverte (rendue dans `body`, hors de `.racine`) passe devant : les messages vont en haut de l'écran,
    sans cacher ses actions (M10). Spécificité (0,4,0) et (0,5,0), placée après : elle l'emporte sur les règles iPhone
    (0,3,0) et barre de sélection (selection.css : jusqu'à (0,4,0)). */
-:root:has(.feuille-fond) .racine .toasts,
-:root:has(.feuille-fond) .racine[data-dispo] .toasts {
+:root:has(.feuille-fond:not([data-fantome])) .racine .toasts,
+:root:has(.feuille-fond:not([data-fantome])) .racine[data-dispo] .toasts {
   top: max(16px, env(safe-area-inset-top));
   bottom: auto;
 }
@@ -706,7 +706,7 @@ button {
 }
 
 /* En haut (feuille ouverte) : il entre par le haut, et repart par où il est venu (Toast.tsx). */
-:root:has(.feuille-fond) .toast {
+:root:has(.feuille-fond:not([data-fantome])) .toast {
   animation-name: descendre-toast;
 }
 

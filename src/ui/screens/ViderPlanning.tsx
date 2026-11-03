@@ -2,7 +2,9 @@
 import { useState } from 'react'
 import { viderPlanning } from '../../domain/actions-creneaux'
 import { FeuilleConfirmation } from '../feuilles/FeuilleConfirmation'
+import { texteSuppression } from '../selection/useSelection'
 import { useStore } from '../store'
+import { toast } from '../Toast'
 
 export function ViderPlanning() {
   const creneaux = useStore((s) => s.etat.creneaux)
@@ -14,7 +16,8 @@ export function ViderPlanning() {
   const dejaExportes = tous.some((c) => c.versionExportee !== null)
 
   const vider = () => {
-    appliquer(viderPlanning)
+    // Même message que la suppression d'un groupe (D.4) : ↶ Annuler, dans la barre, ramène tout.
+    if (appliquer(viderPlanning)) toast(texteSuppression(n))
     setConfirmer(false)
   }
 

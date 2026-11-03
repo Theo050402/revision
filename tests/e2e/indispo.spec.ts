@@ -122,4 +122,39 @@ test.describe('Indisponibilité par bouton', () => {
     await expect(blocs(page)).toHaveCount(0)
   })
 
+  test('minute hors du pas (roue d’iOS) : pas de bulle native, « Ajouter » ajoute', async ({ page }) => {
+    await ouvrir(page)
+    await bouton(page).click()
+    await feuillePosee(page)
+    const f = feuille(page)
+    await expect(f.getByRole('textbox', { name: 'Titre' })).toBeFocused()
+    await f.getByRole('textbox', { name: 'Titre' }).fill('Sport')
+    await f.getByLabel('Début').fill('11:10')
+    // Hors du pas de 15 min : Safari sur iPad ouvrirait sa bulle de validation native si le formulaire validait
+    // lui-même (WebKit de Playwright ne signale pas `stepMismatch` sur un champ d'heure : on vérifie l'attribut).
+    expect(await f.locator('form').evaluate((el: HTMLFormElement) => el.noValidate)).toBe(true)
+    await f.getByRole('button', { name: 'Ajouter' }).click()
+    await expect(feuille(page)).toHaveCount(0)
+    await expect(blocs(page)).toHaveAttribute('aria-label', 'Sport, indisponible de 11h10 à 12h')
+  })
+
+  test('le toast d’une feuille fermée par « Ajouter » est en bas dès la fermeture, sans sauter', async ({ page }) => {
+    await ouvrir(page)
+    await bouton(page).click()
+    await feuillePosee(page)
+    const f = feuille(page)
+    await expect(f.getByRole('textbox', { name: 'Titre' })).toBeFocused()
+    await f.getByRole('textbox', { name: 'Titre' }).fill('Sport')
+    await f.getByRole('button', { name: 'Ajouter' }).click()
+    // La copie de la feuille joue encore sa sortie : le toast ne doit pas s'afficher en haut pour autant.
+    const toast = page.locator('.toast').filter({ hasText: 'Indisponibilité ajoutée.' })
+    await expect(toast).toBeVisible()
+    const haut = await page.evaluate(() => ({
+      fantome: document.querySelector('.feuille-fond[data-fantome]') !== null,
+      milieu: window.innerHeight / 2,
+      y: document.querySelector('.toasts')!.getBoundingClientRect().top,
+    }))
+    expect(haut.fantome).toBe(true)
+    expect(haut.y).toBeGreaterThan(haut.milieu)
+  })
 })

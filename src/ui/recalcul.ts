@@ -25,7 +25,9 @@ export function appliquerEtRecalculer(changement: (e: Etat) => Etat | null, opti
   const avant = useStore.getState().etat
   const apres = changement(avant)
   if (apres === null) return false
-  const portee = typeof options.portee === 'function' ? options.portee(avant, apres) : (options.portee ?? {})
+  // `null` (fixe ou calculée) = pas de recalcul ; seule l'absence vaut « tous les créneaux ».
+  const portee =
+    typeof options.portee === 'function' ? options.portee(avant, apres) : options.portee === undefined ? {} : options.portee
   const recalcul = portee === null ? null : recalculerCreneaux(apres, aujourdhuiParis(), portee)
   const suivant = recalcul?.etat ?? apres
   const creneauxChanges = suivant !== apres

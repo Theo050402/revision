@@ -307,6 +307,8 @@ export function laisserPartir(fond: HTMLElement, reprise: Reprise): void {
   const copie = fond.cloneNode(true) as HTMLElement
   copie.setAttribute('aria-hidden', 'true')
   copie.setAttribute('inert', '')
+  // Ce n'est plus une feuille ouverte : les toasts reviennent en bas tout de suite (ui.css, Toast.tsx).
+  copie.setAttribute('data-fantome', '')
   copie.style.pointerEvents = 'none'
   for (const el of copie.querySelectorAll('[id]')) el.removeAttribute('id')
   const dialogue = copie.querySelector<HTMLElement>('.feuille')

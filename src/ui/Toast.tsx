@@ -44,7 +44,7 @@ function UnToast({ t }: { t: MessageToast }) {
     const el = ref.current
     if (!el) return effacer(t.id)
     // En haut quand une feuille est ouverte (ui.css) : il repart vers le haut.
-    const sens = document.querySelector('.feuille-fond') ? -1 : 1
+    const sens = document.querySelector('.feuille-fond:not([data-fantome])') ? -1 : 1
     const glisse = !mouvementReduit()
     el.style.animation = 'none'
     const f = fondu(

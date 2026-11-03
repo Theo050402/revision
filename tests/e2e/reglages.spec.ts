@@ -910,6 +910,8 @@ test('Réglages › Données : « Vider le planning » supprime tous les crénea
   await page.getByRole('dialog').getByRole('button', { name: 'Supprimer' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(vider).toBeDisabled()
+  // Ce qui est fait est dit (comme la suppression d'un groupe) : ↶ Annuler le défait.
+  await expect(page.locator('.toast').getByText('3 créneaux supprimés')).toBeVisible()
 
   // Collèges, indisponibilités et réglages sont conservés.
   await expect(page.getByRole('heading', { name: 'Collèges' })).toBeVisible()

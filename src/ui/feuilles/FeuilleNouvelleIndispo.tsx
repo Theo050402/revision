@@ -42,14 +42,18 @@ export function FeuilleNouvelleIndispo({ onFermer }: Props) {
   const ajouter = (ev: FormEvent) => {
     ev.preventDefault()
     if (invalide) return
-    useStore.getState().appliquer((e) => ajouterIndispo(e, titre.trim(), local(jour, hm(debut)), local(jour, hm(fin))))
-    toast('Indisponibilité ajoutée.')
+    const ajoutee = useStore
+      .getState()
+      .appliquer((e) => ajouterIndispo(e, titre.trim(), local(jour, hm(debut)), local(jour, hm(fin))))
+    if (ajoutee) toast('Indisponibilité ajoutée.')
     onFermer()
   }
 
   return (
     <Feuille titre="Nouvelle indisponibilité" onFermer={onFermer} className="feuille-etroite">
-      <form className="fiche" onSubmit={ajouter}>
+      {/* `noValidate` : la roue d'iOS permet une minute hors du pas (`step`) ; la validation est celle de la fiche,
+          jamais la bulle native de Safari. */}
+      <form className="fiche" noValidate onSubmit={ajouter}>
         <div className="fiche-champ">
           <label className="etiquette" htmlFor="nouvelle-indispo-titre">
             Titre
