@@ -8,6 +8,12 @@
 //     .copie-bloc   le créneau tel qu'il est dans la grille (même contenu, même mise en page que `BlocCreneau`) ;
 //   .copie-heure  étiquette d'heure, accrochée au-dessus de la copie, jamais inclinée.
 //
+// Un groupe (spec §D.3) ajoute, sous la copie, une copie par autre membre visible dans la grille (`.copie-groupe`,
+// découpée à la zone de la grille) : toutes suivent le doigt d'un seul `translate3d`, chacune à son écart d'origine,
+// soulevée autour de son propre centre. Elles n'ont pas de vol à elles : au lâcher, elles accompagnent la copie de
+// l'ancre et arrivent chacune sur son emplacement (ou son origine), puisque les écarts entre emplacements sont ceux
+// entre créneaux d'origine (même décalage pour tous, colonnes de même largeur).
+//
 // Une carte qui survole la grille prend la forme du créneau (taille de l'emplacement) par un ressort « m » :
 // les deux couches occupent le même rectangle, interpolé entre la carte et le bloc autour du doigt, en fondu
 // enchaîné. Au lâcher, des ressorts X et Y indépendants amènent ce rectangle sur l'emplacement (ou sur l'origine)
@@ -33,6 +39,13 @@ const ECART_ETIQUETTE = 8
 
 export type Taille = { largeur: number; hauteur: number }
 
+/** Autre membre d'un groupe : son créneau tel qu'il est dans la grille ; `dx`, `dy` : son coin haut gauche, relatif au
+ * point de saisie (px). */
+export type MembreCopie = { creneau: Creneau; item: Item | undefined; couleur: number; dx: number; dy: number; taille: Taille }
+
+/** Zone (écran) où les copies des membres sont visibles : la partie visible de la grille, sous l'en-tête des jours. */
+export type Cadre = { haut: number; droite: number; bas: number; gauche: number }
+
 /** Ce que montre la copie, fixé à la saisie. `dx`, `dy` : point de saisie dans l'objet saisi (px). */
 export type ContenuCopie = {
   /** Le créneau représenté (déplacé, ou première partie du prochain tour) ; `null` : item disparu. */
@@ -45,6 +58,9 @@ export type ContenuCopie = {
   nombre: number
   dx: number
   dy: number
+  /** Groupe : les autres membres affichés à la saisie (vide sinon), et la zone où ils se voient. */
+  membres?: readonly MembreCopie[]
+  cadre?: Cadre | null
 }
 
 const useCopie = create<{ contenu: ContenuCopie | null; bloc: Taille | null }>()(() => ({ contenu: null, bloc: null }))
@@ -77,6 +93,9 @@ const c = {
   bloc: null as HTMLDivElement | null,
   etiquette: null as HTMLSpanElement | null,
   nombre: null as HTMLSpanElement | null,
+  /** Groupe : porteur des copies des membres (suit le doigt comme `boite`) et chaque copie avec son écart. */
+  groupe: null as HTMLDivElement | null,
+  membres: new Map<string, { el: HTMLDivElement; dx: number; dy: number }>(),
   /** Point d'ancrage (le doigt pendant le geste), écran. */
   fx: 0,
   fy: 0,
@@ -115,13 +134,26 @@ function rectangle(m: number) {
 }
 
 function ecrireBoite(): void {
-  if (!c.boite) return
-  c.boite.style.transform = `translate3d(${c.fx}px, ${c.fy}px, 0)`
-  c.boite.style.opacity = c.opacite === 1 ? '' : String(c.opacite)
+  const transform = `translate3d(${c.fx}px, ${c.fy}px, 0)`
+  const opacite = c.opacite === 1 ? '' : String(c.opacite)
+  if (c.boite) {
+    c.boite.style.transform = transform
+    c.boite.style.opacity = opacite
+  }
+  if (c.groupe && c.membres.size > 0) {
+    c.groupe.style.transform = transform
+    c.groupe.style.opacity = opacite
+  }
+}
+
+/** Une copie de membre : à son écart du doigt, soulevée autour de son centre (même échelle, même angle). */
+function ecrireMembre(m: { el: HTMLDivElement; dx: number; dy: number }): void {
+  m.el.style.transform = `translate(${m.dx}px, ${m.dy}px) scale(${c.echelle}) rotate(${c.angle}deg)`
 }
 
 function ecrirePorteur(): void {
   if (c.porteur) c.porteur.style.transform = `scale(${c.echelle}) rotate(${c.angle}deg)`
+  for (const m of c.membres.values()) ecrireMembre(m)
 }
 
 /** Les deux couches remplissent le même rectangle ; fondu enchaîné (la couche d'arrivée est opaque dès mi-course). */
@@ -387,48 +419,103 @@ export function CopieFlottante() {
     if (c.carte) c.carte.replaceChildren(...(clone ? [clone] : []))
   }, [clone])
 
+  const refGroupe = useCallback((el: HTMLDivElement | null) => {
+    c.groupe = el
+    if (el) ecrireBoite()
+  }, [])
+
   const style = contenu ? ({ '--teinte': teinte(contenu.couleur) } as CSSProperties) : undefined
   const mise = contenu?.creneau && bloc ? miseEnPageBloc(contenu.creneau, bloc.hauteur) : null
+  const membres = contenu?.membres ?? []
+  const cadre = contenu?.cadre
   return createPortal(
-    <div
-      ref={boite}
-      className="copie"
-      data-copie=""
-      data-visible={contenu !== null}
-      data-refus={(contenu !== null && refus) || undefined}
-      style={style}
-      aria-hidden="true"
-    >
-      <div ref={porteur} className="copie-porteur">
-        {contenu?.carte && (
-          <div
-            ref={refCarte}
-            className="copie-carte"
-            style={{ width: contenu.carte.taille.largeur, height: contenu.carte.taille.hauteur }}
-          />
-        )}
-        {contenu?.creneau && bloc && mise && (
-          <div
-            ref={refBloc}
-            className="bloc bloc-creneau copie-bloc"
-            data-marques={mise.marques}
-            style={{ width: bloc.largeur, height: bloc.hauteur, '--lignes': mise.lignes } as CSSProperties}
-          >
-            <ContenuBloc creneau={contenu.creneau} item={contenu.item} hauteur={bloc.hauteur} />
-          </div>
-        )}
-        {contenu && contenu.nombre > 1 && (
-          <span ref={refNombre} className="copie-nombre">
-            {contenu.nombre}
+    <>
+      {/* Copies des autres membres d'un groupe : sous la copie de l'ancre, découpées à la zone de la grille. */}
+      <div
+        className="copie-groupe"
+        data-copie-groupe=""
+        data-visible={membres.length > 0}
+        data-refus={(membres.length > 0 && refus) || undefined}
+        style={cadre ? { clipPath: `inset(${cadre.haut}px ${cadre.droite}px ${cadre.bas}px ${cadre.gauche}px)` } : undefined}
+        aria-hidden="true"
+      >
+        <div ref={refGroupe} className="copie-groupe-porteur">
+          {membres.map((m) => (
+            <CopieMembre key={m.creneau.id} membre={m} />
+          ))}
+        </div>
+      </div>
+      <div
+        ref={boite}
+        className="copie"
+        data-copie=""
+        data-visible={contenu !== null}
+        data-refus={(contenu !== null && refus) || undefined}
+        style={style}
+        aria-hidden="true"
+      >
+        <div ref={porteur} className="copie-porteur">
+          {contenu?.carte && (
+            <div
+              ref={refCarte}
+              className="copie-carte"
+              style={{ width: contenu.carte.taille.largeur, height: contenu.carte.taille.hauteur }}
+            />
+          )}
+          {contenu?.creneau && bloc && mise && (
+            <div
+              ref={refBloc}
+              className="bloc bloc-creneau copie-bloc"
+              data-marques={mise.marques}
+              style={{ width: bloc.largeur, height: bloc.hauteur, '--lignes': mise.lignes } as CSSProperties}
+            >
+              <ContenuBloc creneau={contenu.creneau} item={contenu.item} hauteur={bloc.hauteur} />
+            </div>
+          )}
+          {contenu && contenu.nombre > 1 && (
+            <span ref={refNombre} className="copie-nombre">
+              {contenu.nombre}
+            </span>
+          )}
+        </div>
+        {contenu && etiquette && (
+          <span ref={refEtiquette} className="copie-heure" data-etiquette-heure="">
+            {etiquette}
           </span>
         )}
       </div>
-      {contenu && etiquette && (
-        <span ref={refEtiquette} className="copie-heure" data-etiquette-heure="">
-          {etiquette}
-        </span>
-      )}
-    </div>,
+    </>,
     document.body,
+  )
+}
+
+/** Copie d'un autre membre du groupe : le créneau tel qu'il est dans la grille (même contenu, même taille). */
+function CopieMembre({ membre }: { membre: MembreCopie }) {
+  const { creneau, item, couleur, dx, dy, taille } = membre
+  const id = creneau.id
+  const ref = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (!el) {
+        c.membres.delete(id)
+        return
+      }
+      const m = { el, dx, dy }
+      c.membres.set(id, m)
+      ecrireMembre(m)
+      ecrireBoite()
+    },
+    [id, dx, dy],
+  )
+  const { marques, lignes } = miseEnPageBloc(creneau, taille.hauteur)
+  return (
+    <div
+      ref={ref}
+      className="bloc bloc-creneau copie-membre"
+      data-copie-membre={id}
+      data-marques={marques}
+      style={{ width: taille.largeur, height: taille.hauteur, '--teinte': teinte(couleur), '--lignes': lignes } as CSSProperties}
+    >
+      <ContenuBloc creneau={creneau} item={item} hauteur={taille.hauteur} />
+    </div>
   )
 }

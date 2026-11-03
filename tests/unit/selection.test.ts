@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { creneauxDansZone, deplacerGroupe, supprimerGroupe, type Zone } from '../../src/domain/selection'
+import { creneauxDansZone, decalageGroupe, deplacerGroupe, supprimerGroupe, type Zone } from '../../src/domain/selection'
 import { etatVide } from '../../src/domain/defaults'
 import type { Creneau, Etat, Indispo } from '../../src/domain/types'
 
@@ -186,6 +186,50 @@ describe('deplacerGroupe', () => {
     if (!r.ok) return
     expect(r.etat.creneaux.a.debut).toBe(`${LUN}T09:30`)
     expect(r.etat.creneaux.b.debut).toBe(`${LUN}T10:30`)
+  })
+})
+
+describe('deplacerGroupe : décalages invalides', () => {
+  // Refus (et non « rien ») : un décalage invalide ne vient que d'un appelant fautif, jamais d'un geste ; refuser
+  // fait revenir le groupe à son origine sans rien écrire, comme tout dépôt impossible.
+  it.each([
+    [Number.NaN, 0],
+    [0, Number.NaN],
+    [Number.POSITIVE_INFINITY, 0],
+    [0, Number.NEGATIVE_INFINITY],
+    [0.5, 0],
+    [0, 15.5],
+  ])('décalage (%s jours, %s min) : refus, rien d’écrit', (jours, minutes) => {
+    const e = base([creneau('a', `${LUN}T09:00`)])
+    expect(deplacerGroupe(e, ['a'], jours, minutes)).toEqual({ ok: false })
+    expect(e.creneaux.a.debut).toBe(`${LUN}T09:00`)
+  })
+
+  it('un décalage qui ramène pile au même début n’existe pas : tout membre déplacé passe en version + 1', () => {
+    // +1 jour −1440 min sortirait des bornes de la journée avant de pouvoir retomber au même début.
+    const e = base([creneau('a', `${LUN}T09:00`)])
+    expect(deplacerGroupe(e, ['a'], 1, -1440)).toEqual({ ok: false })
+    const r = deplacerGroupe(e, ['a'], 0, 15)
+    expect(r.ok && r.etat.creneaux.a.version).toBe(2)
+  })
+})
+
+describe('decalageGroupe (décalage magnétisé de l’ancre)', () => {
+  it('jours et minutes entre le début de l’ancre et la cible (déjà magnétisée au pas)', () => {
+    const ancre = creneau('a', `${LUN}T09:00`)
+    expect(decalageGroupe(ancre, { jour: MER, t: h(14, 30) })).toEqual({ jours: 2, minutes: 330 })
+    expect(decalageGroupe(ancre, { jour: LUN, t: h(9) })).toEqual({ jours: 0, minutes: 0 })
+    expect(decalageGroupe(creneau('b', `${MER}T16:15`), { jour: LUN, t: h(8) })).toEqual({ jours: -2, minutes: -495 })
+  })
+
+  it('traverse un mois et un changement d’heure sans glisser d’une heure', () => {
+    // 25 oct. 2026 : passage à l'heure d'hiver ; le 1er nov. change de mois.
+    expect(decalageGroupe(creneau('a', '2026-10-24T10:00'), { jour: '2026-11-02', t: h(10) })).toEqual({ jours: 9, minutes: 0 })
+    expect(decalageGroupe(creneau('a', '2027-03-27T10:00'), { jour: '2027-03-29', t: h(11) })).toEqual({ jours: 2, minutes: 60 })
+  })
+
+  it('ancre au bac : aucun décalage possible (null)', () => {
+    expect(decalageGroupe(creneau('a', null), { jour: LUN, t: h(9) })).toBeNull()
   })
 })
 

@@ -56,6 +56,11 @@ export function ajouterJours(jour: string, n: number): string {
   return jourDe(naifVersLocal(utcDe(jour, n * 1440)))
 }
 
+/** Nombre de jours de `de` à `a` (`YYYY-MM-DD`), négatif si `a` est avant. */
+export function ecartJours(de: string, a: string): number {
+  return Math.round((utcDe(a, 0) - utcDe(de, 0)) / 86_400_000)
+}
+
 /** 1 = lundi … 7 = dimanche. */
 export function jourSemaine(jour: string): number {
   const dow = new Date(utcDe(jour, 0)).getUTCDay() // 0 = dimanche

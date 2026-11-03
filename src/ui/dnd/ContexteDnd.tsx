@@ -8,7 +8,9 @@
 // - l'aperçu (`apercu`) n'est recalculé, et l'état `useGlisse` écrit, que si la minute magnétisée, le jour,
 //   le créneau visé ou la moitié changent ; l'emplacement d'atterrissage (Atterrissage.tsx) en découle ;
 // - le lâcher rejoue les mêmes actions (`deposer`) par `appliquer` : une seule étape d'annulation. La copie rejoint
-//   alors l'emplacement par ressort, avec la vitesse du doigt (cinq derniers `pointermove`), ou revient à son origine.
+//   alors l'emplacement par ressort, avec la vitesse du doigt (cinq derniers `pointermove`), ou revient à son origine ;
+// - un groupe (créneau sélectionné saisi, spec §D.3) suit le même chemin : l'ancre donne la cible, `deposer` décale
+//   tout le groupe (ou refuse), une copie par membre visible accompagne celle de l'ancre (voir CopieFlottante.tsx).
 import {
   DndContext,
   PointerSensor,
@@ -21,7 +23,7 @@ import {
 import { useCallback, useEffect, useId, useRef, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { supprimerCreneau } from '../../domain/actions-creneaux'
-import type { Etat } from '../../domain/types'
+import type { Creneau, Etat } from '../../domain/types'
 import { haptique } from '../mouvement/haptique'
 import { useStore } from '../store'
 import { toast } from '../Toast'
@@ -39,12 +41,16 @@ import {
   suivreCopie,
   survolCorbeille,
   survolGrille,
+  type Cadre,
+  type MembreCopie,
   type Taille,
 } from './CopieFlottante'
 import {
   bloquerDefilement,
   filtrerPointeurs,
   GLISSE_VIDE,
+  idPrincipal,
+  idsSource,
   marquerGeste,
   pointeurOccupe,
   saisirPointeur,
@@ -209,7 +215,7 @@ export function ContexteDnd({ children, onDepose }: Props) {
    * par-dessus. Objet disparu : la copie s'efface sur place.
    */
   const revenir = useCallback((g: NonNullable<typeof geste.current>, v: { vx: number; vy: number }) => {
-    const id = g.source.type === 'creneau' ? g.source.id : null
+    const id = idPrincipal(g.source)
     const el =
       g.origine?.isConnected === true
         ? g.origine
@@ -221,7 +227,8 @@ export function ContexteDnd({ children, onDepose }: Props) {
       poserCopie(null, v)
       return
     }
-    const masque = id !== null && el.matches('.bloc-creneau[data-creneau]') ? [id] : []
+    // Un groupe revient tout entier : ses membres restent estompés jusqu'à l'arrivée des copies.
+    const masque = id !== null && el.matches('.bloc-creneau[data-creneau]') ? idsSource(g.source) : []
     if (masque.length > 0) useVol.setState({ caches: masque })
     poserCopie({ x: r.left, y: r.top, forme: g.forme }, v, () => useVol.setState({ caches: [] }))
   }, [])
@@ -248,6 +255,7 @@ export function ContexteDnd({ children, onDepose }: Props) {
       window.addEventListener('scroll', defiler, { capture: true, passive: true })
       const etat = useStore.getState().etat
       const fantome = creneauFantome(etat, d.source)
+      const membres = d.source.type === 'groupe' ? membresPlaces(etat, d.source.ids) : []
       const o = d.origine ?? null
       const forme = o?.el.matches('.bloc-creneau[data-creneau]') ? 'bloc' : 'carte'
       geste.current = {
@@ -289,6 +297,8 @@ export function ContexteDnd({ children, onDepose }: Props) {
           nombre: d.source.type === 'item' ? d.source.itemIds.length : 1,
           dx: o ? px - o.r.left : 0,
           dy: o ? py - o.r.top : 0,
+          membres: d.source.type === 'groupe' ? copiesMembres(etat, membres, d.source.ancre, px, py) : [],
+          cadre: d.source.type === 'groupe' ? cadreGrille() : null,
         },
         px,
         py,
@@ -300,6 +310,7 @@ export function ContexteDnd({ children, onDepose }: Props) {
         prise: d.prise,
         depuisFeuille: d.depuisFeuille,
         fantome,
+        membres,
       })
       haptique('leger')
       image()
@@ -347,8 +358,9 @@ export function ContexteDnd({ children, onDepose }: Props) {
               return null
             }
             versBac = r.versBac
-            // Les créneaux posés restent masqués sous la copie jusqu'à son arrivée.
-            poses = source.type === 'creneau' ? [source.id] : Object.keys(r.etat.creneaux).filter((id) => !(id in e.creneaux))
+            // Les créneaux posés (déplacés, ou tout le groupe) restent masqués sous les copies jusqu'à leur arrivée.
+            poses =
+              source.type === 'item' ? Object.keys(r.etat.creneaux).filter((id) => !(id in e.creneaux)) : idsSource(source)
             return r.etat
           })
           if (!reussi) versBac = 0
@@ -415,6 +427,50 @@ export function ContexteDnd({ children, onDepose }: Props) {
 }
 
 const REFUS_MOIS: Apercu = { ok: false, positions: {}, nouveaux: [], versBac: 0 }
+
+/** Créneaux placés d'un groupe, dans l'ordre de la sélection (inconnus et créneaux du bac écartés). */
+function membresPlaces(e: Etat, ids: readonly string[]): Creneau[] {
+  return ids.map((id) => e.creneaux[id]).filter((c): c is Creneau => c !== undefined && c.debut !== null)
+}
+
+/**
+ * Copies des autres membres d'un groupe, relevées sur leurs blocs dans la grille affichée (même place, même taille,
+ * même contenu) ; un membre hors des jours affichés n'en a pas. Écart relatif au point de saisie (`px`, `py`).
+ */
+function copiesMembres(e: Etat, membres: readonly Creneau[], ancre: string, px: number, py: number): MembreCopie[] {
+  const copies: MembreCopie[] = []
+  for (const cr of membres) {
+    if (cr.id === ancre) continue
+    const el = document.querySelector<HTMLElement>(`.grille .bloc-creneau[data-creneau="${CSS.escape(cr.id)}"]`)
+    const r = el?.getBoundingClientRect()
+    if (!r || r.width === 0) continue
+    const item = e.items[cr.itemId]
+    copies.push({
+      creneau: cr,
+      item,
+      couleur: item ? (e.colleges[item.collegeId]?.couleur ?? 0) : 0,
+      dx: r.left - px,
+      dy: r.top - py,
+      taille: { largeur: r.width, hauteur: r.height },
+    })
+  }
+  return copies
+}
+
+/** Partie visible de la grille (sous l'en-tête des jours), en marges depuis les bords de la fenêtre : `clip-path`. */
+function cadreGrille(): Cadre | null {
+  const defil = document.querySelector<HTMLElement>('.calendrier-defilement')
+  if (!defil) return null
+  const r = defil.getBoundingClientRect()
+  const tete = defil.querySelector<HTMLElement>('.grille-tete')
+  const haut = Math.max(r.top, tete?.getBoundingClientRect().bottom ?? r.top)
+  return {
+    haut,
+    droite: Math.max(0, window.innerWidth - r.right),
+    bas: Math.max(0, window.innerHeight - r.bottom),
+    gauche: r.left,
+  }
+}
 
 /** Taille qu'aurait un créneau de `duree` minutes dans la grille affichée (emplacement), `null` sans grille. */
 function tailleDansLaGrille(duree: number | null): Taille | null {

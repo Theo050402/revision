@@ -9,12 +9,19 @@ import {
   type Res,
 } from '../../domain/actions-creneaux'
 import { decouper, dureeTour } from '../../domain/duration'
+import { decalageGroupe, deplacerGroupe } from '../../domain/selection'
 import { hm } from '../../domain/temps'
 import { prochainTour } from '../../domain/tours'
 import type { Creneau, Etat } from '../../domain/types'
 
-/** Ce qui est glissé : un ou plusieurs items de la bibliothèque, ou un créneau (grille ou bac). */
-export type Source = { type: 'item'; itemIds: string[] } | { type: 'creneau'; id: string }
+/**
+ * Ce qui est glissé : un ou plusieurs items de la bibliothèque, un créneau (grille ou bac), ou un groupe de créneaux
+ * sélectionnés (spec §D.3) saisi par l'un d'eux, l'ancre, dont la cible donne le décalage de tout le groupe.
+ */
+export type Source =
+  | { type: 'item'; itemIds: string[] }
+  | { type: 'creneau'; id: string }
+  | { type: 'groupe'; ids: string[]; ancre: string }
 
 export type Apercu = {
   ok: boolean
@@ -28,9 +35,17 @@ export type Apercu = {
 
 const REFUS: Apercu = { ok: false, positions: {}, nouveaux: [], versBac: 0 }
 
-/** Le lâcher : un item seul passe par la cascade, plusieurs par le dépôt multiple (qui ne pousse jamais). */
+/**
+ * Le lâcher : un item seul passe par la cascade, plusieurs par le dépôt multiple (qui ne pousse jamais) ; un groupe
+ * se décale tout entier comme son ancre, sans pousser, ou rien (`deplacerGroupe`).
+ */
 export function deposer(e: Etat, source: Source, c: Cible, id?: () => string): Res {
   if (source.type === 'creneau') return deplacerCreneau(e, source.id, c)
+  if (source.type === 'groupe') {
+    const ancre = e.creneaux[source.ancre]
+    const d = ancre ? decalageGroupe(ancre, c) : null
+    return d ? deplacerGroupe(e, source.ids, d.jours, d.minutes) : { ok: false }
+  }
   if (source.itemIds.length === 1) return deposerItem(e, source.itemIds[0], c, id)
   return deposerItemsSerie(e, source.itemIds, c.jour, c.t, id)
 }
@@ -62,6 +77,7 @@ export function apercu(e: Etat, source: Source, c: Cible): Apercu {
  * part du début de la journée et cherche elle-même ses intervalles libres.
  */
 export function cibleMois(e: Etat, source: Source, jour: string): Cible | null {
+  if (source.type === 'groupe') return null // un groupe ne se dépose que dans la grille (la vue Mois quitte la sélection)
   const debut = hm(e.reglages.journee.debut)
   const fin = hm(e.reglages.journee.fin)
   const a = (t: number): Cible => ({ jour, t, cibleId: null, moitie: 'haute' })
@@ -79,10 +95,11 @@ export function cibleMois(e: Etat, source: Source, jour: string): Cible | null {
 
 /**
  * Le créneau que représente le fantôme quand l'aperçu n'en donne pas (refus, hors de la grille) : le créneau
- * glissé, ou la première partie du prochain tour du premier item (par numéro). `null` si l'item a disparu.
+ * glissé (l'ancre d'un groupe), ou la première partie du prochain tour du premier item (par numéro). `null` si l'item a disparu.
  */
 export function creneauFantome(e: Etat, source: Source): Creneau | null {
   if (source.type === 'creneau') return e.creneaux[source.id] ?? null
+  if (source.type === 'groupe') return e.creneaux[source.ancre] ?? null
   const items = source.itemIds.map((id) => e.items[id]).filter((i) => i && e.colleges[i.collegeId])
   if (items.length === 0) return null
   const item = items.reduce((a, b) => (b.numero < a.numero ? b : a))

@@ -87,7 +87,7 @@ export function lire(x: number, y: number, source: Source, prise: number, e: Eta
     if (!col) return RIEN
     const pxHeure = Number(grille.dataset.pxHeure)
     const plage = { debut: Number(grille.dataset.plageDebut), fin: Number(grille.dataset.plageFin) }
-    const ignorer = source.type === 'creneau' ? source.id : null
+    const ignorer = source.type === 'creneau' ? source.id : source.type === 'groupe' ? source.ancre : null
     const cible = cibleColonne(col, y - rc.top, prise, plage, pxHeure, e.reglages.pas, ignorer)
     return { survol: { type: 'colonne', cible }, el: col }
   }

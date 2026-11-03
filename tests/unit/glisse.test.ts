@@ -33,7 +33,7 @@ const cible = (jour: string, t: number) => ({ type: 'colonne' as const, cible: {
 
 describe('apercuColonne / cleColonne', () => {
   it('sans geste : rien', () => {
-    expect(apercuColonne(GLISSE_VIDE, J)).toEqual({ idSource: null, debuts: {}, fantomes: [], refus: false, visee: false })
+    expect(apercuColonne(GLISSE_VIDE, J)).toEqual({ sources: [], debuts: {}, fantomes: [], refus: false, visee: false })
   })
 
   it('déplacement vers un autre jour : la source est estompée partout, le fantôme et les poussés seulement ce jour-là', () => {
@@ -44,7 +44,7 @@ describe('apercuColonne / cleColonne', () => {
       survol: cible(K, 900),
       apercu: { ok: true, positions: { a: `${K}T15:00`, b: `${K}T16:00` }, nouveaux: [], versBac: 0 },
     }
-    expect(apercuColonne(s, J)).toEqual({ idSource: 'a', debuts: {}, fantomes: [], refus: false, visee: false })
+    expect(apercuColonne(s, J)).toEqual({ sources: ['a'], debuts: {}, fantomes: [], refus: false, visee: false })
     const k = apercuColonne(s, K)
     expect(k.debuts).toEqual({ b: 960 })
     expect(k.visee).toBe(true)
@@ -79,6 +79,78 @@ describe('apercuColonne / cleColonne', () => {
     }
     expect(cleColonne(base, J)).toBe(cleColonne(ailleurs, J))
     expect(cleColonne(base, K)).not.toBe(cleColonne(ailleurs, K))
+  })
+})
+
+describe('groupe (spec §D.3) : un emplacement par membre, l’ancre principale', () => {
+  const L = '2026-11-05'
+  // Ancre a (mar. 14h, 60 min) ; b (mar. 16h, 30 min) ; c (mer. 9h, 45 min).
+  const a = cr('a', `${J}T14:00`)
+  const b = cr('b', `${J}T16:00`, 30)
+  const c = cr('c', `${K}T09:00`, 45)
+  const groupe: Glisse = {
+    ...GLISSE_VIDE,
+    source: { type: 'groupe', ids: ['a', 'b', 'c'], ancre: 'a' },
+    fantome: a,
+    membres: [a, b, c],
+  }
+
+  it('accepté (+1 jour, +30 min) : tous estompés, chaque emplacement dans le jour de sa nouvelle place', () => {
+    const s: Glisse = {
+      ...groupe,
+      survol: cible(K, 870),
+      apercu: { ok: true, positions: { a: `${K}T14:30`, b: `${K}T16:30`, c: `${L}T09:30` }, nouveaux: [], versBac: 0 },
+    }
+    const j = apercuColonne(s, J)
+    expect(j.sources).toEqual(['a', 'b', 'c'])
+    expect([j.fantomes, j.debuts, j.visee]).toEqual([[], {}, false])
+    const k = apercuColonne(s, K)
+    // Les membres ne « s'écartent » pas : seuls leurs emplacements bougent.
+    expect(k.debuts).toEqual({})
+    expect(k.visee).toBe(true)
+    expect(k.fantomes.map((f) => [f.creneau.id, f.debut, f.refus, f.principal])).toEqual([
+      ['a', 870, false, true],
+      ['b', 990, false, false],
+    ])
+    const l = apercuColonne(s, L)
+    expect(l.visee).toBe(false)
+    expect(l.fantomes.map((f) => [f.creneau.id, f.debut, f.principal])).toEqual([['c', 570, false]])
+    expect(emplacementPrincipal(s)).toMatchObject({ jour: K, debut: 870, refus: false })
+  })
+
+  it('refus : chaque membre à sa place visée, en rouge ; la colonne visée teintée', () => {
+    const s: Glisse = { ...groupe, survol: cible(K, 600), apercu: { ok: false, positions: {}, nouveaux: [], versBac: 0 } }
+    const k = apercuColonne(s, K)
+    expect(k.refus).toBe(true)
+    expect(k.fantomes.map((f) => [f.creneau.id, f.debut, f.refus, f.principal])).toEqual([
+      ['a', 600, true, true],
+      ['b', 720, true, false],
+    ])
+    expect(apercuColonne(s, L).fantomes.map((f) => [f.creneau.id, f.debut, f.refus])).toEqual([['c', 300, true]])
+    expect(apercuColonne(s, L).refus).toBe(false)
+    expect(emplacementPrincipal(s)).toMatchObject({ jour: K, debut: 600, refus: true })
+  })
+
+  it('un membre qui sortirait de sa journée n’a pas d’emplacement (minuit dépassé)', () => {
+    const s: Glisse = { ...groupe, survol: cible(J, 23 * 60), apercu: { ok: false, positions: {}, nouveaux: [], versBac: 0 } }
+    // b : 25h, c : mer. 18h.
+    expect(apercuColonne(s, J).fantomes.map((f) => f.creneau.id)).toEqual(['a'])
+    expect(apercuColonne(s, K).fantomes.map((f) => [f.creneau.id, f.debut])).toEqual([['c', 18 * 60]])
+  })
+
+  it('lâché sur place : emplacements aux places d’origine', () => {
+    const s: Glisse = { ...groupe, survol: cible(J, 840), apercu: { ok: true, positions: {}, nouveaux: [], versBac: 0 } }
+    expect(apercuColonne(s, J).fantomes.map((f) => [f.creneau.id, f.debut])).toEqual([
+      ['a', 840],
+      ['b', 960],
+    ])
+  })
+
+  it('la clé d’une colonne change quand un membre y arrive, pas quand rien ne la touche', () => {
+    const s1: Glisse = { ...groupe, survol: cible(J, 840), apercu: { ok: true, positions: {}, nouveaux: [], versBac: 0 } }
+    const s2: Glisse = { ...groupe, survol: cible(J, 855), apercu: { ok: true, positions: {}, nouveaux: [], versBac: 0 } }
+    expect(cleColonne(s1, K)).not.toBe(cleColonne(s2, K)) // c y bouge
+    expect(cleColonne(s1, '2026-11-08')).toBe(cleColonne(s2, '2026-11-08'))
   })
 })
 

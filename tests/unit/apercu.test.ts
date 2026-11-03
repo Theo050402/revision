@@ -159,6 +159,58 @@ describe('deposer (le lâcher, mêmes actions que l’aperçu)', () => {
   })
 })
 
+describe('groupe (spec §D.3) : l’ancre donne le décalage, tout le groupe le suit', () => {
+  const K = '2026-11-04'
+  const groupe = (ids: string[], ancre: string): Source => ({ type: 'groupe', ids, ancre })
+
+  it('aperçu et lâcher : chaque membre décalé comme l’ancre, sans nouveau créneau ni poussée', () => {
+    const e = base([
+      creneau('a', { debut: `${J}T14:00`, duree: 60 }),
+      creneau('b', { debut: `${J}T16:00`, duree: 30 }),
+      creneau('autre', { debut: `${K}T18:00`, duree: 60 }),
+    ])
+    // L'ancre a (mar. 14h) visée mer. 15h : +1 jour, +60 min.
+    const c: Cible = { jour: K, t: 15 * 60, cibleId: null, moitie: 'haute' }
+    const vu = apercu(e, groupe(['a', 'b'], 'a'), c)
+    expect(vu).toEqual({ ok: true, positions: { a: `${K}T15:00`, b: `${K}T17:00` }, nouveaux: [], versBac: 0 })
+    const r = deposer(e, groupe(['a', 'b'], 'a'), c)
+    if (!r.ok) throw new Error('refus inattendu')
+    expect(r.etat.creneaux.a.debut).toBe(vu.positions.a)
+    expect(r.etat.creneaux.b.debut).toBe(vu.positions.b)
+    expect(r.etat.creneaux.autre).toBe(e.creneaux.autre)
+  })
+
+  it('un membre tomberait sur le stage : refus du groupe entier, sans cascade', () => {
+    const e = base([creneau('a', { debut: `${J}T16:00` }), creneau('b', { debut: `${J}T19:00` })])
+    // b remonte de 4 h : 15h, libre ; a remonte à 12h, dans le stage (8h–13h).
+    const c = cible(15, 0)
+    expect(apercu(e, groupe(['a', 'b'], 'b'), c).ok).toBe(false)
+    expect(deposer(e, groupe(['a', 'b'], 'b'), c)).toEqual({ ok: false })
+  })
+
+  it('un créneau non sélectionné sur le chemin : refus (pas de poussée pour un groupe)', () => {
+    const e = base([creneau('a', { debut: `${J}T14:00` }), creneau('x', { debut: `${J}T15:30` })])
+    expect(apercu(e, groupe(['a'], 'a'), cible(15, 0)).ok).toBe(false)
+  })
+
+  it('lâché sur place : aucune position', () => {
+    const e = base([creneau('a'), creneau('b', { debut: `${J}T16:00` })])
+    expect(apercu(e, groupe(['a', 'b'], 'a'), cible(14, 0))).toEqual({ ok: true, positions: {}, nouveaux: [], versBac: 0 })
+  })
+
+  it('ancre disparue ou au bac : refus', () => {
+    const e = base([creneau('a'), creneau('bac', { debut: null })])
+    expect(deposer(e, groupe(['a'], 'inconnu'), cible(15)).ok).toBe(false)
+    expect(deposer(e, groupe(['a', 'bac'], 'bac'), cible(15)).ok).toBe(false)
+  })
+
+  it('vue Mois : pas de dépôt de groupe (null) ; le fantôme est l’ancre', () => {
+    const e = base([creneau('a'), creneau('b', { debut: `${J}T16:00` })])
+    expect(cibleMois(e, groupe(['a', 'b'], 'b'), '2026-11-07')).toBeNull()
+    expect(creneauFantome(e, groupe(['a', 'b'], 'b'))).toBe(e.creneaux.b)
+  })
+})
+
 describe('cibleMois (dépôt sur un jour de la vue Mois)', () => {
   it('jour libre : début de la journée', () => {
     const e = base()

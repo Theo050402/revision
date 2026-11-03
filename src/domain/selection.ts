@@ -1,7 +1,7 @@
 // Sélection par zone et dépôt de groupe (spec amélioration D.1, D.3, D.4) : fonctions pures.
 // Tout est en minutes depuis minuit : le défilement de la grille n'intervient jamais ici.
 import { retirer, vueJour, type Res } from './actions-creneaux'
-import { ajouterJours, jourDe, local, minutesDe } from './temps'
+import { ajouterJours, ecartJours, jourDe, local, minutesDe } from './temps'
 import type { Creneau, Etat } from './types'
 
 /** Rectangle du lasso : jours inclus, minutes depuis minuit. */
@@ -33,6 +33,8 @@ export function creneauxDansZone(e: Etat, z: Zone): string[] {
  * Accepté seulement si chaque membre tient librement à sa nouvelle place : dans les bornes de
  * la journée, hors indisponibilité, hors créneau non sélectionné (intervalles semi-ouverts).
  * Les membres peuvent se suivre ou prendre la place l'un de l'autre. Pas de poussée en cascade.
+ * Un décalage non entier (NaN, infini, fraction) est refusé : il ne peut venir que d'un appelant fautif, et le refus
+ * ramène le groupe à son origine sans rien écrire, comme tout dépôt impossible.
  */
 export function deplacerGroupe(
   e: Etat,
@@ -40,6 +42,7 @@ export function deplacerGroupe(
   decalageJours: number,
   decalageMinutes: number,
 ): Res {
+  if (!Number.isInteger(decalageJours) || !Number.isInteger(decalageMinutes)) return { ok: false }
   const membres: Creneau[] = []
   const vus = new Set<string>()
   for (const id of ids) {
@@ -70,13 +73,22 @@ export function deplacerGroupe(
     if (poses.some((p) => !vus.has(p.id) && debut < p.debut + p.duree && fin > p.debut)) {
       return { ok: false }
     }
-    const nouveau = local(jour, debut)
-    if (nouveau !== c.debut) maj[c.id] = { ...c, debut: nouveau, version: c.version + 1 }
+    // Décalage non nul et nouvelle place dans les bornes de sa journée : le début change forcément.
+    maj[c.id] = { ...c, debut: local(jour, debut), version: c.version + 1 }
   }
 
   // Les membres gardent leurs écarts relatifs : on ne juge pas leurs chevauchements entre eux.
-  if (Object.keys(maj).length === 0) return { ok: true, etat: e, versBac: 0 }
   return { ok: true, etat: { ...e, creneaux: { ...e.creneaux, ...maj } }, versBac: 0 }
+}
+
+/**
+ * Décalage d'un groupe dont l'ancre (le créneau saisi) vise `cible` : jours entre son jour et le jour visé, minutes
+ * entre son début et l'heure visée (déjà magnétisée au pas, comme pour un créneau seul). `null` si l'ancre n'est pas
+ * placée. Calcul sur les jours naïfs (UTC) : un changement d'heure ne décale rien.
+ */
+export function decalageGroupe(ancre: Creneau, cible: { jour: string; t: number }): { jours: number; minutes: number } | null {
+  if (ancre.debut === null) return null
+  return { jours: ecartJours(jourDe(ancre.debut), cible.jour), minutes: cible.t - minutesDe(ancre.debut) }
 }
 
 /** Supprime un groupe de créneaux ; les exportés passent en suppression en attente (§12.1). */

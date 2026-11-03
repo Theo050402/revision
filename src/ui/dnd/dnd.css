@@ -176,6 +176,46 @@
   outline-offset: -2px;
 }
 
+/* Groupe (spec §D.3) : les copies des autres membres, sous celle de l'ancre, visibles seulement dans la zone de la
+   grille (`clip-path` posé à la saisie). Le porteur suit le doigt ; chaque copie est à son écart et se soulève autour
+   de son centre. */
+.copie-groupe {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  pointer-events: none;
+}
+
+.copie-groupe[data-visible='false'] {
+  visibility: hidden;
+}
+
+.copie-groupe-porteur {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  will-change: transform, opacity;
+}
+
+.copie-groupe .copie-membre {
+  left: 0;
+  right: auto;
+  top: 0;
+  transform-origin: 50% 50%;
+  background-color: var(--bg);
+  box-shadow:
+    inset 0 0 22px -10px color-mix(in srgb, var(--teinte) var(--bloc-lueur), transparent),
+    0 18px 36px -10px rgb(0 0 0 / 0.38),
+    0 4px 12px -2px rgb(0 0 0 / 0.2);
+}
+
+.copie-groupe[data-refus='true'] .copie-membre {
+  outline: 2px solid var(--now);
+  outline-offset: -2px;
+}
+
 /* Le texte garde l'encre sur fond (contraste AA) ; seul un anneau rouge signale le refus. */
 .copie[data-refus='true'] .copie-heure {
   box-shadow:

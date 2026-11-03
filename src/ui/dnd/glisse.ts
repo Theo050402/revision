@@ -3,7 +3,8 @@
 // change pendant le geste, et uniquement quand la minute magnétisée, la cible ou la moitié changent.
 import { create } from 'zustand'
 import type { Cible } from '../../domain/actions-creneaux'
-import { jourDe, minutesDe } from '../../domain/temps'
+import { decalageGroupe } from '../../domain/selection'
+import { ajouterJours, jourDe, minutesDe } from '../../domain/temps'
 import type { Creneau } from '../../domain/types'
 import { heureCourte } from '../calendrier/etiquette'
 import { libelleJourCourt } from '../periode'
@@ -29,9 +30,31 @@ export type Glisse = {
   apercu: Apercu | null
   /** Créneau que dessine le fantôme quand l'aperçu n'en donne pas (refus) : calculé une fois au début. */
   fantome: Creneau | null
+  /** Groupe (spec §D.3) : ses créneaux placés, relevés au début ; chacun a son emplacement. Vide sinon. */
+  membres: readonly Creneau[]
 }
 
-export const GLISSE_VIDE: Glisse = { source: null, depuisFeuille: false, prise: 0, survol: null, apercu: null, fantome: null }
+export const GLISSE_VIDE: Glisse = {
+  source: null,
+  depuisFeuille: false,
+  prise: 0,
+  survol: null,
+  apercu: null,
+  fantome: null,
+  membres: [],
+}
+
+/** Créneaux déplacés par le geste (estompés à leur place d'origine) : le créneau glissé, ou tout le groupe. */
+export function idsSource(source: Source | null): string[] {
+  if (source?.type === 'creneau') return [source.id]
+  if (source?.type === 'groupe') return source.ids
+  return []
+}
+
+/** Le créneau qui porte l'emplacement principal : le créneau glissé, l'ancre d'un groupe ; `null` pour des items. */
+export function idPrincipal(source: Source | null): string | null {
+  return source?.type === 'creneau' ? source.id : source?.type === 'groupe' ? source.ancre : null
+}
 
 export const useGlisse = create<Glisse>()(() => GLISSE_VIDE)
 
@@ -119,8 +142,8 @@ export function pointeurOccupe(): boolean {
 /** Emplacement d'atterrissage dans une colonne. `principal` : celui que rejoint la copie au lâcher. */
 export type FantomeColonne = { creneau: Creneau; debut: number; refus: boolean; principal: boolean }
 export type ApercuColonne = {
-  /** Créneau glissé (estompé à sa place d'origine), quel que soit le jour visé. */
-  idSource: string | null
+  /** Créneaux glissés (estompés à leur place d'origine), quel que soit le jour visé. */
+  sources: string[]
   /** Créneaux de ce jour qui s'écartent : nouveau début (minutes). */
   debuts: Record<string, number>
   /** Emplacements d'atterrissage posés ce jour-là. */
@@ -133,22 +156,25 @@ export type ApercuColonne = {
 /**
  * Ce que l'aperçu change dans une colonne : les créneaux de ce jour qui s'écartent, les emplacements posés ce
  * jour-là (sinon, en cas de refus, le créneau glissé à l'heure visée), la teinte de refus et l'éclairage.
+ * Un groupe a un emplacement par membre, dans le jour de sa nouvelle place, rouges en cas de refus.
  */
 export function apercuColonne(s: Glisse, jour: string): ApercuColonne {
   const { source, apercu: vu, fantome } = s
-  const idSource = source?.type === 'creneau' ? source.id : null
+  const sources = idsSource(source)
   const debuts: Record<string, number> = {}
   const fantomes: FantomeColonne[] = []
   const survol = s.survol?.type === 'colonne' && s.survol.cible.jour === jour ? s.survol : null
   if (vu?.ok) {
     for (const [id, debut] of Object.entries(vu.positions)) {
-      if (id !== idSource && jourDe(debut) === jour && !id.startsWith('apercu-')) debuts[id] = minutesDe(debut)
+      if (!sources.includes(id) && jourDe(debut) === jour && !id.startsWith('apercu-')) debuts[id] = minutesDe(debut)
     }
   }
-  if (survol && source) {
+  if (source?.type === 'groupe') {
+    if (s.survol?.type === 'colonne' && vu) fantomes.push(...emplacementsGroupe(s, s.survol.cible, jour, !vu.ok))
+  } else if (survol && source) {
     if (vu?.ok) {
-      if (idSource !== null) {
-        const debut = vu.positions[idSource] ?? fantome?.debut
+      if (source.type === 'creneau') {
+        const debut = vu.positions[source.id] ?? fantome?.debut
         if (fantome && debut && jourDe(debut) === jour) {
           fantomes.push({ creneau: fantome, debut: minutesDe(debut), refus: false, principal: true })
         }
@@ -164,7 +190,26 @@ export function apercuColonne(s: Glisse, jour: string): ApercuColonne {
       fantomes.push({ creneau: fantome, debut: survol.cible.t, refus: vu !== null, principal: true })
     }
   }
-  return { idSource, debuts, fantomes, refus: survol !== null && vu !== null && !vu.ok, visee: survol !== null }
+  return { sources, debuts, fantomes, refus: survol !== null && vu !== null && !vu.ok, visee: survol !== null }
+}
+
+/**
+ * Emplacements des membres d'un groupe qui tombent le jour `jour` : chacun décalé comme l'ancre (`decalageGroupe`,
+ * le même calcul que le lâcher). Un membre poussé hors de sa journée (avant minuit, après minuit) n'en a pas.
+ */
+function emplacementsGroupe(s: Glisse, cible: Cible, jour: string, refus: boolean): FantomeColonne[] {
+  const ancre = s.fantome
+  const d = ancre ? decalageGroupe(ancre, cible) : null
+  if (!d || s.source?.type !== 'groupe') return []
+  const principal = s.source.ancre
+  const fantomes: FantomeColonne[] = []
+  for (const m of s.membres) {
+    if (m.debut === null || ajouterJours(jourDe(m.debut), d.jours) !== jour) continue
+    const debut = minutesDe(m.debut) + d.minutes
+    if (debut < 0 || debut >= 1440) continue
+    fantomes.push({ creneau: m, debut, refus, principal: m.id === principal })
+  }
+  return fantomes
 }
 
 /**
@@ -175,12 +220,12 @@ export function cleColonne(s: Glisse, jour: string): string {
   const a = apercuColonne(s, jour)
   const d = Object.entries(a.debuts).map(([id, m]) => `${id}@${m}`).sort().join(',')
   const f = a.fantomes.map((x) => `${x.creneau.id}@${x.debut}${x.refus ? '!' : ''}${x.principal ? '*' : ''}`).join(',')
-  return `${a.idSource ?? ''}|${d}|${f}|${a.refus}|${a.visee}`
+  return `${a.sources.join(',')}|${d}|${f}|${a.refus}|${a.visee}`
 }
 
 // ───────────────── Emplacement principal ─────────────────
 
-/** Où le lâcher poserait le créneau glissé (ou le premier des nouveaux), minutes depuis minuit. */
+/** Où le lâcher poserait le créneau glissé (l'ancre d'un groupe, ou le premier des nouveaux), minutes depuis minuit. */
 export type Emplacement = { creneau: Creneau; jour: string; debut: number; refus: boolean }
 
 /**
@@ -193,8 +238,9 @@ export function emplacementPrincipal(s: Glisse): Emplacement | null {
   const cible = survol?.type === 'colonne' || survol?.type === 'mois' ? survol.cible : null
   if (!source || !cible) return null
   if (vu?.ok) {
-    if (source.type === 'creneau') {
-      const debut = vu.positions[source.id] ?? fantome?.debut
+    const id = idPrincipal(source)
+    if (id !== null) {
+      const debut = vu.positions[id] ?? fantome?.debut
       return fantome && debut ? { creneau: fantome, jour: jourDe(debut), debut: minutesDe(debut), refus: false } : null
     }
     const n = vu.nouveaux[0]

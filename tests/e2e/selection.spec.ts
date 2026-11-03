@@ -9,6 +9,7 @@ import { deplacer, images, lacher, pointGrille, pointeur, saisir, type Point } f
 // 292 de 13 h 30 à 15 h 30 ; vendredi 301 à 14 h et 291 à 17 h). Gestes : pointeurs tactiles (voir gestes.ts).
 
 const LUNDI = '2026-11-02'
+const MARDI = '2026-11-03'
 const MERCREDI = '2026-11-04'
 const JEUDI = '2026-11-05'
 const VENDREDI = '2026-11-06'
@@ -301,6 +302,229 @@ test.describe('Sélection par zone', () => {
   })
 })
 
+// Déplacer le groupe (spec §D.3) : appui long sur un créneau sélectionné puis glisser ; tout le groupe se soulève et
+// suit le doigt avec ses écarts, un emplacement par créneau ; il se pose seulement si chacun tient librement.
+test.describe('Déplacer une sélection en groupe', () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 900, 'sélection au lasso : vue Semaine (iPad)')
+
+  const copie = (page: Page) => page.locator('[data-copie]')
+  const membre = (page: Page, id: string) => page.locator(`[data-copie-membre="${id}"]`)
+  const atterrissages = (page: Page) => page.locator('[data-atterrissage]')
+  const dans = (page: Page, jour: string) => page.locator(`.colonne[data-jour="${jour}"] [data-atterrissage]`)
+  const badge = (page: Page) => page.locator('.btn-export .export-badge')
+
+  /** Retours haptiques : `navigator.vibrate` (absent du WebKit de bureau) est ajouté et relevé. */
+  async function guetterHaptique(page: Page): Promise<void> {
+    await page.addInitScript(() => {
+      const w = window as unknown as { __vibrations: unknown[] }
+      w.__vibrations = []
+      Object.defineProperty(navigator, 'vibrate', {
+        configurable: true,
+        value: (motif: unknown) => {
+          w.__vibrations.push(motif)
+          return true
+        },
+      })
+    })
+  }
+  const vibrations = (page: Page) => page.evaluate(() => (window as unknown as { __vibrations: unknown[] }).__vibrations)
+
+  /** Point de prise d'un créneau : 10 px sous son haut. */
+  async function prise(page: Page, id: string): Promise<Point> {
+    const b = (await bloc(page, id).boundingBox())!
+    return { x: b.x + b.width / 2, y: b.y + 10 }
+  }
+
+  type Image = { phase: string; r: { x: number; y: number; w: number; h: number } | null }
+  /** Lâche en `p` et relève, image par image, la copie du membre `id` et la phase de la copie, jusqu'à disparition. */
+  const lacherEtSuivre = (page: Page, p: Point, id: string) =>
+    page.evaluate(
+      ({ x, y, id }) =>
+        new Promise<Image[]>((fini) => {
+          const sous = document.elementFromPoint(x, y) ?? document.body
+          sous.dispatchEvent(
+            new PointerEvent('pointerup', {
+              bubbles: true,
+              cancelable: true,
+              clientX: x,
+              clientY: y,
+              pointerId: 7,
+              pointerType: 'touch',
+              isPrimary: true,
+              button: 0,
+              buttons: 0,
+            }),
+          )
+          const vu: Image[] = []
+          const debut = performance.now()
+          const image = () => {
+            const boite = document.querySelector<HTMLElement>('[data-copie]')!
+            const el = document.querySelector<HTMLElement>(`[data-copie-membre="${id}"]`)
+            const r = el?.getBoundingClientRect()
+            vu.push({ phase: boite.dataset.phase ?? '', r: r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null })
+            if (boite.dataset.visible !== 'true' || performance.now() - debut > 3000) return fini(vu)
+            requestAnimationFrame(image)
+          }
+          image()
+        }),
+      { x: p.x, y: p.y, id },
+    )
+
+  test('appui long sur un sélectionné, +1 jour : tout le groupe suit, un emplacement par créneau ; lâcher, ↶ en un pas', async ({ page }) => {
+    await guetterHaptique(page)
+    // Sans 304 (jeudi 14 h) : 292 (mer. 13 h 30 – 15 h 30) tient le jeudi.
+    await ouvrir(page, { sansCreneaux: ['c3:304'] })
+    await lassoLundiMercredi(page)
+    const origineD = (await bloc(page, 'cr-d').boundingBox())!
+    const de = await prise(page, 'cr-a')
+    const vers = await pointGrille(page, MERCREDI, 14, 0, 10)
+    await saisir(page, de, vers)
+
+    // Tout le groupe se soulève : la copie de l'ancre et celle de l'autre membre ; les originaux restent, estompés.
+    await expect(copie(page)).toHaveAttribute('data-visible', 'true')
+    await expect(page.locator('[data-copie-membre]')).toHaveCount(1)
+    await expect(membre(page, 'cr-d')).toBeVisible()
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-source', 'true')
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-source', 'true')
+    await expect(bloc(page, 'cr-d')).toHaveCSS('opacity', '0.35')
+
+    // Un emplacement par créneau, à sa nouvelle place (écarts de jours et d'heures gardés).
+    await expect(atterrissages(page)).toHaveCount(2)
+    await expect(dans(page, MERCREDI)).toHaveAttribute('data-atterrissage', `${MERCREDI}T14:00`)
+    await expect(dans(page, JEUDI)).toHaveAttribute('data-atterrissage', `${JEUDI}T13:30`)
+    await expect(page.locator('[data-atterrissage][data-refus]')).toHaveCount(0)
+
+    // La copie du membre suit le doigt 1:1, à son écart d'origine (son centre : ni l'échelle ni l'angle ne le déplacent).
+    await page.waitForTimeout(400) // soulèvement et frémissement terminés
+    const centreMembre = async () => {
+      const r = (await membre(page, 'cr-d').boundingBox())!
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+    }
+    const c1 = await centreMembre()
+    expect(Math.abs(c1.x - (origineD.x + origineD.width / 2) - (vers.x - de.x))).toBeLessThan(1)
+    expect(Math.abs(c1.y - (origineD.y + origineD.height / 2) - (vers.y - de.y))).toBeLessThan(1)
+    const ailleurs = { x: vers.x + 9, y: vers.y + 4 }
+    await deplacer(page, vers, ailleurs, 2)
+    const c2 = await centreMembre()
+    expect(Math.abs(c2.x - c1.x - 9)).toBeLessThan(0.5)
+    expect(Math.abs(c2.y - c1.y - 4)).toBeLessThan(0.5)
+    await deplacer(page, ailleurs, vers, 2)
+
+    // Au lâcher, la copie du membre arrive exactement sur son emplacement, où le créneau est posé, puis s'efface.
+    const trace = await lacherEtSuivre(page, vers, 'cr-d')
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MERCREDI}T14:00`)
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-debut', `${JEUDI}T13:30`)
+    const arrivee = trace.find((i) => i.phase === 'relais' && i.r !== null)
+    expect(arrivee).toBeDefined()
+    const pose = (await bloc(page, 'cr-d').boundingBox())!
+    expect(Math.abs(arrivee!.r!.x - pose.x)).toBeLessThan(1.5)
+    expect(Math.abs(arrivee!.r!.y - pose.y)).toBeLessThan(1.5)
+    expect(Math.abs(arrivee!.r!.h - pose.height)).toBeLessThan(1.5)
+    await expect(copie(page)).toHaveAttribute('data-visible', 'false')
+    await expect(page.locator('[data-copie-membre]')).toHaveCount(0)
+    expect(await vibrations(page)).toContainEqual([10, 40, 10]) // succès
+    // La sélection est gardée.
+    await expect(barre(page)).toContainText('2 sélectionnés')
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-selectionne', '')
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-selectionne', '')
+
+    // Un seul pas d'annulation pour tout le groupe.
+    await page.getByRole('button', { name: 'Annuler' }).tap()
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MARDI}T14:00`)
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-debut', `${MERCREDI}T13:30`)
+    await expect(page.getByRole('button', { name: 'Annuler' })).toBeDisabled()
+  })
+
+  test('un groupe qui tomberait sur le stage est refusé : emplacements rouges, retour à l’origine, rien d’écrit', async ({ page }) => {
+    await guetterHaptique(page)
+    await ouvrir(page)
+    await lassoLundiMercredi(page)
+    const origineD = (await bloc(page, 'cr-d').boundingBox())!
+    const de = await prise(page, 'cr-a')
+    // 2 h plus haut : 300 à mardi 12 h, dans le stage (8 h – 13 h) ; 292 irait mercredi 11 h 30, libre.
+    const vers = await pointGrille(page, MARDI, 12, 0, 10)
+    await saisir(page, de, vers)
+    await expect(dans(page, MARDI)).toHaveAttribute('data-refus', 'true')
+    await expect(page.locator(`.colonne[data-jour="${MARDI}"]`)).toHaveAttribute('data-refus', 'true')
+    await expect(dans(page, MERCREDI)).toHaveAttribute('data-atterrissage', `${MERCREDI}T11:30`)
+    await expect(dans(page, MERCREDI)).toHaveAttribute('data-refus', 'true')
+    await expect(copie(page)).toHaveAttribute('data-refus', 'true')
+    await expect(page.locator('[data-copie-groupe]')).toHaveAttribute('data-refus', 'true')
+
+    // Au lâcher, la copie du membre revient exactement sur son créneau d'origine, puis tout s'efface.
+    const trace = await lacherEtSuivre(page, vers, 'cr-d')
+    const arrivee = trace.find((i) => i.phase === 'relais' && i.r !== null)
+    expect(arrivee).toBeDefined()
+    expect(Math.abs(arrivee!.r!.x - origineD.x)).toBeLessThan(1.5)
+    expect(Math.abs(arrivee!.r!.y - origineD.y)).toBeLessThan(1.5)
+    expect(Math.abs(arrivee!.r!.w - origineD.width)).toBeLessThan(1.5)
+    await expect(copie(page)).toHaveAttribute('data-visible', 'false')
+    expect(await vibrations(page)).toContainEqual([20, 60, 20]) // erreur
+    expect(await vibrations(page)).not.toContainEqual([10, 40, 10])
+
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MARDI}T14:00`)
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-debut', `${MERCREDI}T13:30`)
+    await expect(page.getByRole('button', { name: 'Annuler' })).toBeDisabled()
+    await expect(barre(page)).toContainText('2 sélectionnés')
+  })
+
+  test('vigilance 4 : un créneau exporté du groupe, ↶ après le déplacement le remet « non modifié »', async ({ page }) => {
+    await ouvrir(page, { sansCreneaux: ['c3:304'] })
+    const avant = Number(await badge(page).textContent())
+    await lassoLundiMercredi(page)
+    // 292 (cr-d) est exporté : pas de point « non exporté ».
+    await expect(bloc(page, 'cr-d').locator('[data-marque="non-exporte"]')).toHaveCount(0)
+    const vers = await pointGrille(page, MERCREDI, 14, 0, 10)
+    await saisir(page, await prise(page, 'cr-a'), vers)
+    await lacher(page, vers)
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-debut', `${JEUDI}T13:30`)
+    // Déplacé : modifié depuis l'export.
+    await expect(bloc(page, 'cr-d').locator('[data-marque="non-exporte"]')).toHaveCount(1)
+    await expect(badge(page)).toHaveText(String(avant + 1))
+
+    await page.getByRole('button', { name: 'Annuler' }).tap()
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-debut', `${MERCREDI}T13:30`)
+    await expect(bloc(page, 'cr-d').locator('[data-marque="non-exporte"]')).toHaveCount(0)
+    await expect(badge(page)).toHaveText(String(avant))
+    await expect(page.getByRole('button', { name: 'Annuler' })).toBeDisabled()
+  })
+
+  test('appui long sur un créneau non sélectionné : il se déplace seul, la sélection ne change pas', async ({ page }) => {
+    await ouvrir(page)
+    await lassoLundiMercredi(page)
+    // 301 (vendredi 14 h) → samedi 14 h.
+    const vers = await pointGrille(page, SAMEDI, 14, 0, 10)
+    await saisir(page, await prise(page, 'cr-f'), vers)
+    await expect(atterrissages(page)).toHaveCount(1)
+    await expect(page.locator('[data-copie-membre]')).toHaveCount(0)
+    await expect(bloc(page, 'cr-a')).not.toHaveAttribute('data-source', 'true')
+    await lacher(page, vers)
+    await expect(bloc(page, 'cr-f')).toHaveAttribute('data-debut', `${SAMEDI}T14:00`)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', `${MARDI}T14:00`)
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-debut', `${MERCREDI}T13:30`)
+    await expect(barre(page)).toContainText('2 sélectionnés')
+    await expect(bloc(page, 'cr-f')).not.toHaveAttribute('data-selectionne', '')
+  })
+
+  test('600 ms contre le bord droit : semaine suivante, le groupe continue et se pose ; la barre compte le hors-vue', async ({ page }) => {
+    await ouvrir(page)
+    await lassoLundiMercredi(page)
+    const d = (await page.locator('.calendrier-defilement').boundingBox())!
+    const bord = { x: d.x + d.width - 8, y: (await pointGrille(page, MARDI, 14, 0, 10)).y }
+    await saisir(page, await prise(page, 'cr-a'), bord)
+    await expect(page.locator('.colonne[data-jour="2026-11-15"]')).toHaveCount(1, { timeout: 3000 })
+    await expect(copie(page)).toHaveAttribute('data-visible', 'true')
+    // L'ancre vise dimanche 15 (+12 jours) ; 292 irait lundi 16, hors de la vue : un seul emplacement visible.
+    await expect(dans(page, '2026-11-15')).toHaveAttribute('data-atterrissage', '2026-11-15T14:00')
+    await expect(atterrissages(page)).toHaveCount(1)
+    await lacher(page, bord)
+    await expect(bloc(page, 'cr-a')).toHaveAttribute('data-debut', '2026-11-15T14:00')
+    await expect(barre(page)).toContainText('2 sélectionnés · 1 hors de la vue')
+    await page.getByRole('button', { name: 'Semaine suivante' }).tap()
+    await expect(bloc(page, 'cr-d')).toHaveAttribute('data-debut', '2026-11-16T13:30')
+  })
+})
+
 // Captures (rapport de la tâche 11 des améliorations) : `CAPTURES=1 npx playwright test selection --project=ipad -g captures`.
 test.describe('captures : sélection', () => {
   test.skip(!process.env.CAPTURES, 'captures à la demande')
@@ -317,6 +541,23 @@ test.describe('captures : sélection', () => {
       await lacher(page, vers)
       await page.waitForTimeout(600)
       await page.screenshot({ path: `${dossier}/task-11-ipad-${theme}-barre.png` })
+    })
+
+    // Tâche 12 : groupe soulevé (+1 jour, accepté) puis visé sur le stage (refus).
+    test(`captures groupe ${theme}`, async ({ page }) => {
+      await ouvrir(page, { sansCreneaux: ['c3:304'], ...(theme === 'sombre' ? { reglages: { theme: 'sombre' } } : {}) })
+      await lassoLundiMercredi(page)
+      const b = (await bloc(page, 'cr-a').boundingBox())!
+      const de = { x: b.x + b.width / 2, y: b.y + 10 }
+      const vers = await pointGrille(page, MERCREDI, 14, 0, 10)
+      await saisir(page, de, { x: vers.x - 30, y: vers.y })
+      await page.waitForTimeout(400)
+      await page.screenshot({ path: `${dossier}/task-12-ipad-${theme}-groupe.png` })
+      const stage = await pointGrille(page, MARDI, 12, 0, 10)
+      await deplacer(page, { x: vers.x - 30, y: vers.y }, stage)
+      await page.waitForTimeout(300)
+      await page.screenshot({ path: `${dossier}/task-12-ipad-${theme}-refus.png` })
+      await lacher(page, stage)
     })
   }
 })

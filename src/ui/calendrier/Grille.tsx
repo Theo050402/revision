@@ -1,7 +1,8 @@
 // Grille semaine / jour (spec §9.1, §9.3) : une colonne par jour affiché, axe des heures commun.
 // Seuls les jours de `jours` sont rendus. `.grille` publie `data-px-heure`, `data-plage-debut` et `data-plage-fin` ;
 // chaque `.colonne[data-jour]` commence à la minute `plage.debut` (voir geometrie.ts).
-// Gestes : appui long sur un créneau puis glisser (dnd-kit, délégué au corps de la grille), poignée du bord bas
+// Gestes : appui long sur un créneau puis glisser (dnd-kit, délégué au corps de la grille ; sur un créneau
+// sélectionné, toute la sélection, spec §D.3), poignée du bord bas
 // (durée), tap sur un emplacement libre (« Pour combler ce trou »), appui long sur un emplacement libre puis glisser
 // (lasso de sélection, spec §D.1). En mode sélection (§D.2), toucher un créneau l'ajoute ou le retire au lieu
 // d'ouvrir sa fiche ; toucher un emplacement libre quitte le mode et retient l'emplacement sans ouvrir la
@@ -13,7 +14,7 @@ import { hm, minutesDe } from '../../domain/temps'
 import type { Etat } from '../../domain/types'
 import { Atterrissage, Eclairage } from '../dnd/Atterrissage'
 import { SourceGlisse } from '../dnd/ContexteDnd'
-import { apercuColonne, cleColonne, useGlisse, useRedim } from '../dnd/glisse'
+import { apercuColonne, cleColonne, useGlisse, useRedim, type Source } from '../dnd/glisse'
 import { libelleJourCourt } from '../periode'
 import { Lasso } from '../selection/Lasso'
 import { enSelection, quitterSelection, useSelection } from '../selection/useSelection'
@@ -48,13 +49,18 @@ function useStable<A extends unknown[]>(f: ((...a: A) => void) | undefined): (..
   return useCallback((...a: A) => r.current?.(...a), [])
 }
 
-/** Le bloc saisi pendant un appui long : un créneau (pas sa poignée), le doigt gardant sa prise dans le bloc. */
-function trouverBloc(cible: HTMLElement, e: PointerEvent) {
+/**
+ * Le bloc saisi pendant un appui long : un créneau (pas sa poignée), le doigt gardant sa prise dans le bloc. Un
+ * créneau sélectionné emporte toute la sélection (spec §D.3) ; un créneau non sélectionné se déplace seul.
+ */
+function trouverBloc(cible: HTMLElement, e: PointerEvent): { source: Source; prise: number } | null {
   if (cible.closest('.poignee-redim')) return null
   const bloc = cible.closest<HTMLElement>('.bloc-creneau[data-creneau]')
   if (!bloc) return null
+  const id = bloc.dataset.creneau as string
+  const selection = useSelection.getState().ids
   return {
-    source: { type: 'creneau' as const, id: bloc.dataset.creneau as string },
+    source: selection.has(id) ? { type: 'groupe', ids: [...selection], ancre: id } : { type: 'creneau', id },
     prise: e.clientY - bloc.getBoundingClientRect().top,
   }
 }
@@ -221,7 +227,7 @@ const ColonneJour = memo(function ColonneJour({
 }: ColonneProps) {
   // Aperçu du glisser en cours, réduit à ce jour : la colonne ne se redessine que si ce qui la concerne change.
   const cle = useGlisse((s) => cleColonne(s, jour))
-  const { idSource, debuts, fantomes, refus, visee } = useMemo(() => apercuColonne(useGlisse.getState(), jour), [cle, jour])
+  const { sources, debuts, fantomes, refus, visee } = useMemo(() => apercuColonne(useGlisse.getState(), jour), [cle, jour])
   const teinteVisee = visee ? teinteDuCollege(useGlisse.getState().fantome?.itemId, items, colleges) : undefined
   const redim = useRedim((s) => (s.id !== null && blocs.creneaux.some((c) => c.id === s.id) ? s : AUCUN_REDIM))
 
@@ -282,7 +288,7 @@ const ColonneJour = memo(function ColonneJour({
             haut={y(debut)}
             hauteur={hauteur}
             decalage={decalage}
-            source={c.id === idSource}
+            source={sources.includes(c.id)}
             onOuvrir={onOuvrirCreneau}
           />
         )
